@@ -1,0 +1,21 @@
+[package]
+name = "matter-vault-ffi"
+description = "C ABI over matter-vault-core, the foundation for the Go (cgo) binding and any other C-compatible consumer of MatterVault."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+# `staticlib` + `cdylib` so consumers can link statically (cgo) or dynamically.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+matter-vault-core = { workspace = true }
+
+[lints]
+workspace = true

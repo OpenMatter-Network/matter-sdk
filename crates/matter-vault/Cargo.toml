@@ -1,0 +1,39 @@
+[package]
+name = "matter-vault"
+description = "The Rust SDK for MatterVault: seal secrets under the matter-kgc committee and recover them via a signed, threshold /partial-decrypt quorum. Wraps the pure matter-vault-core with a committee HTTP client, quorum orchestration, a bring-your-own Signer abstraction, and on-chain call builders."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+matter-vault-core = { workspace = true }
+# Re-used for the on-chain extrinsic argument types in `calls`.
+matter-kgc-config = { workspace = true, features = ["wire"] }
+
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+# Committee HTTP transport. The caller drives the async runtime (e.g. tokio).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# sr25519 signing for the Substrate auth path. `default-features = false` keeps
+# the heavy `subxt` client out; we only need the keypair + signing primitive,
+# which is byte-compatible with the chain's `MultiSignature` verification.
+subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+
+[dev-dependencies]
+# The fake-committee integration test computes *real* partials with matter-crypto.
+matter-crypto = { workspace = true }
+bincode = { workspace = true }
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

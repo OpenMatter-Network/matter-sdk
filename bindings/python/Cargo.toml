@@ -1,0 +1,16 @@
+[package]
+name = "matter-vault-python"
+description = "PyO3 binding over matter-vault-core for the Python MatterVault SDK."
+version = "0.1.0"
+license = "Apache-2.0"
+authors = ["Open Matter <admin@openmatter.network>"]
+edition = "2021"
+publish = false
+
+[lib]
+name = "matter_vault"
+crate-type = ["cdylib"]
+
+[dependencies]
+matter-vault-core = { path = "../../crates/matter-vault-core" }
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }

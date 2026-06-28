@@ -1,0 +1,6 @@
+[net]
+# Fetch any git dependencies (matter-crypto et al. in the release configuration)
+# via the system `git` CLI so it uses your existing GitHub SSH credentials
+# instead of cargo's built-in libgit2. No effect while the sibling crates are
+# path dependencies.
+git-fetch-with-cli = true

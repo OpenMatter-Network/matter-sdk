@@ -1,0 +1,72 @@
+# Workspace root for MatterSDK — the polyglot client SDK for the matter-kgc
+# committee, published under the product name "MatterVault".
+#
+# Layout (see README.md for the full picture):
+#   crates/matter-vault-core/ — PURE, non-networked crypto + wire contract.
+#                               The single source of cryptographic truth; the
+#                               source for every language binding.
+#   crates/matter-vault/      — the Rust SDK: committee HTTP client, quorum
+#                               orchestration, Signer abstraction, call builders.
+#   crates/matter-vault-ffi/  — C ABI (cdylib) over the core, for the Go binding.
+#   bindings/wasm/            — wasm-bindgen binding over the core (drives the TS SDK).
+#   bindings/python/          — PyO3/maturin binding over the core (scaffold).
+#
+# Dependency policy
+# -----------------
+# The novel RLWE/BGV threshold cryptography lives in `matter-crypto`; the HTTP
+# wire types live in `matter-kgc-proto`; the on-chain config + versioned proof
+# codec live in `matter-kgc-config`. We DEPEND on those — we never re-implement
+# them (one audited implementation, no cross-language drift).
+#
+# For local development these are PATH dependencies on sibling checkouts. At
+# release they switch to pinned git tags (the matter-kgc convention). Keeping
+# them as paths here guarantees an offline, reproducible build of the tracer.
+# Expected sibling layout:
+#   ../matter-crypto/crypto
+#   ../matter-kgc/kgc-proto
+#   ../matter-kgc/config-contract
+
+[workspace]
+members = ["crates/matter-vault-core", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e"]
+# The wasm and python bindings build through their own toolchains (wasm-pack,
+# maturin), so they are excluded from the native workspace to keep `cargo build
+# --workspace` native-only.
+exclude = ["bindings/wasm", "bindings/python"]
+resolver = "2"
+
+[workspace.package]
+license = "Apache-2.0"
+authors = ["Open Matter <admin@openmatter.network>"]
+version = "0.1.0"
+homepage = "https://openmatter.network"
+repository = "https://github.com/openmatter-network/matter-sdk"
+edition = "2021"
+rust-version = "1.93"
+
+[workspace.dependencies]
+# --- The cryptographic core we wrap (never re-implement). ---
+# Release form: { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.6.0" }
+matter-crypto = { path = "../matter-crypto/crypto", default-features = false }
+# Release form: { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.7.1" }
+matter-kgc-proto = { path = "../matter-kgc/kgc-proto", default-features = false }
+matter-kgc-config = { path = "../matter-kgc/config-contract", default-features = false }
+
+# --- Local crates. ---
+matter-vault-core = { path = "crates/matter-vault-core", default-features = false }
+
+# --- Shared third-party deps (versions aligned with the matter-kgc workspace). ---
+serde = { version = "1.0.219", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.132" }
+bincode = "1.3"
+hex = "0.4"
+thiserror = "2"
+zeroize = { version = "1", features = ["alloc", "derive"] }
+rand = "0.8"
+once_cell = "1"
+
+[workspace.lints]
+rust.missing_docs = "deny"
+clippy.all = "deny"
+
+[profile.release]
+opt-level = 3

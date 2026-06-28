@@ -1,0 +1,29 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "matter-vault"
+version = "0.1.0"
+description = "Python SDK for MatterVault (scaffold): threshold secret management on the matter-kgc committee."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Open Matter", email = "admin@openmatter.network" }]
+requires-python = ">=3.9"
+classifiers = [
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+]
+
+[project.optional-dependencies]
+# The online SDK layer (committee client, quorum, chain submission). The crypto
+# surface needs none of this; install with `pip install matter-vault[sdk]`.
+sdk = ["substrate-interface>=1.7"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+# Mixed layout: the compiled core is `matter_vault._native`; the pure-Python
+# orchestration layer lives in python/matter_vault/.
+module-name = "matter_vault._native"
+python-source = "python"

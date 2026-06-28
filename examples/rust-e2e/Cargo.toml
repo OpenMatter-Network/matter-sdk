@@ -1,0 +1,29 @@
+[package]
+name = "matter-vault-e2e"
+description = "Live end-to-end MatterVault test (Rust): seal -> secrets.storeSecret on chain -> read back -> threshold-decrypt from the live committee -> verify. Mirrors examples/e2e (TypeScript)."
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "e2e"
+path = "src/main.rs"
+
+[dependencies]
+# The SDK under test: committee transport, quorum decrypt, Signer, call builders.
+matter-vault = { path = "../../crates/matter-vault" }
+
+# A full Substrate client for the chain half (state-call reads + storeSecret
+# extrinsic). The SDK deliberately leaves submission to your own client; here
+# that client is subxt, the Rust analogue of @polkadot/api in examples/e2e.
+subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"] }
+subxt-signer = { version = "0.44.0", features = ["sr25519"] }
+parity-scale-codec = { version = "3", features = ["derive"] }
+
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+hex = { workspace = true }
+serde_json = { workspace = true }
+
+# Teaching binary, not library API — opt out of the workspace doc/clippy denies.
+[lints]

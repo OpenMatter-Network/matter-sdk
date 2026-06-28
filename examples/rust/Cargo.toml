@@ -1,0 +1,23 @@
+[package]
+name = "matter-vault-example"
+description = "Runnable end-to-end MatterVault demo: seal a secret and recover it from a local in-process committee."
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[dependencies]
+matter-vault = { path = "../../crates/matter-vault" }
+# The demo stands up a throwaway committee in-process to mimic the real flow.
+# A real integration never depends on matter-crypto directly — the committee
+# nodes run it for you, and your app only calls matter-vault.
+matter-crypto = { workspace = true }
+bincode = { workspace = true }
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+
+# This is a teaching binary, not library API.
+[lints]

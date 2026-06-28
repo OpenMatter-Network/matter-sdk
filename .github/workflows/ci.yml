@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # During early access the cryptographic core crates are private siblings.
+  # CI clones them next to the checkout; a read-only deploy key is provided as a
+  # secret. At release these become pinned git-tag / registry dependencies and
+  # this step goes away.
+  FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - name: Fetch core crates (matter-crypto, matter-kgc)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
+      - run: |
+          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
+          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - name: Check fmt
+        working-directory: matter-sdk
+        run: cargo fmt --all --check -- --config ${{ env.FMT_CONFIG }}
+      - name: Clippy
+        working-directory: matter-sdk
+        run: cargo clippy --workspace --all-targets -- -Dwarnings
+      - name: Build
+        working-directory: matter-sdk
+        run: cargo build --workspace
+      - name: Test
+        working-directory: matter-sdk
+        run: cargo test --workspace
+      - name: Build core for wasm32
+        working-directory: matter-sdk
+        run: cargo build -p matter-vault-core --target wasm32-unknown-unknown
+
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
+      - run: |
+          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
+          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with: { targets: wasm32-unknown-unknown }
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build wasm + TS package and run vector conformance
+        working-directory: matter-sdk/packages/typescript
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+  # Bindings below the full-parity line (docs/parity.md). Their crypto surface is
+  # real and conformance-tested; allowed-fail until the orchestration is ported.
+  python:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
+      - run: |
+          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
+          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Build the extension and run conformance
+        working-directory: matter-sdk/bindings/python
+        run: |
+          pip install maturin pytest
+          maturin develop
+          pytest -q
+
+  go:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
+      - run: |
+          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
+          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Build the FFI staticlib and run Go conformance
+        working-directory: matter-sdk
+        run: |
+          cargo build -p matter-vault-ffi --release
+          cd packages/go/mattervault && go test ./...

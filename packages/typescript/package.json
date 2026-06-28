@@ -1,0 +1,24 @@
+{
+  "name": "@openmatter-network/matter-vault",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for MatterVault: seal secrets under the matter-kgc committee and recover them via a signed, threshold partial-decrypt quorum.",
+  "license": "Apache-2.0",
+  "author": "Open Matter <admin@openmatter.network>",
+  "homepage": "https://openmatter.network",
+  "repository": "https://github.com/openmatter-network/matter-sdk",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "wasm"],
+  "scripts": {
+    "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript/wasm --out-name matter_vault_wasm",
+    "build": "npm run build:wasm && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build:wasm && vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@types/node": "^22.0.0"
+  }
+}

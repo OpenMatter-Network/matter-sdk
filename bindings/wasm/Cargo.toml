@@ -1,0 +1,31 @@
+[package]
+name = "matter-vault-wasm"
+description = "wasm-bindgen binding over matter-vault-core: the cryptographic core of MatterVault for JS/TS, built into the @openmatter-network/matter-vault package."
+version = "0.1.0"
+license = "Apache-2.0"
+authors = ["Open Matter <admin@openmatter.network>"]
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The single cryptographic core, shared with the Rust SDK and every other binding.
+matter-vault-core = { path = "../../crates/matter-vault-core" }
+
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+serde = { version = "1", features = ["derive"] }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[features]
+default = ["panic-hook"]
+panic-hook = ["dep:console_error_panic_hook"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3", "--enable-bulk-memory"]

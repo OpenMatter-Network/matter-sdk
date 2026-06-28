@@ -1,0 +1,5 @@
+# Pinned to match the matter-kgc / matter-crypto toolchain so the SDK builds
+# against the exact compiler the cryptographic core is verified on.
+[toolchain]
+channel = "1.93.0"
+targets = ["wasm32-unknown-unknown"]

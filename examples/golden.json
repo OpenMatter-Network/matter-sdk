@@ -1,0 +1,8 @@
+{
+  "aad": "env",
+  "address": "5CP9rhrrqJwLfp8U9bPrsqUJ69fBuB3Dqin2iu8gch1LHdsb",
+  "epoch": 19,
+  "plaintext": "API_KEY=swordfish\nDATABASE_URL=postgres://prod",
+  "rpc_url": "wss://node2.testnet.openmatter.network",
+  "secret_id": "265"
+}
