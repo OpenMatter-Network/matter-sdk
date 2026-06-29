@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>Integrating MatterVault</title>
+  <desc>Your app calls the MatterSDK to encrypt a secret and store the ciphertext on the matter chain, then to decrypt by requesting partial decryptions from a t-of-n matter-kgc committee and aggregating them locally.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#ff5fa2"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c3b4ff"/>
+    </marker>
+    <marker id="arrowT" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5fe6d4"/>
+    </marker>
+  </defs>
+  <style>
+    .card{fill:#ffffff;fill-opacity:.07;stroke:#ffffff;stroke-opacity:.22;stroke-width:1.5}
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .lead{stroke:#c3b4ff;stroke-width:2.5;fill:none}
+    .leadT{stroke:#5fe6d4;stroke-width:2.5;fill:none}
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="1430" cy="80" rx="560" ry="380" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="title" x="800" y="92" text-anchor="middle" font-size="46">Integrating MatterVault</text>
+  <text class="muted" x="800" y="140" text-anchor="middle" font-size="22">Encrypt locally · store the ciphertext on-chain · recover only with a t-of-n committee quorum</text>
+
+  <!-- Your App -->
+  <rect class="card" x="70" y="395" width="235" height="150" rx="18"/>
+  <text class="title" x="187" y="468" text-anchor="middle" font-size="28">Your App</text>
+  <text class="muted" x="187" y="503" text-anchor="middle" font-size="18">your process</text>
+
+  <!-- SDK -->
+  <rect class="card" x="455" y="345" width="330" height="245" rx="20"/>
+  <text class="title" x="620" y="412" text-anchor="middle" font-size="34">MatterSDK</text>
+  <line x1="500" y1="436" x2="740" y2="436" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"/>
+  <text x="620" y="483" text-anchor="middle" font-size="20">Rust · TypeScript</text>
+  <text x="620" y="513" text-anchor="middle" font-size="20">Python · Go</text>
+  <text class="teal" x="620" y="560" text-anchor="middle" font-size="16">encrypt · decrypt orchestration</text>
+
+  <!-- Chain -->
+  <rect class="card" x="1090" y="215" width="370" height="160" rx="18"/>
+  <rect x="1090" y="215" width="7" height="160" rx="3.5" fill="#5fe6d4"/>
+  <text class="title" x="1282" y="288" text-anchor="middle" font-size="27">Matter Chain</text>
+  <text class="muted" x="1282" y="326" text-anchor="middle" font-size="18">stores the ciphertext</text>
+
+  <!-- Committee -->
+  <rect class="card" x="1090" y="560" width="370" height="190" rx="18"/>
+  <rect x="1090" y="560" width="7" height="190" rx="3.5" fill="#ff5fa2"/>
+  <text class="title" x="1282" y="623" text-anchor="middle" font-size="25">matter-kgc committee</text>
+  <text class="muted" x="1282" y="660" text-anchor="middle" font-size="18">any t of n nodes</text>
+  <text class="teal" x="1282" y="698" text-anchor="middle" font-size="17">POST /partial-decrypt ×t</text>
+
+  <!-- App <-> SDK -->
+  <path class="lead" d="M305,455 L450,455" marker-end="url(#arrow)"/>
+  <text class="muted" x="377" y="440" text-anchor="middle" font-size="16">secret</text>
+  <path class="leadT" d="M450,512 L305,512" marker-end="url(#arrowT)"/>
+  <text class="teal" x="377" y="536" text-anchor="middle" font-size="16">plaintext</text>
+
+  <!-- SDK -> Chain (encrypt / store) -->
+  <path class="lead" d="M788,430 C920,400 980,330 1085,300" marker-end="url(#arrow)"/>
+  <text class="muted" x="905" y="330" text-anchor="middle" font-size="17">encrypt() — seal under joint pk</text>
+
+  <!-- SDK -> Committee (request) -->
+  <path class="lead" d="M788,505 C915,545 980,575 1085,605" marker-end="url(#arrow)"/>
+  <text class="muted" x="905" y="540" text-anchor="middle" font-size="17">decrypt() — request t partials</text>
+
+  <!-- Committee -> SDK (partials return) -->
+  <path class="leadT" d="M1088,670 C950,710 880,640 788,575" marker-end="url(#arrowT)"/>
+  <text class="teal" x="900" y="755" text-anchor="middle" font-size="16">t partials → verify + aggregate + open (local)</text>
+
+  <!-- Footer caption -->
+  <rect class="card" x="120" y="800" width="1360" height="64" rx="14" fill-opacity="0.05"/>
+  <text class="muted" x="800" y="833" text-anchor="middle" font-size="19">The SDK seals secrets and aggregates the partials inside your process — no node ever sees your plaintext.</text>
+  <text class="muted" x="800" y="852" text-anchor="middle" font-size="15" fill-opacity="0.85">You keep your own signer and submit the chain call with your Substrate client.</text>
+</svg>

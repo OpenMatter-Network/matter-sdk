@@ -45,7 +45,8 @@ rust-version = "1.93"
 
 [workspace.dependencies]
 # --- The cryptographic core we wrap (never re-implement). ---
-# Release form: { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.6.0" }
+# Release form: { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.8.0" }
+# (local sibling checkout is matter-crypto 0.8.0; the call sites target that API)
 matter-crypto = { path = "../matter-crypto/crypto", default-features = false }
 # Release form: { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.7.1" }
 matter-kgc-proto = { path = "../matter-kgc/kgc-proto", default-features = false }

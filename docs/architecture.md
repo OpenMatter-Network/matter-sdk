@@ -4,20 +4,9 @@ MatterSDK is a polyglot SDK with a single rule: **the cryptography exists once.*
 
 ## One core, many shells
 
-```
-                        crates/matter-vault-core   (PURE crypto + wire contract)
-                        wraps matter-crypto (RLWE/BGV threshold) — never re-implements it
-                                     │
-        ┌──────────────┬─────────────┼──────────────┬───────────────┐
-        │ native       │ wasm-bindgen│ C ABI        │ PyO3          │
-   crates/matter-vault │ bindings/   │ crates/      │ bindings/     │
-   (Rust SDK)          │ wasm        │ matter-vault-│ python        │
-        │              │     │       │ ffi          │     │         │
-        │       packages/typescript │      │        │ (Python ext)  │
-        │       (TS SDK)            │ packages/go   │               │
-        ▼              ▼            ▼ (cgo)         ▼               ▼
-   committee client + quorum + Signer + call builders — idiomatic per language
-```
+<p align="center">
+  <img src="assets/core-shells.svg" alt="A single pure crypto core, crates/matter-vault-core, is shared through four bindings: native Rust, wasm-bindgen to TypeScript, a C ABI to Go, and PyO3 to Python. Every shell adds the same idiomatic committee client, quorum, Signer and call builders" width="900">
+</p>
 
 The **core** does only the cryptography that must never diverge: `encrypt`,
 `verifyPlaintextProof`, `lagrangeFor`, the request `signingPayload`, and
@@ -53,14 +42,9 @@ toolchain in CI). This is what lets ergonomics differ while cryptography cannot.
 
 ## Data flow
 
-```
-SEAL (offline)                STORE (your chain client)        DECRYPT (SDK)
-encrypt(plaintext, aad,  ──►  secrets.storeSecret(           ──►  health-probe nodes
-        jointPk, epoch)         payload, epoch, label, aad)        pick t-of-n quorum
-  → EncryptedSecret             → secret_id (u128)                 sign request once (Signer)
-    {binding_id, capsule,                                          POST /partial-decrypt ×t
-     proof, ct}                                                    verify+aggregate+open → plaintext
-```
+<p align="center">
+  <img src="assets/data-flow.svg" alt="SEAL offline with encrypt(), STORE via your own Substrate client, DECRYPT through the SDK: health-probe, pick a t-of-n quorum, sign once, POST /partial-decrypt to t nodes, then verify, aggregate and open locally to plaintext" width="900">
+</p>
 
 The SDK owns the first and third columns. The middle column — submitting the
 extrinsic and reading chain state (`joint_pk`, `shared_a`, committee roster, per-node

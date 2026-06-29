@@ -81,66 +81,113 @@ where
             active: active.len(),
         });
     }
-
-    // 2. Choose the lowest-indexed `threshold` nodes as the subset `S`.
     active.sort_by_key(|n| n.index);
-    let chosen: Vec<&CommitteeNode> = active.into_iter().take(req.threshold).collect();
-    let subset: Vec<u64> = chosen.iter().map(|n| n.index).collect();
 
-    // 3. Sign once for this (secret, subset, block_hash). The signer never
-    //    reveals its key; we only receive the auth fields.
-    let auth = signer.authorize(&SigningRequest {
-        secret_id: req.secret_id,
-        subset: &subset,
-        block_hash: req.block_hash,
-        valid_until: None,
-    })?;
+    // 2. Assemble a quorum. A node that fails or serves a *different* epoch is a
+    //    per-node fault: drop it and re-form the subset from the remaining nodes,
+    //    rather than letting one node deny the whole decrypt (audit MV-H2). A
+    //    *genuine* rotation still surfaces as `threshold` nodes agreeing on the
+    //    same new served_epoch (counted in `rotated_votes`). Each fault removes a
+    //    node from `available`, so the loop terminates.
+    let mut available = active;
+    let mut rotated_votes: std::collections::BTreeMap<u32, usize> = std::collections::BTreeMap::new();
 
-    // 4. Query each chosen node and collect its partial.
-    let mut partials: Vec<PartialInput> = Vec::with_capacity(chosen.len());
-    for node in &chosen {
-        let lambda = lagrange_for(node.index, &subset)?;
-        let request = PartialDecryptRequest {
-            secret_id: secret_id_to_hex(req.secret_id),
-            subset: subset.clone(),
-            lagrange_coeff: to_0x(&lambda),
-            requester: auth.requester.clone(),
-            block_hash: to_0x(&req.block_hash),
-            signature: auth.signature.clone(),
-            auth: auth.auth,
-            eth_address: auth.eth_address.clone(),
-            valid_until: auth.valid_until,
-            eth_signature: auth.eth_signature.clone(),
-        };
-        let resp = transport.partial_decrypt(&node.endpoint, &request).await?;
+    while available.len() >= req.threshold {
+        let chosen: Vec<&CommitteeNode> = available.iter().take(req.threshold).copied().collect();
+        let subset: Vec<u64> = chosen.iter().map(|n| n.index).collect();
 
-        // A served_epoch that differs means a rotation happened and the caller's
-        // shared_a/commitments are for the wrong key. Fail loudly rather than
-        // aggregate against the wrong key. (0 = older node serving current.)
-        if resp.served_epoch != 0 && resp.served_epoch != req.epoch {
-            return Err(SdkError::EpochRotated {
-                served: resp.served_epoch,
-                provided: req.epoch,
+        // Sign once per subset. The signer never reveals its key; we only receive
+        // the auth fields. (Re-signing on retry binds the new subset.)
+        let auth = signer.authorize(&SigningRequest {
+            secret_id: req.secret_id,
+            subset: &subset,
+            block_hash: req.block_hash,
+            valid_until: None,
+        })?;
+
+        let mut partials: Vec<PartialInput> = Vec::with_capacity(chosen.len());
+        let mut faulty: Option<u64> = None;
+        for node in &chosen {
+            let lambda = lagrange_for(node.index, &subset)?;
+            let request = PartialDecryptRequest {
+                secret_id: secret_id_to_hex(req.secret_id),
+                subset: subset.clone(),
+                lagrange_coeff: to_0x(&lambda),
+                requester: auth.requester.clone(),
+                block_hash: to_0x(&req.block_hash),
+                signature: auth.signature.clone(),
+                auth: auth.auth,
+                eth_address: auth.eth_address.clone(),
+                valid_until: auth.valid_until,
+                eth_signature: auth.eth_signature.clone(),
+            };
+
+            let resp = match transport.partial_decrypt(&node.endpoint, &request).await {
+                Ok(resp) => resp,
+                // Treat an unreachable/erroring node as a per-node fault.
+                Err(_) => {
+                    faulty = Some(node.index);
+                    break;
+                }
+            };
+
+            // A served_epoch that differs means this node is serving a different
+            // key than the caller's state is for. If a `threshold` of nodes agree
+            // on the same new epoch it's a real rotation (fail loudly so the caller
+            // refetches); otherwise it's one misbehaving node — drop it.
+            // (0 = older node serving current.)
+            if resp.served_epoch != 0 && resp.served_epoch != req.epoch {
+                let votes = rotated_votes.entry(resp.served_epoch).or_insert(0);
+                *votes += 1;
+                if *votes >= req.threshold {
+                    return Err(SdkError::EpochRotated {
+                        served: resp.served_epoch,
+                        provided: req.epoch,
+                    });
+                }
+                faulty = Some(node.index);
+                break;
+            }
+
+            partials.push(PartialInput {
+                partial: from_0x("partial", &resp.partial)?,
+                proof: from_0x("proof", &resp.proof)?,
+                commitment: node.share_commitment.clone(),
+                lambda,
             });
         }
 
-        partials.push(PartialInput {
-            partial: from_0x("partial", &resp.partial)?,
-            proof: from_0x("proof", &resp.proof)?,
-            commitment: node.share_commitment.clone(),
-            lambda,
-        });
+        match faulty {
+            Some(bad) => {
+                available.retain(|n| n.index != bad);
+                continue;
+            }
+            // 3. Verify the proofs, aggregate, and AEAD-open — all in the pure core.
+            None => {
+                return Ok(open_secret(
+                    req.shared_a,
+                    req.capsule,
+                    req.secret_id,
+                    req.epoch,
+                    req.binding_id,
+                    req.aad,
+                    req.ct,
+                    &partials,
+                )?);
+            }
+        }
     }
 
-    // 5. Verify the proofs, aggregate, and AEAD-open — all in the pure core.
-    Ok(open_secret(
-        req.shared_a,
-        req.capsule,
-        req.secret_id,
-        req.epoch,
-        req.binding_id,
-        req.aad,
-        req.ct,
-        &partials,
-    )?)
+    // Ran out of good nodes. If divergent served_epochs dominated, surface the most
+    // common one as a rotation (refetch + retry); otherwise no quorum could form.
+    if let Some((&served, _)) = rotated_votes.iter().max_by_key(|(_, &votes)| votes) {
+        return Err(SdkError::EpochRotated {
+            served,
+            provided: req.epoch,
+        });
+    }
+    Err(SdkError::QuorumUnavailable {
+        needed: req.threshold,
+        active: available.len(),
+    })
 }
