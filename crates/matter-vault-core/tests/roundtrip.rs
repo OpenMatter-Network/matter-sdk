@@ -13,12 +13,14 @@ use matter_crypto::bgv::poly::crt::CrtPoly;
 use matter_crypto::bgv::poly::CrtContext;
 use matter_crypto::bgv::Ciphertext;
 use matter_crypto::dkg::{
+    commit_to_contribution,
     derive_shared_a,
     generate_contribution,
     process_contributions,
     DkgOutput,
 };
 use matter_crypto::secret::{lagrange_coefficient, produce_proven_partial};
+use matter_crypto::zkp::plaintext::PlaintextProof;
 use matter_crypto::zkp::zkp_aware_smudge_bits;
 use matter_vault_core::{
     encrypt,
@@ -42,28 +44,48 @@ const T: usize = 3;
 fn run_dkg(ctx: &CrtContext<Cipher>, epoch: u32) -> Vec<DkgOutput<Params>> {
     let points: Vec<u64> = (1..=N).collect();
     let shared_a = derive_shared_a::<Cipher>(SHARED_A_SEED, epoch);
+    // Session id binding the commit-before-reveal round; identical for every node
+    // in this simulated session (a real committee derives it from chain context).
+    let ssid = [SHARED_A_SEED, b"/ssid", &epoch.to_be_bytes()].concat();
     let contributions: Vec<_> = points
         .iter()
         .map(|&pt| generate_contribution::<Params>(ctx, pt, &points, T, &shared_a))
         .collect();
+    // Round-1 commitments (commit-before-reveal): one per dealer, bound to `ssid`.
+    let prior_commitments: Vec<_> = contributions
+        .iter()
+        .map(|c| commit_to_contribution(c, &ssid, &c.nonce))
+        .collect();
     points
         .iter()
         .map(|&pt| {
-            process_contributions::<Params>(ctx, pt, &points, &contributions, &shared_a, T)
-                .expect("DKG must finalise")
+            process_contributions::<Params>(
+                ctx,
+                pt,
+                &points,
+                &contributions,
+                &prior_commitments,
+                &ssid,
+                &shared_a,
+                T,
+            )
+            .expect("DKG must finalise")
         })
         .collect()
 }
 
 /// Build the [`PartialInput`] list a decryptor would collect from `subset`.
+#[allow(clippy::too_many_arguments)]
 fn collect_partials(
     ctx: &CrtContext<Cipher>,
     outputs: &[DkgOutput<Params>],
     subset: &[u64],
     capsule: &Ciphertext<Params>,
+    capsule_proof: &PlaintextProof<Params>,
     shared_a: &CrtPoly<Cipher>,
     secret_id: u128,
     epoch: u32,
+    binding_id: &[u8],
 ) -> Vec<PartialInput> {
     let smudge_bits = zkp_aware_smudge_bits::<Params>(subset.len());
     subset
@@ -71,17 +93,24 @@ fn collect_partials(
         .map(|&pt| {
             let idx = (pt - 1) as usize;
             let lambda = lagrange_coefficient::<Params>(pt, subset);
+            // A node refuses to partial-decrypt an unattested capsule: it
+            // re-verifies the capsule's ZKPoPlaintext first (HIGH-04 gate), so
+            // it needs `pk` + `capsule_proof` + `binding_id`.
             let (partial, proof) = produce_proven_partial::<Params>(
                 ctx,
+                &outputs[idx].joint_pk,
                 &outputs[idx].key_share,
                 lambda,
                 capsule,
+                capsule_proof,
                 shared_a,
                 &outputs[idx].share_commitment,
                 smudge_bits,
+                binding_id,
                 &secret_id.to_be_bytes(),
                 epoch as u64,
-            );
+            )
+            .expect("capsule proof verifies, so the node produces a partial");
             PartialInput {
                 partial: bincode::serialize(&partial).unwrap(),
                 proof: bincode::serialize(&proof).unwrap(),
@@ -135,9 +164,12 @@ fn seal_then_open_recovers_plaintext() {
     );
 
     let capsule: Ciphertext<Params> = bincode::deserialize(&env.capsule).unwrap();
+    let capsule_proof: PlaintextProof<Params> =
+        matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 3, 5];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &shared_a, secret_id, epoch,
+        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &binding_id,
     );
 
     let recovered = open_secret(
@@ -174,9 +206,12 @@ fn wrong_aad_fails_terminally() {
         plaintext,
     );
     let capsule: Ciphertext<Params> = bincode::deserialize(&env.capsule).unwrap();
+    let capsule_proof: PlaintextProof<Params> =
+        matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 2, 3];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &shared_a, secret_id, epoch,
+        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &binding_id,
     );
 
     // Opening under a DIFFERENT aad than it was sealed with must fail AEAD —
@@ -267,9 +302,12 @@ fn emit_conformance_vectors() {
         plaintext,
     );
     let capsule: Ciphertext<Params> = bincode::deserialize(&env.capsule).unwrap();
+    let capsule_proof: PlaintextProof<Params> =
+        matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 3, 5];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &shared_a, secret_id, epoch,
+        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &binding_id,
     );
 
     let partials_json: Vec<_> = partials

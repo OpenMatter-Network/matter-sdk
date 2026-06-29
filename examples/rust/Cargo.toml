@@ -16,6 +16,9 @@ matter-vault = { path = "../../crates/matter-vault" }
 # A real integration never depends on matter-crypto directly — the committee
 # nodes run it for you, and your app only calls matter-vault.
 matter-crypto = { workspace = true }
+# Decodes the version-tagged on-chain plaintext proof, mirroring what a real
+# committee node does before it partial-decrypts.
+matter-kgc-config = { workspace = true, features = ["wire"] }
 bincode = { workspace = true }
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
 

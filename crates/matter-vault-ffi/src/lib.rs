@@ -85,6 +85,18 @@ pub struct MvEnvelope {
     pub ct: MvBuf,
 }
 
+impl MvEnvelope {
+    /// An all-empty envelope, used to honor the "out is empty on error" contract.
+    fn empty() -> Self {
+        MvEnvelope {
+            binding_id: MvBuf::empty(),
+            capsule: MvBuf::empty(),
+            proof: MvBuf::empty(),
+            ct: MvBuf::empty(),
+        }
+    }
+}
+
 /// Free all four buffers of an envelope produced by [`mv_encrypt`].
 #[no_mangle]
 pub unsafe extern "C" fn mv_envelope_free(env: MvEnvelope) {
@@ -182,6 +194,11 @@ pub unsafe extern "C" fn mv_encrypt(
     if out.is_null() {
         return MV_ERR_INVALID_ARG;
     }
+    // Honor the module contract ("out is empty on every error path") up front, so
+    // a conforming C caller that frees the envelope after a non-OK return never
+    // frees an uninitialized pointer. Every other entry point clears its out-param
+    // here; `mv_encrypt` was the lone exception (audit MV-H1).
+    *out = MvEnvelope::empty();
     let (Some(pk), Some(sec), Some(aad)) = (
         as_slice(joint_pk, joint_pk_len),
         as_slice(secrets, secrets_len),
@@ -337,5 +354,52 @@ pub unsafe extern "C" fn mv_open_secret(
             MV_OK
         }
         Err(_) => MV_ERR_CRYPTO,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression for audit MV-H1: `mv_encrypt` must overwrite `*out` with empty
+    /// buffers on an error path. A malformed `joint_pk` triggers an error; if the
+    /// envelope were left as the caller's (here, sentinel) memory, a conforming
+    /// consumer's `mv_envelope_free` would be a wild free.
+    #[test]
+    fn mv_encrypt_clears_out_on_error() {
+        fn sentinel() -> MvBuf {
+            MvBuf {
+                ptr: 0xAB as *mut u8,
+                len: 0xABAB,
+            }
+        }
+        let mut env = MvEnvelope {
+            binding_id: sentinel(),
+            capsule: sentinel(),
+            proof: sentinel(),
+            ct: sentinel(),
+        };
+        let bad_pk = [0u8; 4]; // too short to decode as a bincode PublicKey
+        let secrets = [1u8, 2, 3];
+        let aad = [7u8; 2];
+        let rc = unsafe {
+            mv_encrypt(
+                bad_pk.as_ptr(),
+                bad_pk.len(),
+                0,
+                secrets.as_ptr(),
+                secrets.len(),
+                aad.as_ptr(),
+                aad.len(),
+                std::ptr::null(),
+                0,
+                &mut env,
+            )
+        };
+        assert_eq!(rc, MV_ERR_INVALID_ARG);
+        for buf in [&env.binding_id, &env.capsule, &env.proof, &env.ct] {
+            assert!(buf.ptr.is_null(), "out buffer must be cleared on error");
+            assert_eq!(buf.len, 0, "out buffer len must be zero on error");
+        }
     }
 }

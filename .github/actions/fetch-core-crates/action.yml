@@ -1,0 +1,33 @@
+name: Fetch core crates
+description: >
+  Clone the private cryptographic core siblings (matter-crypto, matter-kgc) next
+  to the matter-sdk checkout so the workspace path-dependencies resolve. Reads a
+  GitHub PAT through a git credential helper (the same flow matter-node uses for
+  its DEPS_PAT); the token is never written to a clone URL or to ~/.gitconfig.
+
+inputs:
+  token:
+    description: PAT with read access to the openmatter-network core repositories.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Clone matter-crypto and matter-kgc via PAT
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        DEPS_PAT: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        test -n "${DEPS_PAT}" || { echo "::error::core-deps PAT is empty — secret not delivered to this job"; exit 1; }
+        # Supply credentials through a helper that reads the token from the
+        # environment at fetch time, keeping it out of argv and the on-disk config.
+        # The insteadOf rewrite covers the release-form `ssh://git@github.com/...`
+        # cargo git deps (see Cargo.toml); the clones below already use HTTPS.
+        git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+        git config --global credential.helper \
+          '!f() { echo username=x-access-token; echo "password=${DEPS_PAT}"; }; f'
+        for repo in matter-crypto matter-kgc; do
+          git clone --depth 1 "https://github.com/openmatter-network/${repo}.git"
+        done
