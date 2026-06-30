@@ -129,19 +129,6 @@ await /* store the ciphertext on-chain */ storeSecret(...);
 const plaintext = await decrypt(transport, signer, { /* … */ }); // still just works
 ```
 
-<details><summary>Read deeper: how the key survives rotation</summary>
-
-The public key is tied to the underlying secret, **not** to which nodes currently
-hold shares. A rotation reshares that same secret to the new committee — refreshing
-every share without ever rebuilding the full key — so the public key is unchanged.
-Each stored ciphertext is also stamped with the **epoch** it was sealed under, so data
-encrypted before a rotation stays decryptable after it.
-</details>
-
-<p align="center">
-  <img src="docs/assets/rotation-refresh.svg" alt="On rotation the committee reshares the same secret to the next epoch, refreshing every node's share without rebuilding the full key. The joint public key is unchanged so stored ciphertext still decrypts, while the old shares become useless" width="820">
-</p>
-
 **Q: How does rotating members make things *more* secure, not less?**
 
 Rotation runs a **proactive refresh**: members periodically replace their shares with
@@ -151,9 +138,9 @@ slowly, one at a time, is reset at every rotation: they'd have to compromise `t`
 members *within a single rotation window* to learn anything. Steal `t-1` shares over a
 year and you still have nothing.
 
-<p align="center">
-  <img src="docs/assets/rotation-compromise.svg" alt="An attacker who compromises one node per rotation window never accumulates the t shares needed to decrypt: each rotation refreshes every share and makes previously stolen shares useless, so the usable-stolen-share count stays below the threshold" width="820">
-</p>
+For the mechanism — proactive resharing, epoch-stamped ciphertext, and the per-window
+compromise model — see [**Key rotation**](docs/architecture.md#key-rotation) in the
+architecture doc.
 
 **Q: Is this quantum-safe? How does it line up with NIST's post-quantum standards?**
 

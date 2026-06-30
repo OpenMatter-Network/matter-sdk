@@ -51,6 +51,44 @@ extrinsic and reading chain state (`joint_pk`, `shared_a`, committee roster, per
 share commitments, threshold) — stays with your own Substrate client. The SDK gives
 you ready-to-sign call arguments (`StoreSecret`/`RotateSecret`/`GrantAccess`) for it.
 
+## Key rotation
+
+The committee is a **dynamic `t`-of-`n` group**: members can be added, removed, or
+swapped and the threshold can change over time. It keeps its key healthy through
+**proactive resharing** — periodically the committee reshares the *same* secret to the
+next epoch, handing every node a brand-new share without the full key ever being
+reconstructed.
+
+<p align="center">
+  <img src="assets/rotation-refresh.svg" alt="On rotation the committee reshares the same secret to the next epoch, refreshing every node's share without rebuilding the full key. The joint public key is unchanged so stored ciphertext still decrypts, while the old shares become useless" width="860">
+</p>
+
+The joint public key is tied to the underlying secret, **not** to which nodes hold
+shares, so it is **unchanged across rotations**. Each stored ciphertext is stamped with
+the **epoch** it was sealed under, so a secret encrypted before a rotation stays
+decryptable after it — you never re-encrypt. Resharing advances the committee's epoch;
+the SDK reads the live committee state (`joint_pk`, `shared_a`, roster, per-node share
+commitments, threshold) from the chain at decrypt time. If a `threshold` of nodes report
+a newer `served_epoch` mid-request, the client raises `SdkError::EpochRotated` so the
+caller refetches that state and retries — see
+[`committee.rs`](../crates/matter-vault/src/committee.rs).
+
+> This is committee-side **key** rotation. It is distinct from the `RotateSecret` call,
+> which re-seals *your secret's value* in place under the current epoch — see
+> [`calls.rs`](../crates/matter-vault/src/calls.rs).
+
+### Surviving a compromised node
+
+Because a reshare replaces every share, **old shares become useless** the moment a
+rotation completes. An attacker who compromises nodes slowly — one at a time — is reset
+at every rotation: to recover anything they must hold `t` valid shares *at once*, which
+means breaching `t` nodes **within a single rotation window**. Stealing `t-1` shares
+spread over a year yields nothing.
+
+<p align="center">
+  <img src="assets/rotation-compromise.svg" alt="An attacker who compromises one node per rotation window never accumulates the t shares needed to decrypt: each rotation refreshes every share and makes previously stolen shares useless, so the usable-stolen-share count stays below the threshold" width="860">
+</p>
+
 ## Crate / package map
 
 | Path | Role |
