@@ -1,6 +1,6 @@
 [net]
-# Fetch any git dependencies (matter-crypto et al. in the release configuration)
-# via the system `git` CLI so it uses your existing GitHub SSH credentials
-# instead of cargo's built-in libgit2. No effect while the sibling crates are
-# path dependencies.
+# Fetch the private git-tag deps (matter-crypto, matter-kgc) via the system `git`
+# CLI instead of cargo's built-in libgit2, so cargo honors your global git config:
+# locally your GitHub SSH credentials, and in CI the `insteadOf` HTTPS rewrite +
+# PAT credential helper set up by .github/actions/fetch-core-crates.
 git-fetch-with-cli = true

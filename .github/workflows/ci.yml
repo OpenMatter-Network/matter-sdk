@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # During early access the cryptographic core crates are private siblings. Each
-  # job clones them next to the checkout via the fetch-core-crates action,
-  # authenticated with a read-only PAT (secrets.DEPS_PAT). At release these become
-  # pinned git-tag / registry dependencies and the clone step goes away.
+  # The cryptographic core crates (matter-crypto, matter-kgc) are private, pinned
+  # as git-tag deps in Cargo.toml/Cargo.lock. Each job runs the fetch-core-crates
+  # action first, which configures a git credential helper so cargo's own fetch
+  # authenticates over HTTPS with a read-only PAT (secrets.DEPS_PAT).
   FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
 
 jobs:
