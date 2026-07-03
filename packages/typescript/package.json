@@ -9,7 +9,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "wasm"],
+  "files": [
+    "dist",
+    "wasm"
+  ],
   "scripts": {
     "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript/wasm --out-name matter_vault_wasm",
     "build": "npm run build:wasm && tsc -p tsconfig.json",
@@ -17,8 +20,11 @@
     "test": "npm run build:wasm && vitest run"
   },
   "devDependencies": {
+    "@polkadot/keyring": "^14.0.3",
+    "@polkadot/util": "^14.0.3",
+    "@polkadot/util-crypto": "^14.0.3",
+    "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^2.1.0"
   }
 }

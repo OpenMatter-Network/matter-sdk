@@ -85,8 +85,12 @@ class ChainClient:
 
     @staticmethod
     def keypair_from_seed(seed: str) -> Keypair:
-        """An sr25519 keypair from a SURI / ``0x`` seed (the funded signer)."""
-        return Keypair.create_from_seed(seed, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519)
+        """An sr25519 keypair from a ``0x`` hex seed or a BIP39 mnemonic / SURI
+        (the funded signer). No ``///password`` support for sr25519."""
+        # substrate-interface's create_from_uri feeds the phrase to
+        # create_from_mnemonic, so hex seeds must branch to create_from_seed.
+        factory = Keypair.create_from_seed if seed.startswith("0x") else Keypair.create_from_uri
+        return factory(seed, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519)
 
     # --- runtime-API reads -------------------------------------------------
 

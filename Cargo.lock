@@ -1837,7 +1837,6 @@ dependencies = [
 name = "matter-vault-e2e"
 version = "0.1.0"
 dependencies = [
- "hex",
  "matter-vault",
  "parity-scale-codec",
  "serde_json",

@@ -38,9 +38,10 @@ exactly what the committee verifies — no transcript drift.
 
 ## Dev-only local keys
 
-For examples and tests the SDK offers local helpers that load a key from a raw seed:
+For examples and tests the SDK offers local helpers that load a key into memory:
 
-- Rust: `Sr25519Signer::from_seed_insecure_dev_only(&seed)`
+- Rust: `Sr25519Signer::from_seed_insecure_dev_only(&seed)` (raw 32-byte seed) or
+  `Sr25519Signer::from_uri_insecure_dev_only(uri)` (`0x`-hex seed, BIP39 mnemonic, or SURI)
 
 They carry `insecure`/`dev_only` in the name and print a runtime warning. **Never use
 them in production**, and keep them out of production builds. CI fails if a release
