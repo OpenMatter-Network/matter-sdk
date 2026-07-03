@@ -6,6 +6,9 @@
   "author": "Open Matter <admin@openmatter.network>",
   "homepage": "https://openmatter.network",
   "repository": "https://github.com/openmatter-network/matter-sdk",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
