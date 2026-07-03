@@ -9,16 +9,30 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "wasm"],
+  "imports": {
+    "#wasm": {
+      "browser": "./wasm-web/matter_vault_wasm.js",
+      "default": "./wasm/matter_vault_wasm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "wasm-web"
+  ],
   "scripts": {
-    "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript/wasm --out-name matter_vault_wasm",
-    "build": "npm run build:wasm && tsc -p tsconfig.json",
+    "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript/wasm --out-name matter_vault_wasm && rm -f ../../packages/typescript/wasm/.gitignore",
+    "build:wasm-web": "cd ../../bindings/wasm && wasm-pack build --target bundler --out-dir ../../packages/typescript/wasm-web --out-name matter_vault_wasm && rm -f ../../packages/typescript/wasm-web/.gitignore",
+    "build": "npm run build:wasm && npm run build:wasm-web && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build:wasm && vitest run"
   },
   "devDependencies": {
+    "@polkadot/keyring": "^14.0.3",
+    "@polkadot/util": "^14.0.3",
+    "@polkadot/util-crypto": "^14.0.3",
+    "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^2.1.0"
   }
 }

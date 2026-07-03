@@ -200,9 +200,9 @@ Each binding has a live harness that runs the full path — encrypt →
 (that the committee accepts the SDK's signature on-chain):
 [Rust](examples/rust-e2e) · [TypeScript](examples/e2e) ([README](examples/e2e/README.md)) ·
 [Python](examples/python-e2e) · [Go](examples/go-e2e). They share env vars —
-`MATTER_RPC_URL` (defaults to testnet) and `MATTER_SIGNER_SEED` (a funded sr25519 seed;
-`TEST_KEY` also accepted). A no-gas [`preflight.ts`](examples/e2e/preflight.ts) checks
-funding + committee health first.
+`MATTER_RPC_URL` (defaults to testnet) and `MATTER_SIGNER_SEED` (a funded sr25519 key,
+as a `0x`-hex seed or a BIP39 mnemonic; `TEST_KEY` also accepted). A no-gas
+[`preflight.ts`](examples/e2e/preflight.ts) checks funding + committee health first.
 
 ## License
 
