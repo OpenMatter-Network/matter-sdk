@@ -12,9 +12,9 @@
 // /partial-decrypt requests.
 //
 // Env:
-//   MATTER_RPC_URL      ws(s) endpoint            (default: testnet)
-//   MATTER_SIGNER_SEED  sr25519 SURI / 0x-seed    (falls back to TEST_KEY)
-//   MATTER_SECRET       plaintext to seal         (default: a sample env line)
+//   MATTER_RPC_URL      ws(s) endpoint                          (default: testnet)
+//   MATTER_SIGNER_SEED  0x-hex seed or mnemonic / sr25519 SURI  (falls back to TEST_KEY)
+//   MATTER_SECRET       plaintext to seal                       (default: a sample env line)
 
 use std::str::FromStr;
 
@@ -73,14 +73,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_url = std::env::var("MATTER_RPC_URL").unwrap_or_else(|_| DEFAULT_RPC.to_string());
     let seed_str = std::env::var("MATTER_SIGNER_SEED")
         .or_else(|_| std::env::var("TEST_KEY"))
-        .map_err(|_| "set MATTER_SIGNER_SEED or TEST_KEY (sr25519 SURI / 0x-seed)")?;
+        .map_err(|_| "set MATTER_SIGNER_SEED or TEST_KEY (0x-hex seed or mnemonic / SURI)")?;
     let secret = std::env::var("MATTER_SECRET").unwrap_or_else(|_| DEFAULT_SECRET.to_string());
 
-    // The same 32-byte seed drives both signers (chain extrinsic + committee auth).
-    let seed = parse_seed(&seed_str)?;
-    let uri = SecretUri::from_str(&format!("0x{}", hex::encode(seed)))?;
+    // The same secret URI (0x-hex seed, mnemonic, or SURI) drives both signers
+    // (chain extrinsic + committee auth).
+    let uri = SecretUri::from_str(seed_str.trim())?;
     let keypair = Keypair::from_uri(&uri)?;
-    let committee_signer = Sr25519Signer::from_seed_insecure_dev_only(&seed)?;
+    let committee_signer = Sr25519Signer::from_uri_insecure_dev_only(seed_str.trim())?;
     let account_id = keypair.public_key().to_account_id();
     println!("Account: {account_id}");
 
@@ -251,12 +251,6 @@ fn secret_id_from_events(
         }
     }
     Err("storeSecret landed but emitted no Secrets.SecretStored event".into())
-}
-
-fn parse_seed(s: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> {
-    let hexstr = s.strip_prefix("0x").ok_or("MATTER_SIGNER_SEED/TEST_KEY must be a 0x 32-byte seed")?;
-    let bytes = hex::decode(hexstr)?;
-    bytes.try_into().map_err(|_| "seed must be exactly 32 bytes".into())
 }
 
 fn normalize_endpoint(raw: &str) -> String {

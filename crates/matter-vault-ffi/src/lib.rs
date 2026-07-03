@@ -115,17 +115,20 @@ unsafe fn as_slice<'a>(ptr: *const u8, len: usize) -> Option<&'a [u8]> {
     }
 }
 
-/// The canonical request signing payload for `(secret_id, subset, block_hash)`.
+/// The canonical request signing payload for
+/// `(secret_id, subset, block_hash, recipient_index)`.
 ///
 /// `secret_id` is 16 big-endian bytes; `block_hash` is 32 bytes; `subset` is an
-/// array of `subset_len` `u64`s. Writes the payload bytes to `*out`. Returns
-/// [`MV_OK`] or [`MV_ERR_INVALID_ARG`].
+/// array of `subset_len` `u64`s; `recipient_index` is the responding node's
+/// 1-based `dkg_index` (the request is signed once per node, MV-C1). Writes the
+/// payload bytes to `*out`. Returns [`MV_OK`] or [`MV_ERR_INVALID_ARG`].
 #[no_mangle]
 pub unsafe extern "C" fn mv_signing_payload(
     secret_id: *const u8,
     subset: *const u64,
     subset_len: usize,
     block_hash: *const u8,
+    recipient_index: u64,
     out: *mut MvBuf,
 ) -> i32 {
     if out.is_null() {
@@ -145,7 +148,7 @@ pub unsafe extern "C" fn mv_signing_payload(
     };
     let sid = u128::from_be_bytes(sid.try_into().unwrap());
     let bh: [u8; 32] = bh.try_into().unwrap();
-    *out = into_buf(core::signing_payload(sid, subset, &bh));
+    *out = into_buf(core::signing_payload(sid, subset, &bh, recipient_index));
     MV_OK
 }
 

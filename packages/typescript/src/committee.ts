@@ -141,17 +141,17 @@ export async function decrypt(
   const chosen = active.slice(0, params.threshold);
   const subset = chosen.map((n) => n.index);
 
-  // 3. Sign once for this (secret, subset, block_hash).
-  const auth = await signer.authorize({
-    secretId: params.secretId,
-    subset,
-    blockHash: params.blockHash,
-  });
-
-  // 4. Query each chosen node, collecting partials.
+  // 3. Query each chosen node, signing per node so the payload binds that node's
+  //    index — a signature can't be replayed by it to a peer (MV-C1).
   const partials: PartialInput[] = [];
   for (const node of chosen) {
     const lambda = lagrangeFor(node.index, subset);
+    const auth = await signer.authorize({
+      secretId: params.secretId,
+      subset,
+      recipientIndex: node.index,
+      blockHash: params.blockHash,
+    });
     const req: PartialDecryptRequest = {
       secret_id: secretIdToHex(params.secretId),
       subset,

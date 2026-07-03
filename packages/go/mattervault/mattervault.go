@@ -63,14 +63,17 @@ func goBytesAndFree(buf C.MvBuf) []byte {
 }
 
 // SigningPayload returns the canonical bytes a requester signs for a
-// /partial-decrypt request, binding (secretID, subset, blockHash).
-func SigningPayload(secretID [16]byte, subset []uint64, blockHash [32]byte) ([]byte, error) {
+// /partial-decrypt request, binding (secretID, subset, blockHash,
+// recipientIndex). recipientIndex is the responding node's 1-based dkg_index:
+// sign once per node so a signature can't be replayed to a peer (MV-C1).
+func SigningPayload(secretID [16]byte, subset []uint64, blockHash [32]byte, recipientIndex uint64) ([]byte, error) {
 	var out C.MvBuf
 	rc := C.mv_signing_payload(
 		(*C.uint8_t)(&secretID[0]),
 		subsetPtr(subset),
 		C.size_t(len(subset)),
 		(*C.uint8_t)(&blockHash[0]),
+		C.uint64_t(recipientIndex),
 		&out,
 	)
 	if err := errFromCode(rc); err != nil {

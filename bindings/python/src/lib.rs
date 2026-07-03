@@ -40,24 +40,37 @@ fn encrypt<'py>(
     ))
 }
 
-/// Canonical request signing payload for `(secret_id, subset, block_hash)`.
+/// Canonical request signing payload for
+/// `(secret_id, subset, block_hash, recipient_index)`. `recipient_index` is the
+/// responding node's 1-based `dkg_index` (sign once per node, MV-C1).
 #[pyfunction]
 fn signing_payload<'py>(
     py: Python<'py>,
     secret_id: u128,
     subset: Vec<u64>,
     block_hash: &[u8],
+    recipient_index: u64,
 ) -> PyResult<Bound<'py, PyBytes>> {
     let bh: [u8; 32] = block_hash
         .try_into()
         .map_err(|_| PyValueError::new_err("block_hash must be 32 bytes"))?;
-    Ok(PyBytes::new(py, &core::signing_payload(secret_id, &subset, &bh)))
+    Ok(PyBytes::new(
+        py,
+        &core::signing_payload(secret_id, &subset, &bh, recipient_index),
+    ))
 }
 
 /// Bincode Lagrange coefficient for `point` over `subset`.
 #[pyfunction]
-fn lagrange_for<'py>(py: Python<'py>, point: u64, subset: Vec<u64>) -> PyResult<Bound<'py, PyBytes>> {
-    Ok(PyBytes::new(py, &core::lagrange_for(point, &subset).map_err(err)?))
+fn lagrange_for<'py>(
+    py: Python<'py>,
+    point: u64,
+    subset: Vec<u64>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    Ok(PyBytes::new(
+        py,
+        &core::lagrange_for(point, &subset).map_err(err)?,
+    ))
 }
 
 /// Verify a capsule's ZKPoPlaintext proof up front.

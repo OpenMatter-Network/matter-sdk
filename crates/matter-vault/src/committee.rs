@@ -90,36 +90,40 @@ where
     //    same new served_epoch (counted in `rotated_votes`). Each fault removes a
     //    node from `available`, so the loop terminates.
     let mut available = active;
-    let mut rotated_votes: std::collections::BTreeMap<u32, usize> = std::collections::BTreeMap::new();
+    let mut rotated_votes: std::collections::BTreeMap<u32, usize> =
+        std::collections::BTreeMap::new();
 
     while available.len() >= req.threshold {
         let chosen: Vec<&CommitteeNode> = available.iter().take(req.threshold).copied().collect();
         let subset: Vec<u64> = chosen.iter().map(|n| n.index).collect();
 
-        // Sign once per subset. The signer never reveals its key; we only receive
-        // the auth fields. (Re-signing on retry binds the new subset.)
-        let auth = signer.authorize(&SigningRequest {
-            secret_id: req.secret_id,
-            subset: &subset,
-            block_hash: req.block_hash,
-            valid_until: None,
-        })?;
-
         let mut partials: Vec<PartialInput> = Vec::with_capacity(chosen.len());
         let mut faulty: Option<u64> = None;
         for node in &chosen {
             let lambda = lagrange_for(node.index, &subset)?;
+
+            // Sign per node: the payload binds this node's index, so the auth
+            // fields we hand it can't be replayed by it to any peer (MV-C1). The
+            // signer never reveals its key; we only receive the auth fields.
+            let auth = signer.authorize(&SigningRequest {
+                secret_id: req.secret_id,
+                subset: &subset,
+                recipient_index: node.index,
+                block_hash: req.block_hash,
+                valid_until: None,
+            })?;
+
             let request = PartialDecryptRequest {
                 secret_id: secret_id_to_hex(req.secret_id),
                 subset: subset.clone(),
                 lagrange_coeff: to_0x(&lambda),
-                requester: auth.requester.clone(),
+                requester: auth.requester,
                 block_hash: to_0x(&req.block_hash),
-                signature: auth.signature.clone(),
+                signature: auth.signature,
                 auth: auth.auth,
-                eth_address: auth.eth_address.clone(),
+                eth_address: auth.eth_address,
                 valid_until: auth.valid_until,
-                eth_signature: auth.eth_signature.clone(),
+                eth_signature: auth.eth_signature,
             };
 
             let resp = match transport.partial_decrypt(&node.endpoint, &request).await {

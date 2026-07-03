@@ -61,16 +61,15 @@ func Decrypt(transport Transport, signer Signer, p DecryptParams) ([]byte, error
 		subset[i] = n.Index
 	}
 
-	// 3. Sign once for this (secret, subset, block_hash).
-	auth, err := signer.Authorize(p.SecretID, subset, p.BlockHash)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. Query each chosen node, collecting partials.
+	// 3. Query each chosen node, signing per node so the payload binds that
+	//    node's index — a signature can't be replayed by it to a peer (MV-C1).
 	partials := make([]PartialInput, 0, len(chosen))
 	for _, node := range chosen {
 		lambda, err := LagrangeFor(node.Index, subset)
+		if err != nil {
+			return nil, err
+		}
+		auth, err := signer.Authorize(p.SecretID, subset, node.Index, p.BlockHash)
 		if err != nil {
 			return nil, err
 		}

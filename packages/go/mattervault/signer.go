@@ -12,10 +12,13 @@ type RequestAuth struct {
 	Signature string `json:"signature"`
 }
 
-// Signer authorizes a /partial-decrypt request without exposing its key.
+// Signer authorizes a /partial-decrypt request without exposing its key. One
+// request targets one node: recipientIndex is that node's 1-based dkg_index,
+// folded into the signed payload so a signature can't be replayed to a peer
+// (MV-C1). The shell calls this once per node in the quorum.
 type Signer interface {
 	AuthScheme() string
-	Authorize(secretID uint64, subset []uint64, blockHash [32]byte) (RequestAuth, error)
+	Authorize(secretID uint64, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error)
 }
 
 type substrateSigner struct {
@@ -35,9 +38,9 @@ func SubstrateSigner(accountID []byte, sign func([]byte) ([]byte, error)) (Signe
 
 func (s *substrateSigner) AuthScheme() string { return "substrate" }
 
-func (s *substrateSigner) Authorize(secretID uint64, subset []uint64, blockHash [32]byte) (RequestAuth, error) {
+func (s *substrateSigner) Authorize(secretID uint64, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error) {
 	payloadID := secretIDBytes(secretID)
-	payload, err := SigningPayload(payloadID, subset, blockHash)
+	payload, err := SigningPayload(payloadID, subset, blockHash, recipientIndex)
 	if err != nil {
 		return RequestAuth{}, err
 	}

@@ -168,7 +168,14 @@ fn seal_then_open_recovers_plaintext() {
         matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 3, 5];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &ctx,
+        &outputs,
+        &subset,
+        &capsule,
+        &capsule_proof,
+        &shared_a,
+        secret_id,
+        epoch,
         &binding_id,
     );
 
@@ -210,7 +217,14 @@ fn wrong_aad_fails_terminally() {
         matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 2, 3];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &ctx,
+        &outputs,
+        &subset,
+        &capsule,
+        &capsule_proof,
+        &shared_a,
+        secret_id,
+        epoch,
         &binding_id,
     );
 
@@ -233,13 +247,16 @@ fn wrong_aad_fails_terminally() {
 #[test]
 fn signing_payload_is_deterministic_and_binds_inputs() {
     let block_hash = [0x11u8; 32];
-    let a = signing_payload(1, &[1, 2, 3], &block_hash);
-    let b = signing_payload(1, &[1, 2, 3], &block_hash);
+    let a = signing_payload(1, &[1, 2, 3], &block_hash, 2);
+    let b = signing_payload(1, &[1, 2, 3], &block_hash, 2);
     assert_eq!(a, b, "same inputs → same bytes");
     // Changing any bound input changes the payload.
-    assert_ne!(a, signing_payload(2, &[1, 2, 3], &block_hash));
-    assert_ne!(a, signing_payload(1, &[1, 2, 4], &block_hash));
-    assert_ne!(a, signing_payload(1, &[1, 2, 3], &[0x22u8; 32]));
+    assert_ne!(a, signing_payload(2, &[1, 2, 3], &block_hash, 2));
+    assert_ne!(a, signing_payload(1, &[1, 2, 4], &block_hash, 2));
+    assert_ne!(a, signing_payload(1, &[1, 2, 3], &[0x22u8; 32], 2));
+    // MV-C1: the responding node index is bound, so a signature for one node
+    // isn't valid at another.
+    assert_ne!(a, signing_payload(1, &[1, 2, 3], &block_hash, 3));
 }
 
 /// Writes the cross-language conformance fixtures. Run explicitly:
@@ -252,19 +269,22 @@ fn emit_conformance_vectors() {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testvectors");
     std::fs::create_dir_all(dir).unwrap();
 
-    // (1) signing_payload — fully deterministic, every binding must match byte-for-byte.
+    // (1) signing_payload — fully deterministic, every binding must match
+    // byte-for-byte. `recipient_index` is the responding node's dkg_index, bound
+    // per node (MV-C1); each binding signs once per node.
     let block_hash = [0x11u8; 32];
     let sp_cases: Vec<_> = [
-        (1u128, vec![1u64, 2, 3]),
-        (0xdead_beefu128, vec![2u64, 5, 9, 11]),
+        (1u128, vec![1u64, 2, 3], 2u64),
+        (0xdead_beefu128, vec![2u64, 5, 9, 11], 9u64),
     ]
     .into_iter()
-    .map(|(secret_id, subset)| {
+    .map(|(secret_id, subset, recipient_index)| {
         json!({
             "secret_id": secret_id.to_string(),
             "subset": subset,
+            "recipient_index": recipient_index,
             "block_hash_hex": hex::encode(block_hash),
-            "payload_hex": hex::encode(signing_payload(secret_id, &subset, &block_hash)),
+            "payload_hex": hex::encode(signing_payload(secret_id, &subset, &block_hash, recipient_index)),
         })
     })
     .collect();
@@ -306,7 +326,14 @@ fn emit_conformance_vectors() {
         matter_kgc_config::wire::decode_tagged(&env.proof).expect("decode capsule proof");
     let subset = vec![1u64, 3, 5];
     let partials = collect_partials(
-        &ctx, &outputs, &subset, &capsule, &capsule_proof, &shared_a, secret_id, epoch,
+        &ctx,
+        &outputs,
+        &subset,
+        &capsule,
+        &capsule_proof,
+        &shared_a,
+        secret_id,
+        epoch,
         &binding_id,
     );
 

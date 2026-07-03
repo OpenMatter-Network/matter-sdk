@@ -45,11 +45,25 @@ fn de<T: serde::de::DeserializeOwned>(field: &'static str, bytes: &[u8]) -> Resu
 }
 
 /// The canonical bytes a requester signs for a `/partial-decrypt` request,
-/// binding `(secret_id, subset, block_hash)`. A thin typed wrapper over the
-/// shared `matter-kgc-proto` helper so the SDK and the committee node sign and
-/// verify the identical payload.
-pub fn signing_payload(secret_id: u128, subset: &[u64], block_hash: &[u8; 32]) -> Vec<u8> {
-    matter_kgc_proto::partial_decrypt_signing_payload(secret_id, subset, block_hash)
+/// binding `(secret_id, subset, block_hash, recipient_index)`. A thin typed
+/// wrapper over the shared `matter-kgc-proto` helper so the SDK and the committee
+/// node sign and verify the identical payload.
+///
+/// `recipient_index` is the responding node's 1-based `dkg_index`: the requester
+/// signs once per node with that node's index, so a signature can't be replayed
+/// to a different node in the subset (MV-C1).
+pub fn signing_payload(
+    secret_id: u128,
+    subset: &[u64],
+    block_hash: &[u8; 32],
+    recipient_index: u64,
+) -> Vec<u8> {
+    matter_kgc_proto::partial_decrypt_signing_payload(
+        secret_id,
+        subset,
+        block_hash,
+        recipient_index,
+    )
 }
 
 /// The bincode-encoded Lagrange coefficient `λ` for `point` over `subset` — the

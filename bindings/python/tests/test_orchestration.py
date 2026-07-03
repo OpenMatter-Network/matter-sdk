@@ -38,7 +38,7 @@ class _FakeSigner:
     def auth_scheme(self):
         return "substrate"
 
-    def authorize(self, secret_id, subset, block_hash):
+    def authorize(self, secret_id, subset, recipient_index, block_hash):
         return {"auth": "substrate", "requester": "0x" + "00" * 32, "signature": "0x01" + "00" * 64}
 
 
@@ -79,7 +79,7 @@ def test_quorum_unavailable_when_no_node_is_active():
 
 def test_substrate_signer_frames_a_multisignature():
     account = bytes(range(32))
-    auth = substrate_signer(account, lambda payload: b"\x07" * 64).authorize(42, [1, 2, 3], b"\x11" * 32)
+    auth = substrate_signer(account, lambda payload: b"\x07" * 64).authorize(42, [1, 2, 3], 2, b"\x11" * 32)
     assert auth["auth"] == "substrate"
     assert auth["requester"] == "0x" + account.hex()
     # signature = 0x + 1-byte Sr25519 variant (0x01) + 64-byte sig.

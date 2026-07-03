@@ -24,6 +24,7 @@ def test_signing_payload_conformance():
             int(case["secret_id"]),
             case["subset"],
             bytes.fromhex(case["block_hash_hex"]),
+            case["recipient_index"],
         )
         assert got.hex() == case["payload_hex"]
 

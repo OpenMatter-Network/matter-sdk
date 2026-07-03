@@ -7,7 +7,7 @@ their crypto stays identical.
 
 | File | What every binding must reproduce |
 |---|---|
-| `signing_payload.json` | the exact bytes a requester signs for `/partial-decrypt` |
+| `signing_payload.json` | the exact bytes a requester signs for `/partial-decrypt`, including the per-node `recipient_index` bound into the payload (MV-C1) |
 | `lagrange.json` | the bincode Lagrange coefficient for a node over a subset |
 | `open_secret.json` | a sealed secret + a real committee quorum; `openSecret` must recover `expected_plaintext_hex` |
 

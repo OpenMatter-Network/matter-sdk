@@ -51,10 +51,11 @@ func toU64(xs []int) []uint64 {
 func TestSigningPayloadConformance(t *testing.T) {
 	var doc struct {
 		Cases []struct {
-			SecretID     string `json:"secret_id"`
-			Subset       []int  `json:"subset"`
-			BlockHashHex string `json:"block_hash_hex"`
-			PayloadHex   string `json:"payload_hex"`
+			SecretID       string `json:"secret_id"`
+			Subset         []int  `json:"subset"`
+			RecipientIndex uint64 `json:"recipient_index"`
+			BlockHashHex   string `json:"block_hash_hex"`
+			PayloadHex     string `json:"payload_hex"`
 		} `json:"cases"`
 	}
 	load(t, "signing_payload.json", &doc)
@@ -67,7 +68,7 @@ func TestSigningPayloadConformance(t *testing.T) {
 		var blockHash [32]byte
 		copy(blockHash[:], bh)
 
-		got, err := SigningPayload(secretID16(t, c.SecretID), toU64(c.Subset), blockHash)
+		got, err := SigningPayload(secretID16(t, c.SecretID), toU64(c.Subset), blockHash, c.RecipientIndex)
 		if err != nil {
 			t.Fatalf("SigningPayload: %v", err)
 		}

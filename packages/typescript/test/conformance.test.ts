@@ -16,7 +16,7 @@ const load = (name: string) => JSON.parse(readFileSync(resolve(vectorsDir, name)
 describe("signing payload conformance", () => {
   const { cases } = load("signing_payload.json");
   it.each(cases)("secret_id=$secret_id subset=$subset", (c: any) => {
-    const got = signingPayload(BigInt(c.secret_id), c.subset, fromHex(c.block_hash_hex));
+    const got = signingPayload(BigInt(c.secret_id), c.subset, fromHex(c.block_hash_hex), c.recipient_index);
     expect(toHex(got)).toBe("0x" + c.payload_hex);
   });
 });
