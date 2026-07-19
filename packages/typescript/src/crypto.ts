@@ -28,13 +28,23 @@ export function encrypt(
   return { bindingId: env.bindingId, capsule: env.capsule, proof: env.proof, ct: env.ct };
 }
 
-/** Canonical bytes a requester signs for a `/partial-decrypt` request. */
+/**
+ * Canonical bytes a requester signs for a `/partial-decrypt` request.
+ * `recipientIndex` is the responding node's 1-based `dkg_index`: sign once per
+ * node so a signature can't be replayed to another node in the subset (MV-C1).
+ */
 export function signingPayload(
   secretId: bigint,
   subset: Array<bigint | number>,
   blockHash: Uint8Array,
+  recipientIndex: bigint | number,
 ): Uint8Array {
-  return wasm.partialDecryptSigningPayload(secretIdToHex(secretId), subsetBig(subset), toHex(blockHash));
+  return wasm.partialDecryptSigningPayload(
+    secretIdToHex(secretId),
+    subsetBig(subset),
+    toHex(blockHash),
+    BigInt(recipientIndex),
+  );
 }
 
 /** Bincode Lagrange coefficient `λ` for `point` over `subset`. */

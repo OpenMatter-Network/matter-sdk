@@ -23,6 +23,11 @@ pub enum Aad {
     StorageCredsV1,
     /// A persistent-volume data-encryption key (DEK).
     VolumeDekV1,
+    /// Dataset data-source credentials (S3/Postgres) recovered by the matter-ml
+    /// agent. Payload: the canonical UTF-8 JSON schema in
+    /// `docs/agent-credential-delivery.md` — the whole connector config, with
+    /// `"kind"` discriminating `"s3"`/`"postgres"`; unknown fields are ignored.
+    DatasetSourceCredsV1,
 }
 
 impl Aad {
@@ -33,6 +38,7 @@ impl Aad {
             Aad::TlsV1 => b"matter-deployment/tls/v1",
             Aad::StorageCredsV1 => b"matter-volume/storage-creds/v1",
             Aad::VolumeDekV1 => b"matter-volume/dek/v1",
+            Aad::DatasetSourceCredsV1 => b"matter-dataset/source-creds/v1",
         }
     }
 }
@@ -58,5 +64,9 @@ mod tests {
             b"matter-volume/storage-creds/v1"
         );
         assert_eq!(Aad::VolumeDekV1.as_bytes(), b"matter-volume/dek/v1");
+        assert_eq!(
+            Aad::DatasetSourceCredsV1.as_bytes(),
+            b"matter-dataset/source-creds/v1"
+        );
     }
 }

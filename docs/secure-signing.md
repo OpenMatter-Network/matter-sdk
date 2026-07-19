@@ -38,9 +38,10 @@ exactly what the committee verifies — no transcript drift.
 
 ## Dev-only local keys
 
-For examples and tests the SDK offers local helpers that load a key from a raw seed:
+For examples and tests the SDK offers local helpers that load a key into memory:
 
-- Rust: `Sr25519Signer::from_seed_insecure_dev_only(&seed)`
+- Rust: `Sr25519Signer::from_seed_insecure_dev_only(&seed)` (raw 32-byte seed) or
+  `Sr25519Signer::from_uri_insecure_dev_only(uri)` (`0x`-hex seed, BIP39 mnemonic, or SURI)
 
 They carry `insecure`/`dev_only` in the name and print a runtime warning. **Never use
 them in production**, and keep them out of production builds. CI fails if a release
@@ -56,9 +57,11 @@ target depends on them.
    logging that does. Follow quiet-success / loud-typed-failure.
 3. **Use the AAD registry.** Seal and store with the same `Aad` tag; a mismatch is a
    silent decrypt failure. The enum makes a typo a compile error.
-4. **Freshness is enforced.** The request binds a recent `block_hash` (and, on the
-   Ethereum path, `valid_until`); a captured request can't be replayed at another
-   secret or after its window.
+4. **Freshness and recipient are enforced.** The request binds a recent `block_hash`
+   (and, on the Ethereum path, `valid_until`) plus the responding node's `dkg_index`, so
+   a captured request can't be replayed at another secret, at a different committee node,
+   or after its window. The SDK signs once per node — each node verifies against its own
+   index (MV-C1).
 
 ## Threat boundaries
 

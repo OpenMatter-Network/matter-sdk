@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # During early access the cryptographic core crates are private siblings.
-  # CI clones them next to the checkout; a read-only deploy key is provided as a
-  # secret. At release these become pinned git-tag / registry dependencies and
-  # this step goes away.
+  # The cryptographic core crates (matter-crypto, matter-kgc) are private, pinned
+  # as git-tag deps in Cargo.toml/Cargo.lock. Each job runs the fetch-core-crates
+  # action first, which configures a git credential helper so cargo's own fetch
+  # authenticates over HTTPS with a read-only PAT (secrets.DEPS_PAT).
   FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
 
 jobs:
@@ -22,13 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
-      - name: Fetch core crates (matter-crypto, matter-kgc)
-        uses: webfactory/ssh-agent@v0.9.0
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
         with:
-          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
-      - run: |
-          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
-          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+          token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
         with:
           components: rustfmt, clippy
@@ -54,12 +50,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
         with:
-          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
-      - run: |
-          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
-          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+          token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
         with: { targets: wasm32-unknown-unknown }
       - name: Install wasm-pack
@@ -81,12 +74,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
         with:
-          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
-      - run: |
-          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
-          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+          token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
@@ -103,12 +93,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
         with:
-          ssh-private-key: ${{ secrets.CORE_REPOS_DEPLOY_KEY }}
-      - run: |
-          git clone --depth 1 git@github.com:openmatter-network/matter-crypto.git
-          git clone --depth 1 git@github.com:openmatter-network/matter-kgc.git
+          token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
       - uses: actions/setup-go@v5
         with: { go-version: "1.22" }

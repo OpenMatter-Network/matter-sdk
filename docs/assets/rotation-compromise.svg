@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>A slow attacker is reset every rotation</title>
+  <desc>An attacker who compromises one node per rotation window never accumulates the t shares needed to decrypt, because each rotation refreshes every share and makes previously stolen shares useless. To win they must compromise t nodes inside one window.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <marker id="arrowT" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5fe6d4"/>
+    </marker>
+  </defs>
+  <style>
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .pink{fill:#ff85bb}
+    .hex{fill:#ffffff;fill-opacity:.06;stroke:#cbb8ff;stroke-opacity:.55;stroke-width:1.6}
+    .bad{fill:#ff5a6a;fill-opacity:.85;stroke:#ff8a96;stroke-width:1.6}
+    .card{fill:#ffffff;fill-opacity:.05;stroke:#ffffff;stroke-opacity:.18;stroke-width:1.5}
+    .reshare{stroke:#5fe6d4;stroke-width:3;fill:none}
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="200" cy="60" rx="540" ry="340" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="teal" x="800" y="80" text-anchor="middle" font-size="18" letter-spacing="5">KEY ROTATION · SURVIVING A COMPROMISED NODE</text>
+  <text class="title" x="800" y="146" text-anchor="middle" font-size="42">A slow attacker is reset every rotation.</text>
+
+  <!-- threshold reminder -->
+  <rect x="500" y="184" width="600" height="58" rx="29" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.2" stroke-width="1.5"/>
+  <text x="800" y="221" text-anchor="middle" font-size="19"><tspan class="muted">To decrypt, an attacker needs </tspan><tspan class="title">t = 3 shares within one window</tspan></text>
+
+  <!-- ===== window 1 ===== -->
+  <rect class="card" x="80" y="320" width="400" height="300" rx="18"/>
+  <text class="title" x="280" y="362" text-anchor="middle" font-size="23">Window 1</text>
+  <text class="muted" x="280" y="388" text-anchor="middle" font-size="15">epoch N</text>
+  <polygon class="bad" points="168,433 148.95,444 148.95,466 168,477 187.05,466 187.05,444"/>
+  <polygon class="hex" points="224,433 204.95,444 204.95,466 224,477 243.05,466 243.05,444"/>
+  <polygon class="hex" points="280,433 260.95,444 260.95,466 280,477 299.05,466 299.05,444"/>
+  <polygon class="hex" points="336,433 316.95,444 316.95,466 336,477 355.05,466 355.05,444"/>
+  <polygon class="hex" points="392,433 372.95,444 372.95,466 392,477 411.05,466 411.05,444"/>
+  <text class="pink" x="168" y="505" text-anchor="middle" font-size="13">stolen</text>
+  <text class="muted" x="280" y="552" text-anchor="middle" font-size="14">usable stolen shares</text>
+  <text x="280" y="590" text-anchor="middle" font-size="30"><tspan class="pink title">1</tspan><tspan class="muted" font-size="22"> / 3</tspan></text>
+
+  <!-- ===== window 2 ===== -->
+  <rect class="card" x="600" y="320" width="400" height="300" rx="18"/>
+  <text class="title" x="800" y="362" text-anchor="middle" font-size="23">Window 2</text>
+  <text class="muted" x="800" y="388" text-anchor="middle" font-size="15">epoch N + 1</text>
+  <polygon class="hex" points="688,433 668.95,444 668.95,466 688,477 707.05,466 707.05,444"/>
+  <polygon class="hex" points="744,433 724.95,444 724.95,466 744,477 763.05,466 763.05,444"/>
+  <polygon class="bad" points="800,433 780.95,444 780.95,466 800,477 819.05,466 819.05,444"/>
+  <polygon class="hex" points="856,433 836.95,444 836.95,466 856,477 875.05,466 875.05,444"/>
+  <polygon class="hex" points="912,433 892.95,444 892.95,466 912,477 931.05,466 931.05,444"/>
+  <text class="pink" x="800" y="505" text-anchor="middle" font-size="13">stolen</text>
+  <text class="muted" x="800" y="552" text-anchor="middle" font-size="14">usable stolen shares</text>
+  <text x="800" y="590" text-anchor="middle" font-size="30"><tspan class="pink title">1</tspan><tspan class="muted" font-size="22"> / 3</tspan></text>
+
+  <!-- ===== window 3 ===== -->
+  <rect class="card" x="1120" y="320" width="400" height="300" rx="18"/>
+  <text class="title" x="1320" y="362" text-anchor="middle" font-size="23">Window 3</text>
+  <text class="muted" x="1320" y="388" text-anchor="middle" font-size="15">epoch N + 2</text>
+  <polygon class="hex" points="1208,433 1188.95,444 1188.95,466 1208,477 1227.05,466 1227.05,444"/>
+  <polygon class="hex" points="1264,433 1244.95,444 1244.95,466 1264,477 1283.05,466 1283.05,444"/>
+  <polygon class="hex" points="1320,433 1300.95,444 1300.95,466 1320,477 1339.05,466 1339.05,444"/>
+  <polygon class="hex" points="1376,433 1356.95,444 1356.95,466 1376,477 1395.05,466 1395.05,444"/>
+  <polygon class="bad" points="1432,433 1412.95,444 1412.95,466 1432,477 1451.05,466 1451.05,444"/>
+  <text class="pink" x="1432" y="505" text-anchor="middle" font-size="13">stolen</text>
+  <text class="muted" x="1320" y="552" text-anchor="middle" font-size="14">usable stolen shares</text>
+  <text x="1320" y="590" text-anchor="middle" font-size="30"><tspan class="pink title">1</tspan><tspan class="muted" font-size="22"> / 3</tspan></text>
+
+  <!-- rotation arrows between windows -->
+  <text class="teal title" x="540" y="430" text-anchor="middle" font-size="14">reshare</text>
+  <path class="reshare" d="M488,455 L596,455" marker-end="url(#arrowT)"/>
+  <text class="muted" x="540" y="485" text-anchor="middle" font-size="12">old share</text>
+  <text class="muted" x="540" y="500" text-anchor="middle" font-size="12">now useless</text>
+
+  <text class="teal title" x="1060" y="430" text-anchor="middle" font-size="14">reshare</text>
+  <path class="reshare" d="M1008,455 L1116,455" marker-end="url(#arrowT)"/>
+  <text class="muted" x="1060" y="485" text-anchor="middle" font-size="12">old share</text>
+  <text class="muted" x="1060" y="500" text-anchor="middle" font-size="12">now useless</text>
+
+  <!-- conclusion -->
+  <rect class="card" x="140" y="700" width="1320" height="124" rx="16"/>
+  <text class="title" x="800" y="748" text-anchor="middle" font-size="24">Steal t − 1 shares over a year — still nothing.</text>
+  <text class="muted" x="800" y="782" text-anchor="middle" font-size="17">Every rotation refreshes all shares, so a one-node-at-a-time attacker never holds t valid shares at once.</text>
+  <text class="muted" x="800" y="808" text-anchor="middle" font-size="15" fill-opacity="0.85">To win, they must compromise t nodes inside a single window — before the next reshare.</text>
+</svg>

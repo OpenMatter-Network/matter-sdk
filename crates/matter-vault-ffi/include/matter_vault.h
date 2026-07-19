@@ -34,10 +34,11 @@ typedef struct {
 void mv_free(MvBuf buf);
 void mv_envelope_free(MvEnvelope env);
 
-/* secret_id: 16 big-endian bytes; block_hash: 32 bytes; subset: subset_len u64s. */
+/* secret_id: 16 big-endian bytes; block_hash: 32 bytes; subset: subset_len u64s;
+ * recipient_index: the responding node's 1-based dkg_index (sign once per node). */
 int32_t mv_signing_payload(const uint8_t *secret_id, const uint64_t *subset,
                            size_t subset_len, const uint8_t *block_hash,
-                           MvBuf *out);
+                           uint64_t recipient_index, MvBuf *out);
 
 int32_t mv_lagrange_for(uint64_t point, const uint64_t *subset,
                         size_t subset_len, MvBuf *out);

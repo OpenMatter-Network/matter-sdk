@@ -19,10 +19,12 @@ export interface RequestAuth {
   eth_signature?: string;
 }
 
-/** Per-request context handed to a {@link Signer}. */
+/** Per-request context handed to a {@link Signer}. One request targets one node. */
 export interface SigningRequest {
   secretId: bigint;
   subset: number[];
+  /** The 1-based `dkg_index` of the node this request is addressed to (MV-C1). */
+  recipientIndex: number;
   blockHash: Uint8Array;
   validUntil?: number;
 }
@@ -51,7 +53,7 @@ export function substrateSigner(
   return {
     authScheme: () => "substrate",
     async authorize(req: SigningRequest): Promise<RequestAuth> {
-      const payload = signingPayload(req.secretId, req.subset, req.blockHash);
+      const payload = signingPayload(req.secretId, req.subset, req.blockHash, req.recipientIndex);
       const sig = await sign(payload);
       if (sig.length !== 64) throw new Error(`sr25519 signature must be 64 bytes, got ${sig.length}`);
       const multisig = new Uint8Array(65);

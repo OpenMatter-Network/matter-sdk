@@ -19,7 +19,9 @@ class Signer(Protocol):
 
     def auth_scheme(self) -> str: ...
 
-    def authorize(self, secret_id: int, subset: List[int], block_hash: bytes) -> dict: ...
+    def authorize(
+        self, secret_id: int, subset: List[int], recipient_index: int, block_hash: bytes
+    ) -> dict: ...
 
 
 class _SubstrateSigner:
@@ -32,8 +34,12 @@ class _SubstrateSigner:
     def auth_scheme(self) -> str:
         return "substrate"
 
-    def authorize(self, secret_id: int, subset: List[int], block_hash: bytes) -> dict:
-        payload = signing_payload(secret_id, list(subset), bytes(block_hash))
+    def authorize(
+        self, secret_id: int, subset: List[int], recipient_index: int, block_hash: bytes
+    ) -> dict:
+        # recipient_index is the responding node's 1-based dkg_index: sign once
+        # per node so the signature can't be replayed to a peer (MV-C1).
+        payload = signing_payload(secret_id, list(subset), bytes(block_hash), recipient_index)
         sig = self._sign(payload)
         if len(sig) != 64:
             raise ValueError(f"sr25519 signature must be 64 bytes, got {len(sig)}")

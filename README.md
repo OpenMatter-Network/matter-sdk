@@ -11,17 +11,9 @@ No single party — not even the committee operators — can decrypt your secret
 > work end-to-end and have each been verified against the live testnet. See
 > [Language support](#language-support).
 
-```
-                   ┌──────────────────────────────────────────────┐
-   your app  ──►   │  MatterSDK (Rust │ TypeScript │ Python │ Go)  │
-                   └───────────────┬───────────────┬──────────────┘
-            encrypt() locally      │               │   decrypt(): collect t partials,
-            (seal under joint pk)   │               │   verify + aggregate + AEAD-open
-                   ┌────────────────▼──┐      ┌──────▼───────────────────┐
-                   │ matter chain      │      │ matter-kgc committee      │
-                   │ (store ciphertext)│      │ POST /partial-decrypt ×t  │
-                   └───────────────────┘      └──────────────────────────┘
-```
+<p align="center">
+  <img src="docs/assets/integration-flow.svg" alt="Your app calls MatterSDK to encrypt a secret and store the ciphertext on the matter chain, then to decrypt by requesting partial decryptions from a t-of-n matter-kgc committee and aggregating them locally" width="880">
+</p>
 
 ## Why a committee?
 
@@ -32,6 +24,10 @@ to each compute a *partial decryption* that your client aggregates locally. The
 cryptography is RLWE/BGV threshold decryption with zero-knowledge proofs at every
 step (implemented in [`matter-crypto`](https://github.com/openmatter-network/matter-crypto));
 this SDK is the safe, ergonomic way to use it.
+
+<p align="center">
+  <img src="docs/assets/quorum.svg" alt="Five committee nodes each hold one piece of the private key; any three pieces reconstruct the secret while any two reveal nothing — no single node ever holds the full key" width="760">
+</p>
 
 ## Architecture: one core, four shells
 
@@ -60,6 +56,15 @@ the core guarantees every binding agrees byte-for-byte. See [`docs/architecture.
   your own Substrate client (subxt / @polkadot / py-substrate / GSRPC), and you sign
   with **your** signer (HSM, KMS, wallet, or a local dev key). See
   [Secure signing](#secure-signing).
+
+## How it works
+
+A secret travels through six steps — sealed client-side, stored as ciphertext, and
+recovered only when a `t`-of-`n` quorum cooperates:
+
+<p align="center">
+  <img src="docs/assets/lifecycle.svg" alt="Six-step lifecycle: Seal, Store, Authorize, Request, Partial-decrypt, Deploy. Any t of the n committee nodes suffice to decrypt; fewer than t learn nothing" width="900">
+</p>
 
 ## Language support
 
@@ -124,15 +129,6 @@ await /* store the ciphertext on-chain */ storeSecret(...);
 const plaintext = await decrypt(transport, signer, { /* … */ }); // still just works
 ```
 
-<details><summary>Read deeper: how the key survives rotation</summary>
-
-The public key is tied to the underlying secret, **not** to which nodes currently
-hold shares. A rotation reshares that same secret to the new committee — refreshing
-every share without ever rebuilding the full key — so the public key is unchanged.
-Each stored ciphertext is also stamped with the **epoch** it was sealed under, so data
-encrypted before a rotation stays decryptable after it.
-</details>
-
 **Q: How does rotating members make things *more* secure, not less?**
 
 Rotation runs a **proactive refresh**: members periodically replace their shares with
@@ -141,6 +137,10 @@ ever being assembled. Old shares become useless. So an attacker who breaks into 
 slowly, one at a time, is reset at every rotation: they'd have to compromise `t`
 members *within a single rotation window* to learn anything. Steal `t-1` shares over a
 year and you still have nothing.
+
+For the mechanism — proactive resharing, epoch-stamped ciphertext, and the per-window
+compromise model — see [**Key rotation**](docs/architecture.md#key-rotation) in the
+architecture doc.
 
 **Q: Is this quantum-safe? How does it line up with NIST's post-quantum standards?**
 
@@ -200,9 +200,9 @@ Each binding has a live harness that runs the full path — encrypt →
 (that the committee accepts the SDK's signature on-chain):
 [Rust](examples/rust-e2e) · [TypeScript](examples/e2e) ([README](examples/e2e/README.md)) ·
 [Python](examples/python-e2e) · [Go](examples/go-e2e). They share env vars —
-`MATTER_RPC_URL` (defaults to testnet) and `MATTER_SIGNER_SEED` (a funded sr25519 seed;
-`TEST_KEY` also accepted). A no-gas [`preflight.ts`](examples/e2e/preflight.ts) checks
-funding + committee health first.
+`MATTER_RPC_URL` (defaults to testnet) and `MATTER_SIGNER_SEED` (a funded sr25519 key,
+as a `0x`-hex seed or a BIP39 mnemonic; `TEST_KEY` also accepted). A no-gas
+[`preflight.ts`](examples/e2e/preflight.ts) checks funding + committee health first.
 
 ## License
 

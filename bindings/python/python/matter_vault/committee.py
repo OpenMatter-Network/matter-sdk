@@ -68,13 +68,12 @@ def decrypt(transport: Transport, signer: Signer, params: DecryptParams) -> byte
     chosen = active[: params.threshold]
     subset = [n.index for n in chosen]
 
-    # 3. Sign once for this (secret, subset, block_hash).
-    auth = signer.authorize(params.secret_id, subset, params.block_hash)
-
-    # 4. Query each chosen node, collecting partials.
+    # 3. Query each chosen node, signing per node so the payload binds that
+    #    node's index — a signature can't be replayed by it to a peer (MV-C1).
     partials = []
     for node in chosen:
         lam = lagrange_for(node.index, subset)
+        auth = signer.authorize(params.secret_id, subset, node.index, params.block_hash)
         req = {
             "secret_id": secret_id_to_hex(params.secret_id),
             "subset": subset,

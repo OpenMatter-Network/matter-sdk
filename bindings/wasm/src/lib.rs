@@ -82,13 +82,15 @@ pub fn encrypt_secret(
 }
 
 /// The canonical bytes a requester signs for a `/partial-decrypt` request,
-/// binding `(secret_id, subset, block_hash)`. `secret_id_hex` / `block_hash_hex`
-/// are `"0x"`+hex.
+/// binding `(secret_id, subset, block_hash, recipient_index)`. `secret_id_hex` /
+/// `block_hash_hex` are `"0x"`+hex; `recipient_index` is the responding node's
+/// 1-based `dkg_index` (sign once per node, MV-C1).
 #[wasm_bindgen(js_name = partialDecryptSigningPayload)]
 pub fn partial_decrypt_signing_payload(
     secret_id_hex: &str,
     subset: Vec<u64>,
     block_hash_hex: &str,
+    recipient_index: u64,
 ) -> Result<Uint8Array, JsError> {
     let secret_id = core::wire::secret_id_from_hex(secret_id_hex).map_err(js_err)?;
     let block_hash: [u8; 32] = core::wire::from_0x("block_hash", block_hash_hex)
@@ -96,7 +98,7 @@ pub fn partial_decrypt_signing_payload(
         .try_into()
         .map_err(|_| JsError::new("block_hash must be 32 bytes"))?;
     Ok(Uint8Array::from(
-        &core::signing_payload(secret_id, &subset, &block_hash)[..],
+        &core::signing_payload(secret_id, &subset, &block_hash, recipient_index)[..],
     ))
 }
 

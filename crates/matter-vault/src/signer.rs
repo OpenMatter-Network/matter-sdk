@@ -23,12 +23,19 @@ use crate::error::{Result, SdkError};
 const MULTISIGNATURE_SR25519: u8 = 1;
 
 /// The per-request context a [`Signer`] needs to authorize one `/partial-decrypt`.
+///
+/// One request targets **one** committee node: `recipient_index` is that node's
+/// 1-based `dkg_index`, folded into the signed payload so the signature can't be
+/// replayed to another node in the subset (MV-C1). The shell builds and signs one
+/// of these per node in the quorum.
 #[derive(Debug, Clone)]
 pub struct SigningRequest<'a> {
     /// The secret being decrypted.
     pub secret_id: u128,
     /// The sorted committee subset being queried.
     pub subset: &'a [u64],
+    /// The 1-based `dkg_index` of the node this request is addressed to.
+    pub recipient_index: u64,
     /// A recent finalized block hash, the freshness anchor.
     pub block_hash: [u8; 32],
     /// Ethereum path only: block number after which the signature expires.
@@ -39,7 +46,12 @@ impl SigningRequest<'_> {
     /// The canonical bytes a Substrate signer signs — identical to what the
     /// committee node reconstructs and verifies.
     pub fn payload(&self) -> Vec<u8> {
-        signing_payload(self.secret_id, self.subset, &self.block_hash)
+        signing_payload(
+            self.secret_id,
+            self.subset,
+            &self.block_hash,
+            self.recipient_index,
+        )
     }
 }
 
@@ -92,14 +104,26 @@ impl Sr25519Signer {
     ///
     /// The name is a deterrent: this loads a private key into process memory and
     /// must never be used in production. It also prints a one-line warning to
-    /// stderr the first time it is constructed.
+    /// stderr each time it is constructed.
     pub fn from_seed_insecure_dev_only(seed: &[u8; 32]) -> Result<Self> {
-        eprintln!(
-            "WARNING: Sr25519Signer::from_seed_insecure_dev_only loads a raw \
-             private key into memory. Use an HSM/KMS-backed Signer in production."
-        );
-        let uri = SecretUri::from_str(&format!("0x{}", hex::encode(seed)))
-            .map_err(|e| SdkError::Signer(format!("seed parse: {e}")))?;
+        warn_insecure("from_seed_insecure_dev_only");
+        // Straight into the keypair — no `0x{hex}` SecretUri round-trip, which
+        // left un-zeroized hex copies of the seed on the heap (MV-M3). This is
+        // byte-for-byte the path `Keypair::from_uri` takes for a `0x` phrase.
+        let keypair = Keypair::from_secret_key(*seed)
+            .map_err(|e| SdkError::Signer(format!("seed: {e}")))?;
+        Ok(Self { keypair })
+    }
+
+    /// Build a signer from an sr25519 secret URI: a `0x` 32-byte hex seed, a
+    /// BIP39 mnemonic, or a full SURI with derivation junctions.
+    ///
+    /// Same deterrent name and warning as [`Self::from_seed_insecure_dev_only`]:
+    /// examples and tests only.
+    pub fn from_uri_insecure_dev_only(uri: &str) -> Result<Self> {
+        warn_insecure("from_uri_insecure_dev_only");
+        let uri =
+            SecretUri::from_str(uri).map_err(|e| SdkError::Signer(format!("uri parse: {e}")))?;
         let keypair =
             Keypair::from_uri(&uri).map_err(|e| SdkError::Signer(format!("keypair: {e}")))?;
         Ok(Self { keypair })
@@ -109,6 +133,13 @@ impl Sr25519Signer {
     pub fn account_id(&self) -> [u8; 32] {
         self.keypair.public_key().0
     }
+}
+
+fn warn_insecure(ctor: &str) {
+    eprintln!(
+        "WARNING: Sr25519Signer::{ctor} loads a raw private key into memory. \
+         Use an HSM/KMS-backed Signer in production."
+    );
 }
 
 impl Signer for Sr25519Signer {
@@ -151,6 +182,7 @@ mod tests {
         let req = SigningRequest {
             secret_id: 42,
             subset: &[1, 2, 3],
+            recipient_index: 2,
             block_hash: [0x11; 32],
             valid_until: None,
         };
@@ -174,9 +206,90 @@ mod tests {
         let req = SigningRequest {
             secret_id: 9,
             subset: &[2, 4, 6],
+            recipient_index: 4,
             block_hash: [0xab; 32],
             valid_until: None,
         };
-        assert_eq!(req.payload(), signing_payload(9, &[2, 4, 6], &[0xab; 32]));
+        assert_eq!(
+            req.payload(),
+            signing_payload(9, &[2, 4, 6], &[0xab; 32], 4)
+        );
+    }
+
+    #[test]
+    fn per_node_signatures_differ() {
+        // MV-C1: the same (secret, subset, block) signed for two different nodes
+        // must produce different signed bytes, so a signature made for one node
+        // is not valid at another.
+        let base = |recipient_index| SigningRequest {
+            secret_id: 9,
+            subset: &[2, 4, 6],
+            recipient_index,
+            block_hash: [0xab; 32],
+            valid_until: None,
+        };
+        assert_ne!(base(2).payload(), base(4).payload());
+    }
+
+    // Cross-language seed-format vector — mirrors testvectors/seed_formats.json
+    // (kept as consts because inline unit tests shouldn't do file IO; the
+    // emit_seed_format_vectors test keeps fixture and consts honest). The same
+    // constants are asserted by every language binding and by the dashboard that
+    // mints API keys, pinning the key-ingestion contract across repos.
+    const VECTOR_MNEMONIC: &str =
+        "bottom drive obey lake curtain smoke basket hold race lonely fit walk";
+    const VECTOR_SEED_HEX: &str =
+        "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e";
+    const VECTOR_ACCOUNT_ID_HEX: &str =
+        "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a";
+
+    fn vector_account_id() -> [u8; 32] {
+        hex::decode(VECTOR_ACCOUNT_ID_HEX)
+            .unwrap()
+            .try_into()
+            .unwrap()
+    }
+
+    #[test]
+    fn hex_and_mnemonic_uris_derive_the_same_key() {
+        let from_mnemonic = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_MNEMONIC).unwrap();
+        let from_hex = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_SEED_HEX).unwrap();
+        assert_eq!(from_mnemonic.account_id(), vector_account_id());
+        assert_eq!(from_hex.account_id(), vector_account_id());
+    }
+
+    #[test]
+    fn from_seed_matches_from_uri_hex() {
+        // Pins the MV-M3 refactor: from_secret_key must stay byte-for-byte the
+        // path from_uri takes for a 0x phrase.
+        let seed: [u8; 32] = hex::decode(&VECTOR_SEED_HEX[2..])
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let from_seed = Sr25519Signer::from_seed_insecure_dev_only(&seed).unwrap();
+        let from_uri = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_SEED_HEX).unwrap();
+        assert_eq!(from_seed.account_id(), from_uri.account_id());
+    }
+
+    #[test]
+    fn equivalent_encodings_produce_the_same_requester() {
+        // sr25519 signatures are non-deterministic, so compare the requester
+        // (account) both constructions attach, not the signature bytes.
+        let req = SigningRequest {
+            secret_id: 42,
+            subset: &[1, 2, 3],
+            recipient_index: 1,
+            block_hash: [0x22; 32],
+            valid_until: None,
+        };
+        let a = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_MNEMONIC)
+            .unwrap()
+            .authorize(&req)
+            .unwrap();
+        let b = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_SEED_HEX)
+            .unwrap()
+            .authorize(&req)
+            .unwrap();
+        assert_eq!(a.requester, b.requester);
     }
 }

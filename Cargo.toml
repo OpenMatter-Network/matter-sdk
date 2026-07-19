@@ -37,19 +37,24 @@ resolver = "2"
 [workspace.package]
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
-version = "0.1.0"
+version = "0.9.1"
 homepage = "https://openmatter.network"
 repository = "https://github.com/openmatter-network/matter-sdk"
 edition = "2021"
-rust-version = "1.93"
+# Floor lowered from 1.93 so the matter-ml agent (workspace pinned to
+# nightly-2025-07-15 = 1.90 for matter-ml-offline) can consume matter-vault
+# as a git-tag dependency. Nothing in the workspace needs post-1.90 rustc;
+# restore a higher floor only alongside a matter-ml toolchain bump.
+rust-version = "1.90"
 
 [workspace.dependencies]
 # --- The cryptographic core we wrap (never re-implement). ---
-# Release form: { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.6.0" }
-matter-crypto = { path = "../matter-crypto/crypto", default-features = false }
-# Release form: { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.7.1" }
-matter-kgc-proto = { path = "../matter-kgc/kgc-proto", default-features = false }
-matter-kgc-config = { path = "../matter-kgc/config-contract", default-features = false }
+matter-crypto = { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.8.1", default-features = false }
+# Wire types moved out of matter-crypto into the matter-kgc repo; pinned by tag.
+matter-kgc-proto = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
+# On-chain config mirror + the `wire` codec (versioned tag ⇄ bincode pairing)
+# the provider uses to decode `EncryptedEnv.proof`. Same repo/tag as the proto.
+matter-kgc-config = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
 
 # --- Local crates. ---
 matter-vault-core = { path = "crates/matter-vault-core", default-features = false }

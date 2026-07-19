@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 700" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>One core, many shells</title>
+  <desc>A single pure crypto core, crates/matter-vault-core, is shared through four bindings: native Rust, wasm-bindgen to TypeScript, a C ABI to Go, and PyO3 to Python. Every shell adds the same idiomatic committee client, quorum, Signer and call builders.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#ff5fa2"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c3b4ff"/>
+    </marker>
+  </defs>
+  <style>
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .mono{font-family:'SFMono-Regular',Menlo,Consolas,monospace}
+    .card{fill:#ffffff;fill-opacity:.07;stroke:#ffffff;stroke-opacity:.22;stroke-width:1.5}
+    .lead{stroke:#c3b4ff;stroke-width:2.5;fill:none}
+  </style>
+
+  <rect width="1600" height="700" fill="url(#bg)"/>
+  <ellipse cx="200" cy="40" rx="560" ry="300" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="title" x="800" y="58" text-anchor="middle" font-size="36">One core, many shells</text>
+
+  <!-- core -->
+  <rect x="350" y="92" width="900" height="108" rx="18" fill="#ffffff" fill-opacity="0.10" stroke="#cbb8ff" stroke-opacity="0.7" stroke-width="2"/>
+  <rect x="350" y="92" width="900" height="7" rx="3.5" fill="url(#accent)"/>
+  <text class="title mono" x="800" y="148" text-anchor="middle" font-size="28">crates/matter-vault-core</text>
+  <text class="muted" x="800" y="182" text-anchor="middle" font-size="17">pure crypto + wire contract · wraps matter-crypto (RLWE/BGV) — never re-implements it</text>
+
+  <!-- fan to shells -->
+  <path class="lead" d="M800,200 C540,250 320,250 224,298" marker-end="url(#arrow)"/>
+  <path class="lead" d="M800,200 C700,250 640,255 608,298" marker-end="url(#arrow)"/>
+  <path class="lead" d="M800,200 C900,250 960,255 992,298" marker-end="url(#arrow)"/>
+  <path class="lead" d="M800,200 C1060,250 1280,250 1376,298" marker-end="url(#arrow)"/>
+
+  <!-- column 1: native -->
+  <rect class="card" x="64" y="300" width="320" height="92" rx="14"/>
+  <text class="title mono" x="224" y="338" text-anchor="middle" font-size="19">crates/matter-vault</text>
+  <text class="teal" x="224" y="368" text-anchor="middle" font-size="16">Rust SDK · native</text>
+
+  <!-- column 2: wasm -->
+  <rect class="card" x="448" y="300" width="320" height="92" rx="14"/>
+  <text class="title mono" x="608" y="338" text-anchor="middle" font-size="19">bindings/wasm</text>
+  <text class="teal" x="608" y="368" text-anchor="middle" font-size="16">wasm-bindgen</text>
+  <path class="lead" d="M608,392 L608,414" marker-end="url(#arrow)"/>
+  <rect class="card" x="448" y="416" width="320" height="92" rx="14"/>
+  <text class="title mono" x="608" y="454" text-anchor="middle" font-size="19">packages/typescript</text>
+  <text class="muted" x="608" y="484" text-anchor="middle" font-size="16">TS SDK</text>
+
+  <!-- column 3: C ABI -->
+  <rect class="card" x="832" y="300" width="320" height="92" rx="14"/>
+  <text class="title mono" x="992" y="338" text-anchor="middle" font-size="19">crates/matter-vault-ffi</text>
+  <text class="teal" x="992" y="368" text-anchor="middle" font-size="16">C ABI</text>
+  <path class="lead" d="M992,392 L992,414" marker-end="url(#arrow)"/>
+  <rect class="card" x="832" y="416" width="320" height="92" rx="14"/>
+  <text class="title mono" x="992" y="454" text-anchor="middle" font-size="19">packages/go</text>
+  <text class="muted" x="992" y="484" text-anchor="middle" font-size="16">cgo</text>
+
+  <!-- column 4: PyO3 -->
+  <rect class="card" x="1216" y="300" width="320" height="92" rx="14"/>
+  <text class="title mono" x="1376" y="338" text-anchor="middle" font-size="19">bindings/python</text>
+  <text class="teal" x="1376" y="368" text-anchor="middle" font-size="16">PyO3 · Python ext</text>
+
+  <!-- converge to shell band -->
+  <path class="lead" d="M224,392 L224,627 L298,627" marker-end="url(#arrow)"/>
+  <path class="lead" d="M608,508 L608,586" marker-end="url(#arrow)"/>
+  <path class="lead" d="M992,508 L992,586" marker-end="url(#arrow)"/>
+  <path class="lead" d="M1376,392 L1376,627 L1302,627" marker-end="url(#arrow)"/>
+
+  <rect class="card" x="300" y="588" width="1000" height="78" rx="16" fill-opacity="0.05"/>
+  <text x="800" y="624" text-anchor="middle" font-size="21"><tspan class="title">Each shell adds: </tspan><tspan class="muted">committee client · quorum · Signer · call builders</tspan></text>
+  <text class="teal" x="800" y="650" text-anchor="middle" font-size="16">idiomatic per language — only the cryptography is shared</text>
+</svg>

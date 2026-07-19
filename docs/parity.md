@@ -29,7 +29,7 @@ signature and the crypto agrees byte-for-byte.
 Live e2e harnesses: [`examples/rust-e2e`](../examples/rust-e2e) ·
 [`examples/e2e`](../examples/e2e) (TypeScript) · [`examples/python-e2e`](../examples/python-e2e) ·
 [`examples/go-e2e`](../examples/go-e2e). Each reads `MATTER_RPC_URL` (defaults to testnet)
-and `MATTER_SIGNER_SEED` (a funded sr25519 account).
+and `MATTER_SIGNER_SEED` (a funded sr25519 account, as a `0x`-hex seed or a BIP39 mnemonic).
 
 ## How conformance is guaranteed
 

@@ -18,9 +18,12 @@ What MatterVault protects, and against whom:
   (or anyone who compromises one) computes a partial decryption that is useless on its
   own. You need `t` cooperating nodes.
 - **A captured `/partial-decrypt` request can't be replayed elsewhere.** The signature
-  binds `(secret_id, subset, block_hash)` (and `valid_until` on the Ethereum path), so a
-  recorded request can't be re-aimed at another secret or replayed past its freshness
-  window.
+  binds `(secret_id, subset, block_hash, recipient_node)` (and `valid_until` on the
+  Ethereum path), so a recorded request can't be re-aimed at another secret, **replayed
+  to a different committee node in the same subset**, or replayed past its freshness
+  window. The requester signs once per node; each node verifies the signature against its
+  own `dkg_index`. This is what stops one in-subset node from replaying a user's request
+  to its peers and harvesting a full quorum of partials alone (MV-C1).
 - **Only authorized accounts can request decryption.** Each node checks the resolved
   signer against the on-chain authorization list before serving a partial.
 

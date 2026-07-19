@@ -7,9 +7,10 @@ their crypto stays identical.
 
 | File | What every binding must reproduce |
 |---|---|
-| `signing_payload.json` | the exact bytes a requester signs for `/partial-decrypt` |
+| `signing_payload.json` | the exact bytes a requester signs for `/partial-decrypt`, including the per-node `recipient_index` bound into the payload (MV-C1) |
 | `lagrange.json` | the bincode Lagrange coefficient for a node over a subset |
 | `open_secret.json` | a sealed secret + a real committee quorum; `openSecret` must recover `expected_plaintext_hex` |
+| `seed_formats.json` | one sr25519 secret in both encodings (`0x`-hex mini-secret and BIP39 mnemonic) must derive `account_id_hex` — pins key ingestion in every binding's companion signer library, and in the dashboard that mints API keys |
 
 All binary fields are bare lowercase hex (no `0x`). `secret_id` is a decimal string
 (it's a `u128`).
@@ -21,6 +22,7 @@ conformance suite:
 
 ```bash
 cargo test -p matter-vault-core --test roundtrip -- --ignored
+cargo test -p matter-vault --test seed_formats -- --ignored
 ```
 
 `open_secret.json` is large (~4 MB) because RLWE capsules and ZK proofs are large;

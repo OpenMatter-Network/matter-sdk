@@ -6,10 +6,11 @@ package mattervault
 type Aad string
 
 const (
-	AadEnvV1          Aad = "matter-deployment/env/v1"
-	AadTlsV1          Aad = "matter-deployment/tls/v1"
-	AadStorageCredsV1 Aad = "matter-volume/storage-creds/v1"
-	AadVolumeDekV1    Aad = "matter-volume/dek/v1"
+	AadEnvV1                Aad = "matter-deployment/env/v1"
+	AadTlsV1                Aad = "matter-deployment/tls/v1"
+	AadStorageCredsV1       Aad = "matter-volume/storage-creds/v1"
+	AadVolumeDekV1          Aad = "matter-volume/dek/v1"
+	AadDatasetSourceCredsV1 Aad = "matter-dataset/source-creds/v1"
 )
 
 // AadBytes returns the canonical bytes for an AAD tag.

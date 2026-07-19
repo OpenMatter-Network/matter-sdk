@@ -367,6 +367,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 [[package]]
 name = "matter-crypto"
 version = "0.8.0"
+source = "git+ssh://git@github.com/openmatter-network/matter-crypto.git?tag=v0.8.1#0f7ae62260c687b15211be39ba1d213803358ba7"
 dependencies = [
  "aes-gcm",
  "bincode",
@@ -384,6 +385,7 @@ dependencies = [
 [[package]]
 name = "matter-kgc-config"
 version = "0.1.0"
+source = "git+ssh://git@github.com/openmatter-network/matter-kgc.git?tag=v0.10.0#45872b209784aeca1a4b7ee6980e3f4be4ca9b0c"
 dependencies = [
  "bincode",
  "parity-scale-codec",
@@ -393,6 +395,7 @@ dependencies = [
 [[package]]
 name = "matter-kgc-proto"
 version = "0.1.0"
+source = "git+ssh://git@github.com/openmatter-network/matter-kgc.git?tag=v0.10.0#45872b209784aeca1a4b7ee6980e3f4be4ca9b0c"
 dependencies = [
  "serde",
 ]

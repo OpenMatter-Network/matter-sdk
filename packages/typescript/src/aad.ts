@@ -8,6 +8,9 @@ export enum Aad {
   TlsV1 = "matter-deployment/tls/v1",
   StorageCredsV1 = "matter-volume/storage-creds/v1",
   VolumeDekV1 = "matter-volume/dek/v1",
+  /** Dataset data-source credentials (S3/Postgres) for the matter-ml agent —
+   * payload is the canonical JSON schema in `docs/agent-credential-delivery.md`. */
+  DatasetSourceCredsV1 = "matter-dataset/source-creds/v1",
 }
 
 const ENCODER = new TextEncoder();

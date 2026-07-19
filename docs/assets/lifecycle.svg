@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>The MatterVault secret lifecycle</title>
+  <desc>Six steps: Seal, Store, Authorize, Request, Partial-decrypt, Deploy. Any t of the n committee nodes suffice to decrypt; fewer than t learn nothing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#ff5fa2"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c3b4ff"/>
+    </marker>
+  </defs>
+  <style>
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .num{font-weight:700}
+    .step{font-weight:700}
+    .lead{stroke:#c3b4ff;stroke-width:2.5;fill:none}
+    .card{fill:#ffffff;fill-opacity:.05;stroke:#ffffff;stroke-opacity:.18;stroke-width:1.5}
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="200" cy="60" rx="560" ry="360" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="teal" x="800" y="92" text-anchor="middle" font-size="18" letter-spacing="6">HOW IT WORKS</text>
+  <text class="title" x="800" y="150" text-anchor="middle" font-size="44">From sealed secret to running workload</text>
+
+  <!-- connectors -->
+  <path class="lead" d="M268,350 L388,350" marker-end="url(#arrow)"/>
+  <path class="lead" d="M504,350 L624,350" marker-end="url(#arrow)"/>
+  <path class="lead" d="M740,350 L860,350" marker-end="url(#arrow)"/>
+  <path class="lead" d="M976,350 L1096,350" marker-end="url(#arrow)"/>
+  <path class="lead" d="M1212,350 L1332,350" marker-end="url(#arrow)"/>
+
+  <!-- step 1 -->
+  <circle cx="210" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="210" y="364" text-anchor="middle" font-size="38">1</text>
+  <text class="step" x="210" y="450" text-anchor="middle" font-size="23">Seal</text>
+  <text class="muted" x="210" y="486" text-anchor="middle" font-size="15">encrypt under the</text>
+  <text class="muted" x="210" y="508" text-anchor="middle" font-size="15">committee public key</text>
+
+  <!-- step 2 -->
+  <circle cx="446" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="446" y="364" text-anchor="middle" font-size="38">2</text>
+  <text class="step" x="446" y="450" text-anchor="middle" font-size="23">Store</text>
+  <text class="muted" x="446" y="486" text-anchor="middle" font-size="15">ciphertext envelope</text>
+  <text class="muted" x="446" y="508" text-anchor="middle" font-size="15">written on-chain</text>
+
+  <!-- step 3 -->
+  <circle cx="682" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="682" y="364" text-anchor="middle" font-size="38">3</text>
+  <text class="step" x="682" y="450" text-anchor="middle" font-size="23">Authorize</text>
+  <text class="muted" x="682" y="486" text-anchor="middle" font-size="15">owner grants decrypt</text>
+  <text class="muted" x="682" y="508" text-anchor="middle" font-size="15">access to accounts</text>
+
+  <!-- step 4 -->
+  <circle cx="918" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="918" y="364" text-anchor="middle" font-size="38">4</text>
+  <text class="step" x="918" y="450" text-anchor="middle" font-size="23">Request</text>
+  <text class="muted" x="918" y="486" text-anchor="middle" font-size="15">provider asks t of</text>
+  <text class="muted" x="918" y="508" text-anchor="middle" font-size="15">n committee nodes</text>
+
+  <!-- step 5 -->
+  <circle cx="1154" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="1154" y="364" text-anchor="middle" font-size="38">5</text>
+  <text class="step" x="1154" y="450" text-anchor="middle" font-size="23">Partial-decrypt</text>
+  <text class="muted" x="1154" y="486" text-anchor="middle" font-size="15">each node returns a</text>
+  <text class="muted" x="1154" y="508" text-anchor="middle" font-size="15">partial + ZK proof</text>
+
+  <!-- step 6 -->
+  <circle cx="1390" cy="350" r="46" fill="url(#accent)"/>
+  <text class="num" x="1390" y="364" text-anchor="middle" font-size="38">6</text>
+  <text class="step" x="1390" y="450" text-anchor="middle" font-size="23">Deploy</text>
+  <text class="muted" x="1390" y="486" text-anchor="middle" font-size="15">partials combine, secret</text>
+  <text class="muted" x="1390" y="508" text-anchor="middle" font-size="15">opens, workload runs</text>
+
+  <!-- footer -->
+  <rect class="card" x="250" y="700" width="1100" height="66" rx="14"/>
+  <text x="800" y="742" text-anchor="middle" font-size="20"><tspan class="title">Threshold (t-of-n): </tspan><tspan class="muted">any t of the n nodes suffice to decrypt — fewer than t learn nothing.</tspan></text>
+</svg>

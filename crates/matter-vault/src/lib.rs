@@ -53,3 +53,53 @@ pub use error::{Result, SdkError};
 pub use matter_vault_core::{self, encrypt, Aad, CoreError, EncryptedSecret, Plaintext};
 pub use signer::{RequestAuth, Signer, SigningRequest, Sr25519Signer};
 pub use transport::{Health, ReqwestTransport, Transport};
+
+/// Chain-derived committee state at a secret's stored epoch — everything
+/// [`recover_secret`] needs besides the envelope itself. The caller fetches
+/// these fields with its own Substrate client.
+#[derive(Debug, Clone)]
+pub struct CommitteeInfo {
+    /// The epoch the secret was sealed under (which this state is for).
+    pub epoch: u32,
+    /// The committee threshold `t` in force for `epoch`.
+    pub threshold: usize,
+    /// Bincode `shared_a` for `epoch`, read from chain.
+    pub shared_a: Vec<u8>,
+    /// The candidate committee nodes (at least `threshold` must be healthy).
+    pub nodes: Vec<CommitteeNode>,
+    /// A recent finalized block hash (freshness anchor for request signatures).
+    pub block_hash: [u8; 32],
+}
+
+/// Recover one stored secret in a single call — a thin composition of
+/// [`decrypt`] over a fetched [`EncryptedSecret`] and [`CommitteeInfo`]; no new
+/// crypto, and errors are exactly [`decrypt`]'s.
+///
+/// Takes the AAD as a registry [`Aad`] tag (not raw bytes) so an embedded
+/// consumer can't drift from the tag the secret was sealed under.
+pub async fn recover_secret(
+    committee: &CommitteeInfo,
+    transport: &impl Transport,
+    signer: &impl Signer,
+    secret_id: u128,
+    secret: &EncryptedSecret,
+    aad: Aad,
+) -> Result<Plaintext> {
+    decrypt(
+        transport,
+        signer,
+        &DecryptRequest {
+            secret_id,
+            epoch: committee.epoch,
+            binding_id: &secret.binding_id,
+            aad: aad.as_bytes(),
+            capsule: &secret.capsule,
+            ct: &secret.ct,
+            shared_a: &committee.shared_a,
+            block_hash: committee.block_hash,
+            threshold: committee.threshold,
+            nodes: &committee.nodes,
+        },
+    )
+    .await
+}

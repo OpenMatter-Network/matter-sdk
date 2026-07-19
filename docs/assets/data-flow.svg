@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>Data flow: seal, store, decrypt</title>
+  <desc>The SDK seals a secret offline and decrypts it through a t-of-n committee. The middle step — submitting the extrinsic and reading chain state — stays with your own Substrate client.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c3b4ff"/>
+    </marker>
+  </defs>
+  <style>
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .pink{fill:#ff85bb}
+    .mono{font-family:'SFMono-Regular',Menlo,Consolas,monospace}
+    .card{fill:#ffffff;fill-opacity:.07;stroke:#ffffff;stroke-opacity:.22;stroke-width:1.5}
+    .lead{stroke:#c3b4ff;stroke-width:2.5;fill:none}
+  </style>
+
+  <rect width="1600" height="720" fill="url(#bg)"/>
+  <ellipse cx="1400" cy="40" rx="540" ry="300" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="title" x="800" y="64" text-anchor="middle" font-size="36">Data flow</text>
+  <text class="muted" x="800" y="104" text-anchor="middle" font-size="20">encrypt offline · store on your chain · decrypt through the SDK</text>
+
+  <!-- SEAL -->
+  <rect class="card" x="70" y="150" width="440" height="380" rx="18"/>
+  <rect x="70" y="150" width="440" height="7" rx="3.5" fill="#5fe6d4"/>
+  <text class="title" x="94" y="208" font-size="26">SEAL</text>
+  <text class="teal" x="94" y="236" font-size="15">offline · owned by the SDK</text>
+  <line x1="94" y1="254" x2="486" y2="254" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.5"/>
+  <text class="mono muted" x="94" y="300" font-size="18">encrypt(plaintext, aad,</text>
+  <text class="mono muted" x="94" y="330" font-size="18">        jointPk, epoch)</text>
+  <text class="mono" x="94" y="372" font-size="18">→ EncryptedSecret {</text>
+  <text class="mono muted" x="94" y="402" font-size="18">    binding_id, capsule,</text>
+  <text class="mono muted" x="94" y="432" font-size="18">    proof, ct }</text>
+
+  <!-- STORE -->
+  <rect class="card" x="580" y="150" width="440" height="380" rx="18"/>
+  <rect x="580" y="150" width="440" height="7" rx="3.5" fill="#ff5fa2"/>
+  <text class="title" x="604" y="208" font-size="26">STORE</text>
+  <text class="pink" x="604" y="236" font-size="15">your Substrate client</text>
+  <line x1="604" y1="254" x2="996" y2="254" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.5"/>
+  <text class="mono muted" x="604" y="300" font-size="18">secrets.storeSecret(</text>
+  <text class="mono muted" x="604" y="330" font-size="18">  payload, epoch,</text>
+  <text class="mono muted" x="604" y="360" font-size="18">  label, aad)</text>
+  <text class="mono" x="604" y="402" font-size="18">→ secret_id (u128)</text>
+
+  <!-- DECRYPT -->
+  <rect class="card" x="1090" y="150" width="440" height="380" rx="18"/>
+  <rect x="1090" y="150" width="440" height="7" rx="3.5" fill="#5fe6d4"/>
+  <text class="title" x="1114" y="208" font-size="26">DECRYPT</text>
+  <text class="teal" x="1114" y="236" font-size="15">owned by the SDK</text>
+  <line x1="1114" y1="254" x2="1506" y2="254" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.5"/>
+  <text class="mono muted" x="1114" y="296" font-size="17">health-probe nodes</text>
+  <text class="mono muted" x="1114" y="324" font-size="17">pick t-of-n quorum</text>
+  <text class="mono muted" x="1114" y="352" font-size="17">sign request once (Signer)</text>
+  <text class="mono muted" x="1114" y="380" font-size="17">POST /partial-decrypt ×t</text>
+  <text class="mono muted" x="1114" y="408" font-size="17">verify + aggregate + open</text>
+  <text class="mono" x="1114" y="440" font-size="17">→ plaintext</text>
+
+  <!-- arrows -->
+  <path class="lead" d="M512,330 L578,330" marker-end="url(#arrow)"/>
+  <text class="muted" x="545" y="314" text-anchor="middle" font-size="14">submit</text>
+  <path class="lead" d="M1022,330 L1088,330" marker-end="url(#arrow)"/>
+  <text class="muted" x="1055" y="314" text-anchor="middle" font-size="14">secret_id</text>
+
+  <!-- footer -->
+  <rect class="card" x="70" y="588" width="1460" height="74" rx="14" fill-opacity="0.05"/>
+  <text x="800" y="624" text-anchor="middle" font-size="20"><tspan class="title">The SDK owns SEAL and DECRYPT. </tspan><tspan class="muted">The middle — submit the extrinsic, read chain state — stays with your client.</tspan></text>
+  <text class="muted" x="800" y="648" text-anchor="middle" font-size="15" fill-opacity="0.85">It hands you ready-to-sign call arguments (StoreSecret / RotateSecret / GrantAccess).</text>
+</svg>
