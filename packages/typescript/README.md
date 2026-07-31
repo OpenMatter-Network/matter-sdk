@@ -3,10 +3,14 @@
 TypeScript SDK for **MatterVault** — seal secrets under the matter-kgc committee
 and recover them through a signed, threshold `/partial-decrypt` quorum.
 
-The cryptography runs in a shared wasm core (the same core the Rust SDK uses, built
-from `bindings/wasm`); this package adds the committee client, the quorum
-orchestration, a bring-your-own-`Signer`, and the on-chain call builders. You
-submit transactions with your own Substrate client (`@polkadot/api`).
+The cryptography — and API-key derivation — run in a shared wasm core (the same core
+the Rust SDK uses, built from `bindings/wasm`); this package adds the committee
+client, the quorum orchestration, the signer seam, and the on-chain call builders.
+
+This package has **zero runtime dependencies**, which CI asserts, so it stays small
+enough for a browser bundle. To connect to the chain, install
+[`@openmatter-network/matter-client`](../typescript-client) — it re-exports everything
+here, so you import one package name.
 
 ## Install
 
@@ -38,11 +42,19 @@ const plaintext = await decrypt(new FetchTransport(), signer, {
 
 ## Secure signing
 
-`decrypt` takes a `Signer`. The built-in `substrateSigner(accountId, sign)` wraps a
-signing callback you control — a `@polkadot/keyring` pair, a browser wallet, or an
-HSM/KMS adapter — so the private key never enters the SDK. See
-[`docs/secure-signing.md`](../../docs/secure-signing.md). The recovered plaintext is
-returned as raw bytes; keep it short-lived and never log it.
+`decrypt` takes a `Signer`. You choose where the key lives:
+
+- `keySigner({ accountId, sign })` or `substrateSigner(accountId, sign)` wrap a
+  callback you control — a `@polkadot/keyring` pair, a browser wallet, an HSM/KMS
+  adapter — so the key behind that signer never enters the SDK. Recommended for
+  production.
+- `new ApiKey(process.env.MATTER_API_KEY!)` holds the key in-process, inside a
+  container that is redacted through `toString`/`toJSON`/`inspect` and exposes no
+  accessor for the material. An `ApiKey` is itself a `KeySigner`.
+
+See [`docs/secure-signing.md`](../../docs/secure-signing.md) for what that trade
+actually costs. Recovered plaintext is returned as raw bytes; keep it short-lived and
+never log it.
 
 ## Build & test
 

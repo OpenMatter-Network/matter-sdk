@@ -13,4 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 matter-vault-core = { path = "../../crates/matter-vault-core" }
+# API-key ingestion, so Python shares the derivation every other binding uses
+# rather than re-deriving with substrate-interface.
+matter-vault-key = { path = "../../crates/matter-vault-key" }
 pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }

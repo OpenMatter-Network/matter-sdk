@@ -80,6 +80,35 @@ int32_t mv_open_secret(const uint8_t *shared_a, size_t shared_a_len,
                        const MvPartialInput *partials, size_t partials_len,
                        MvBuf *out);
 
+/* ---- API keys -----------------------------------------------------------
+ *
+ * Key derivation is a cross-language contract (testvectors/api_keys.json), so
+ * consumers share this implementation rather than deriving natively. The key
+ * material never crosses the boundary: only the account id and signatures do.
+ */
+
+/* The key was empty, malformed, or named an unsupported scheme. */
+#define MV_ERR_KEY (-3)
+
+/* Opaque handle to a parsed API key. Release with mv_apikey_free. */
+typedef struct MvApiKey MvApiKey;
+
+/* Parse UTF-8 key bytes: a 0x mini-secret, a BIP39 mnemonic, or an sr25519
+ * SURI, each optionally "sr25519:"-prefixed. On error *out is set to NULL. */
+int32_t mv_apikey_parse(const uint8_t *key, size_t key_len, MvApiKey **out);
+
+/* Release a handle, wiping the key material. NULL is a no-op. */
+void mv_apikey_free(MvApiKey *key);
+
+/* Write the key's 32-byte account id to *out. */
+int32_t mv_apikey_account_id(MvApiKey *key, MvBuf *out);
+
+/* Write the key's scheme token (e.g. "sr25519", UTF-8, no NUL) to *out. */
+int32_t mv_apikey_scheme(MvApiKey *key, MvBuf *out);
+
+/* Sign msg, writing the raw 64-byte sr25519 signature (no framing) to *out. */
+int32_t mv_apikey_sign(MvApiKey *key, const uint8_t *msg, size_t msg_len, MvBuf *out);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

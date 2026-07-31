@@ -1,0 +1,41 @@
+[package]
+name = "matter-vault-key"
+description = "Key ingestion and signing for MatterVault: parses an OpenMatter API key (0x mini-secret, BIP39 mnemonic, or sr25519 SURI) into a zeroizing, redacted, non-serializable signer. No networking and no chain client, so it compiles to wasm32 and is shared by every language binding."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+hex = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true }
+
+# sr25519 keypair + signing primitive, byte-compatible with the chain's
+# `MultiSignature` verification. `default-features = false` keeps the heavy
+# `subxt` client out — this crate must stay light enough for `bindings/wasm`,
+# which cannot depend on `matter-vault` (reqwest/rustls do not build for
+# wasm32-unknown-unknown).
+subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Route `OsRng` through `crypto.getRandomValues` when compiled to wasm, matching
+# matter-vault-core. sr25519 signing needs an RNG (schnorrkel randomises), so
+# without this the crate does not link for wasm32 — and being wasm-clean is the
+# whole reason this crate is separate from `matter-vault`.
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+# The `#[ignore]`d emitter writes testvectors/api_keys.json.
+serde_json = { workspace = true }
+# `tests/suri_equivalence.rs` uses subxt-signer's own SecretUri as an oracle for
+# the hand-rolled splitter. A dev-dependency does not link into a cdylib, so the
+# oracle stays out of the shipped wasm artifact.
+subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+
+[lints]
+workspace = true

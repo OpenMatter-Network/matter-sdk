@@ -1,0 +1,299 @@
+{
+  "calls": [
+    {
+      "args": [
+        "payload",
+        "epoch",
+        "label",
+        "aad"
+      ],
+      "call": "store_secret",
+      "facade": "secrets",
+      "method": "store",
+      "pallet": "Secrets"
+    },
+    {
+      "args": [
+        "secret_id",
+        "payload",
+        "epoch",
+        "aad"
+      ],
+      "call": "rotate_secret",
+      "facade": "secrets",
+      "method": "rotate",
+      "pallet": "Secrets"
+    },
+    {
+      "args": [
+        "secret_id",
+        "target"
+      ],
+      "call": "grant_access",
+      "facade": "secrets",
+      "method": "grant",
+      "pallet": "Secrets"
+    },
+    {
+      "args": [
+        "secret_id",
+        "target"
+      ],
+      "call": "revoke_access",
+      "facade": "secrets",
+      "method": "revoke",
+      "pallet": "Secrets"
+    },
+    {
+      "args": [
+        "secret_id"
+      ],
+      "call": "delete_secret",
+      "facade": "secrets",
+      "method": "delete",
+      "pallet": "Secrets"
+    },
+    {
+      "args": [
+        "request"
+      ],
+      "call": "request_deployment",
+      "facade": "deployments",
+      "method": "request",
+      "pallet": "Jobs"
+    },
+    {
+      "args": [
+        "deployment"
+      ],
+      "call": "cancel_deployment",
+      "facade": "deployments",
+      "method": "cancel",
+      "pallet": "Jobs"
+    },
+    {
+      "args": [
+        "deployment",
+        "secret_ref"
+      ],
+      "call": "set_deployment_secret_ref",
+      "facade": "deployments",
+      "method": "set_secret_ref",
+      "pallet": "Jobs"
+    },
+    {
+      "args": [
+        "deployment",
+        "env_vars"
+      ],
+      "call": "set_deployment_env",
+      "facade": "deployments",
+      "method": "set_env",
+      "pallet": "Jobs"
+    },
+    {
+      "args": [
+        "deployment",
+        "user_wg_pubkey"
+      ],
+      "call": "register_wg_peer",
+      "facade": "deployments",
+      "method": "register_wg_peer",
+      "pallet": "Jobs"
+    },
+    {
+      "args": [
+        "resource_id",
+        "ownership_proof",
+        "name"
+      ],
+      "call": "register_resource",
+      "facade": "resources",
+      "method": "register",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "uuid",
+        "sku"
+      ],
+      "call": "update_sku",
+      "facade": "resources",
+      "method": "update_sku",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "capacity"
+      ],
+      "call": "report_capacity",
+      "facade": "resources",
+      "method": "report_capacity",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "resource_id",
+        "is_private"
+      ],
+      "call": "set_resource_privacy",
+      "facade": "resources",
+      "method": "set_privacy",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "resource_id",
+        "user"
+      ],
+      "call": "add_to_whitelist",
+      "facade": "resources",
+      "method": "allow",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "resource_id",
+        "user"
+      ],
+      "call": "remove_from_whitelist",
+      "facade": "resources",
+      "method": "disallow",
+      "pallet": "Resources"
+    },
+    {
+      "args": [
+        "value",
+        "payee"
+      ],
+      "call": "bond",
+      "facade": "staking",
+      "method": "bond",
+      "pallet": "Staking"
+    },
+    {
+      "args": [
+        "additional"
+      ],
+      "call": "bond_extra",
+      "facade": "staking",
+      "method": "bond_extra",
+      "pallet": "Staking"
+    },
+    {
+      "args": [
+        "value"
+      ],
+      "call": "unbond",
+      "facade": "staking",
+      "method": "unbond",
+      "pallet": "Staking"
+    },
+    {
+      "args": [
+        "num_slashing_spans"
+      ],
+      "call": "withdraw_unbonded",
+      "facade": "staking",
+      "method": "withdraw_unbonded",
+      "pallet": "Staking"
+    },
+    {
+      "args": [
+        "targets"
+      ],
+      "call": "nominate",
+      "facade": "staking",
+      "method": "nominate",
+      "pallet": "Staking"
+    },
+    {
+      "args": [],
+      "call": "chill",
+      "facade": "staking",
+      "method": "chill",
+      "pallet": "Staking"
+    },
+    {
+      "args": [
+        "amount",
+        "pool_id"
+      ],
+      "call": "join",
+      "facade": "staking",
+      "method": "join_pool",
+      "pallet": "NominationPools"
+    },
+    {
+      "args": [],
+      "call": "claim_payout",
+      "facade": "staking",
+      "method": "claim_pool_payout",
+      "pallet": "NominationPools"
+    },
+    {
+      "args": [
+        "metadata"
+      ],
+      "call": "create_org",
+      "facade": "orgs",
+      "method": "create",
+      "pallet": "Organizations"
+    },
+    {
+      "args": [
+        "org",
+        "who",
+        "role"
+      ],
+      "call": "add_member",
+      "facade": "orgs",
+      "method": "add_member",
+      "pallet": "Organizations"
+    },
+    {
+      "args": [
+        "org",
+        "who"
+      ],
+      "call": "remove_member",
+      "facade": "orgs",
+      "method": "remove_member",
+      "pallet": "Organizations"
+    },
+    {
+      "args": [
+        "org",
+        "project",
+        "amount"
+      ],
+      "call": "allot",
+      "facade": "orgs",
+      "method": "allot",
+      "pallet": "Budgets"
+    },
+    {
+      "args": [
+        "org",
+        "project",
+        "who"
+      ],
+      "call": "authorize_project_secrets_agent",
+      "facade": "orgs",
+      "method": "authorize_secrets_agent",
+      "pallet": "Budgets"
+    },
+    {
+      "args": [
+        "org",
+        "project",
+        "who"
+      ],
+      "call": "revoke_project_secrets_agent",
+      "facade": "orgs",
+      "method": "revoke_secrets_agent",
+      "pallet": "Budgets"
+    }
+  ],
+  "comment": "The curated typed façade surface. Every binding with a chain client must expose exactly these (facade, method) pairs, each mapping to the named (pallet, call) with these ordered args. Method names are snake_case here; bindings apply their own convention (TypeScript camelCases them)."
+}

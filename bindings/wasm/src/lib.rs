@@ -2,14 +2,20 @@
 //!
 //! Exposes the pure cryptographic steps to JS/TS: seal a secret, the canonical
 //! request signing payload, the per-node Lagrange coefficient, the up-front proof
-//! check, and verify-aggregate-open. Networking, the quorum loop, and signing stay
-//! in TypeScript (see `packages/typescript`) — exactly the split the core enforces.
+//! check, and verify-aggregate-open. Networking and the quorum loop stay in
+//! TypeScript (see `packages/typescript`) — exactly the split the core enforces.
+//!
+//! It also exposes [`ApiKeyJs`], because key *derivation* is a cryptographic
+//! step: doing it here rather than in `@polkadot/util-crypto` is what keeps
+//! TypeScript pinned to `testvectors/api_keys.json` alongside every other
+//! binding. Signature *framing* still lives in TypeScript.
 //!
 //! Every binary value crosses the boundary as a `Uint8Array`; `secret_id` crosses
 //! as a `"0x"`+hex string (JS has no native u128).
 
 use js_sys::Uint8Array;
 use matter_vault_core as core;
+use matter_vault_key::{ApiKey, KeyError};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
@@ -23,6 +29,81 @@ pub fn _start() {
 /// Map a core error to a JS exception.
 fn js_err(e: core::CoreError) -> JsError {
     JsError::new(&e.to_string())
+}
+
+/// Map a key error to a JS exception. `KeyError` never embeds any part of the
+/// key, so its message is safe to surface verbatim.
+fn key_err(e: KeyError) -> JsError {
+    JsError::new(&e.to_string())
+}
+
+/// An OpenMatter API key: parse once, then sign.
+///
+/// Derivation and signing happen in Rust, so TypeScript agrees byte-for-byte
+/// with every other binding on `testvectors/api_keys.json`. The secret never
+/// crosses into JS: there is no getter for it, `toString`/`toJSON` are redacted,
+/// and the only outputs are the public account id and signatures.
+///
+/// Call [`ApiKeyJs::free`] (wasm-bindgen generates it) when done to drop the
+/// Rust-side key and let its zeroizing buffers wipe. JS has no destructors, so
+/// unlike Rust this cannot be automatic.
+#[wasm_bindgen(js_name = ApiKey)]
+pub struct ApiKeyJs {
+    inner: ApiKey,
+}
+
+#[wasm_bindgen(js_class = ApiKey)]
+impl ApiKeyJs {
+    /// Parse a `0x` 32-byte mini-secret, a BIP39 mnemonic, or an sr25519 SURI,
+    /// each optionally prefixed with `"sr25519:"`.
+    ///
+    /// Throws with a precise reason for an empty key, an unsupported scheme
+    /// (`secp256k1:` is reserved but unimplemented), a malformed encoding, or a
+    /// failed derivation. The thrown message never contains key material.
+    #[wasm_bindgen(constructor)]
+    pub fn new(key: &str) -> Result<ApiKeyJs, JsError> {
+        Ok(ApiKeyJs {
+            inner: ApiKey::parse(key).map_err(key_err)?,
+        })
+    }
+
+    /// The signature scheme, as a lowercase token (`"sr25519"`).
+    #[wasm_bindgen(getter)]
+    pub fn scheme(&self) -> String {
+        self.inner.scheme().as_str().to_string()
+    }
+
+    /// The 32-byte on-chain account id this key controls.
+    #[wasm_bindgen(getter, js_name = accountId)]
+    pub fn account_id(&self) -> Uint8Array {
+        Uint8Array::from(&self.inner.account_id().as_bytes()[..])
+    }
+
+    /// The same account id as `0x` + 64 lowercase hex characters.
+    #[wasm_bindgen(getter, js_name = accountIdHex)]
+    pub fn account_id_hex(&self) -> String {
+        self.inner.account_id().to_hex()
+    }
+
+    /// Sign `message`, returning the raw 64-byte sr25519 signature. Framing
+    /// (SCALE `MultiSignature`, extrinsic payload) is TypeScript's job.
+    pub fn sign(&self, message: &[u8]) -> Result<Uint8Array, JsError> {
+        let signature = self.inner.sign(message).map_err(key_err)?;
+        Ok(Uint8Array::from(&signature[..]))
+    }
+
+    /// Redacted. Never renders the key.
+    #[wasm_bindgen(js_name = toString)]
+    pub fn to_string_js(&self) -> String {
+        format!("ApiKey({}, {}, <redacted>)", self.scheme(), self.account_id_hex())
+    }
+
+    /// Redacted, so `JSON.stringify` cannot serialize key material. Returns the
+    /// same string as `toString`, not an object with fields to walk.
+    #[wasm_bindgen(js_name = toJSON)]
+    pub fn to_json(&self) -> String {
+        self.to_string_js()
+    }
 }
 
 /// The four-blob sealed envelope returned to JS. Getters return `Uint8Array`

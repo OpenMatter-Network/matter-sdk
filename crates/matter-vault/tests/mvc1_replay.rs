@@ -24,7 +24,10 @@ use matter_crypto::bgv::poly::crt::CrtPoly;
 use matter_crypto::bgv::poly::CrtContext;
 use matter_crypto::bgv::Ciphertext;
 use matter_crypto::dkg::{
-    commit_to_contribution, derive_shared_a, generate_contribution, process_contributions,
+    commit_to_contribution,
+    derive_shared_a,
+    generate_contribution,
+    process_contributions,
     DkgOutput,
 };
 use matter_crypto::secret::{lagrange_coefficient, produce_proven_partial};
@@ -32,10 +35,20 @@ use matter_crypto::zkp::plaintext::PlaintextProof;
 use matter_crypto::zkp::zkp_aware_smudge_bits;
 use matter_vault::{decrypt, CommitteeNode, DecryptRequest, Health, Sr25519Signer, Transport};
 use matter_vault_core::wire::{
-    from_0x, secret_id_to_hex, to_0x, PartialDecryptRequest, PartialDecryptResponse,
+    from_0x,
+    secret_id_to_hex,
+    to_0x,
+    PartialDecryptRequest,
+    PartialDecryptResponse,
 };
 use matter_vault_core::{
-    encrypt, lagrange_for, open_secret, signing_payload, Aad, EncryptedSecret, PartialInput,
+    encrypt,
+    lagrange_for,
+    open_secret,
+    signing_payload,
+    Aad,
+    EncryptedSecret,
+    PartialInput,
 };
 use subxt_signer::sr25519::{self, Keypair};
 use subxt_signer::SecretUri;
@@ -134,7 +147,10 @@ fn dkg_and_seal() -> Fixture {
                 .unwrap(),
         })
         .collect();
-    let by_endpoint = nodes.iter().map(|n| (n.endpoint.clone(), n.index)).collect();
+    let by_endpoint = nodes
+        .iter()
+        .map(|n| (n.endpoint.clone(), n.index))
+        .collect();
 
     Fixture {
         shared_a_bytes: bincode::serialize(&shared_a).unwrap(),
@@ -262,7 +278,11 @@ fn sign_wire(keypair: &Keypair, payload: &[u8]) -> (String, String) {
 /// * `V1` — the lone, non-node-bound signature the old protocol produced.
 /// * `V2` — the signature the requester made **for the malicious node itself**
 ///   (`subset[0]`), the only one it legitimately receives under the fix.
-fn replay_attack(committee: &VerifyingCommittee, keypair: &Keypair, scheme: Scheme) -> Option<Vec<u8>> {
+fn replay_attack(
+    committee: &VerifyingCommittee,
+    keypair: &Keypair,
+    scheme: Scheme,
+) -> Option<Vec<u8>> {
     let fx = committee.fx;
     let subset: Vec<u64> = fx.nodes.iter().take(T).map(|n| n.index).collect();
     let payload = match scheme {
@@ -328,7 +348,10 @@ async fn recipient_binding_defeats_the_replay_attack() {
     let keypair = attacker_keypair();
 
     // (1) Pre-fix: against v1 nodes, one replayed signature harvests a quorum.
-    let v1 = VerifyingCommittee { fx: &fx, scheme: Scheme::V1 };
+    let v1 = VerifyingCommittee {
+        fx: &fx,
+        scheme: Scheme::V1,
+    };
     let stolen = replay_attack(&v1, &keypair, Scheme::V1);
     assert_eq!(
         stolen.as_deref(),
@@ -338,7 +361,10 @@ async fn recipient_binding_defeats_the_replay_attack() {
 
     // (2) This fix: against v2 nodes, the same replay is rejected by every peer,
     //     so the attacker never reaches a quorum.
-    let v2 = VerifyingCommittee { fx: &fx, scheme: Scheme::V2 };
+    let v2 = VerifyingCommittee {
+        fx: &fx,
+        scheme: Scheme::V2,
+    };
     let defeated = replay_attack(&v2, &keypair, Scheme::V2);
     assert_eq!(
         defeated, None,

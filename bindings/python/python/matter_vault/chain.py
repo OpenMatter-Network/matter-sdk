@@ -1,18 +1,87 @@
-"""Substrate chain client for the matter-kgc chain (optional ``[sdk]`` extra).
+"""Substrate chain client for MatterChain (optional ``[sdk]`` extra).
 
 Reads the committee context the SDK needs (joint_pk, nodes, commitments, ...) via
-runtime-API ``state_call``s and submits the gas-paying ``secrets.store_secret``
-extrinsic — the analogue of @polkadot/api in the TypeScript example. The SDK
-proper never holds keys or submits; this is the "your own Substrate client" half.
+runtime-API ``state_call``s, and signs and submits extrinsics — any pallet the
+runtime exposes, resolved by name from live metadata.
+
+Most callers want :class:`~matter_vault.client.MatterClient`, which wraps this with
+the network guards, amount helpers, and identity handling. This module is the layer
+underneath, and stays usable directly for anything the client does not cover.
 
 Requires ``substrate-interface`` (``pip install matter-vault[sdk]``).
 """
 
-from typing import Dict, List, Tuple
+import re
+from typing import Dict, List, Optional, Tuple
 
 from scalecodec.base import ScaleBytes
 from substrateinterface import Keypair, KeypairType, SubstrateInterface
-from substrateinterface.utils.ss58 import ss58_decode
+from substrateinterface.utils.ss58 import ss58_decode, ss58_encode
+
+# A bare 32-byte hex mini-secret: no derivation junctions, no ``///password``.
+# Anything else — including ``0x…//hard`` — must not go to ``create_from_seed``, or
+# the junctions are silently dropped.
+_BARE_MINI_SECRET = re.compile(r"0x[0-9a-fA-F]{64}")
+
+#: Scheme tokens ``ApiKey`` accepts as a prefix, stripped before derivation.
+_SCHEME_PREFIX = "sr25519:"
+
+
+def _strip_scheme(text: str) -> str:
+    """Remove an optional ``sr25519:`` prefix, case-insensitively."""
+    return text[len(_SCHEME_PREFIX) :] if text[: len(_SCHEME_PREFIX)].lower() == _SCHEME_PREFIX else text
+
+
+class ApiKeySigner:
+    """An :class:`~matter_vault.apikey.ApiKey` shaped like a ``substrate-interface``
+    ``Keypair``, so it can sign extrinsics.
+
+    ``create_signed_extrinsic`` only reads ``crypto_type``, ``public_key``,
+    ``ss58_address``, and ``sign`` — so this adapter is enough, and it means the
+    binding has exactly **one** derivation path (the shared Rust core) instead of
+    two that can disagree. It also lifts substrate-interface's limitation that a
+    hex phrase cannot carry derivation junctions.
+
+    The key material stays in Rust: this holds an ``ApiKey``, which has no
+    accessor for its secret.
+    """
+
+    __slots__ = ("_key", "public_key", "ss58_address", "crypto_type")
+
+    def __init__(self, key) -> None:
+        self._key = key
+        self.public_key = key.account_id
+        self.ss58_address = ss58_encode(key.account_id, _SS58_FORMAT)
+        self.crypto_type = KeypairType.SR25519
+
+    def sign(self, data) -> bytes:
+        """Sign ``data``, accepting the same shapes ``Keypair.sign`` does."""
+        return self._key.sign(_as_bytes_to_sign(data))
+
+    def __repr__(self) -> str:
+        return f"ApiKeySigner({self.ss58_address})"
+
+
+def _as_bytes_to_sign(data) -> bytes:
+    """Normalize what substrate-interface passes to ``keypair.sign``.
+
+    It may hand over a ``ScaleBytes``, a ``0x`` hex string, or plain text; the
+    real ``Keypair.sign`` accepts all three, so the adapter must too.
+    """
+    if isinstance(data, ScaleBytes):
+        return bytes(data.data)
+    if isinstance(data, str):
+        return bytes.fromhex(data[2:]) if data.startswith("0x") else data.encode()
+    return bytes(data)
+
+
+def api_key_signer(key) -> ApiKeySigner:
+    """Adapt an :class:`~matter_vault.apikey.ApiKey` for extrinsic signing.
+
+    The recommended way to submit: one derivation, full SURI support, and the key
+    never leaves the Rust core.
+    """
+    return ApiKeySigner(key)
 
 # Custom return types the runtime APIs use (scalecodec needs them registered).
 _CUSTOM_TYPES = {
@@ -85,12 +154,38 @@ class ChainClient:
 
     @staticmethod
     def keypair_from_seed(seed: str) -> Keypair:
-        """An sr25519 keypair from a ``0x`` hex seed or a BIP39 mnemonic / SURI
-        (the funded signer). No ``///password`` support for sr25519."""
-        # substrate-interface's create_from_uri feeds the phrase to
-        # create_from_mnemonic, so hex seeds must branch to create_from_seed.
-        factory = Keypair.create_from_seed if seed.startswith("0x") else Keypair.create_from_uri
-        return factory(seed, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519)
+        """An sr25519 ``substrate-interface`` keypair from a ``0x`` hex mini-secret
+        or a BIP39 mnemonic / SURI.
+
+        **Prefer** :func:`api_key_signer`, which derives in the shared Rust core and
+        therefore cannot drift. This helper exists for callers that need a real
+        ``substrate-interface`` ``Keypair``, and it inherits that library's limits:
+
+        * ``create_from_uri`` feeds the phrase to bip39, so it cannot derive a
+          **hex** phrase with junctions (``0x…//hard`` raises). Use
+          :func:`api_key_signer` for those.
+        * ``create_from_seed`` ignores junctions entirely, so it is only used for a
+          bare 32-byte secret — routing every ``0x``-prefixed string to it is what
+          made ``0x…//hard`` silently derive the **root** account.
+
+        A ``sr25519:`` scheme prefix is accepted and stripped, matching
+        :class:`~matter_vault.apikey.ApiKey`.
+        """
+        text = _strip_scheme(seed.strip())
+        if _BARE_MINI_SECRET.fullmatch(text):
+            # A bare 32-byte hex secret: no junctions, no password.
+            return Keypair.create_from_seed(
+                text, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519
+            )
+        if text.startswith("0x"):
+            raise ValueError(
+                "substrate-interface cannot derive a hex phrase with derivation "
+                "junctions or a password; use matter_vault.api_key_signer(), which "
+                "derives in the shared core"
+            )
+        return Keypair.create_from_uri(
+            text, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519
+        )
 
     # --- runtime-API reads -------------------------------------------------
 
@@ -156,25 +251,117 @@ class ChainClient:
     def free_balance(self, address: str) -> int:
         return int(self.substrate.query("System", "Account", [address]).value["data"]["free"])
 
+    # --- the generic surface -----------------------------------------------
+
+    def query(self, pallet: str, entry: str, keys: Optional[List] = None):
+        """Read any storage entry. ``None`` means the entry is absent, which is
+        normal control flow — an unfunded account has no ``System.Account`` row."""
+        result = self.substrate.query(pallet, entry, keys or [])
+        return None if result is None else result.value
+
+    def runtime_api(self, method: str, args: bytes = b"", return_type: str = "Bytes"):
+        """Call any runtime API by its ``state_call`` name, e.g.
+        ``runtime_api("KgcApi_dkg_epoch", return_type="Option<u32>")``."""
+        return self._decode(return_type, self._call(method, args))
+
+    def constant(self, pallet: str, name: str):
+        """Read any pallet constant from the live metadata."""
+        return self.substrate.get_constant(pallet, name).value
+
+    def submit(self, keypair: Keypair, pallet: str, call: str, params: dict) -> "TxReceipt":
+        """Sign and submit any call, waiting for FINALIZATION.
+
+        Resolution is by name against the live metadata, so this reaches every
+        pallet the runtime exposes — including ones added by a forkless upgrade.
+
+        Finalization, not inclusion: the committee authorizes a partial-decrypt
+        against a finalized block, so resolving earlier gets an HTTP 403. That was
+        a real bug in the TypeScript harness before it was fixed.
+        """
+        composed = self.substrate.compose_call(pallet, call, params)
+        # Read the nonce from System.Account directly: get_account_nonce() can
+        # report 0 on this runtime, which signs a stale tx ("outdated", 1010).
+        nonce = int(
+            self.substrate.query("System", "Account", [keypair.ss58_address]).value["nonce"]
+        )
+        extrinsic = self.substrate.create_signed_extrinsic(
+            call=composed, keypair=keypair, nonce=nonce
+        )
+        receipt = self.substrate.submit_extrinsic(
+            extrinsic, wait_for_inclusion=True, wait_for_finalization=True
+        )
+        if not receipt.is_success:
+            raise ChainError(
+                f"{pallet}.{call} failed on chain: {receipt.error_message}",
+                pallet=pallet,
+                call=call,
+            )
+
+        events = []
+        for event in receipt.triggered_events:
+            e = event.value["event"]
+            events.append((e.get("module_id"), e.get("event_id"), e.get("attributes")))
+        return TxReceipt(
+            tx_hash=receipt.extrinsic_hash,
+            block_hash=receipt.block_hash,
+            events=events,
+        )
+
     # --- extrinsic ---------------------------------------------------------
 
     def store_secret(self, keypair: Keypair, call_params: dict) -> int:
         """Submit ``secrets.store_secret`` and return the chain-assigned secret_id.
 
-        Waits for FINALIZATION: the committee authorizes a partial-decrypt against
-        a finalized block, so decrypting before the storing block is finalized
-        gets a 403. (The same race the TypeScript example had to fix.)
+        A thin wrapper over :meth:`submit` that pulls the id out of the
+        ``Secrets.SecretStored`` event, so the id is read from the chain's own
+        output rather than predicted from a counter.
         """
-        call = self.substrate.compose_call("Secrets", "store_secret", call_params)
-        # Take the nonce from System.Account directly: get_account_nonce() can
-        # report 0 on this runtime, which signs a stale tx ("outdated", 1010).
-        nonce = int(self.substrate.query("System", "Account", [keypair.ss58_address]).value["nonce"])
-        extrinsic = self.substrate.create_signed_extrinsic(call=call, keypair=keypair, nonce=nonce)
-        receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True, wait_for_finalization=True)
-        if not receipt.is_success:
-            raise RuntimeError(f"storeSecret failed: {receipt.error_message}")
-        for event in receipt.triggered_events:
-            e = event.value["event"]
-            if e.get("module_id") == "Secrets" and e.get("event_id") == "SecretStored":
-                return _secret_id_from_attributes(e["attributes"])
-        raise RuntimeError("storeSecret landed but emitted no Secrets.SecretStored event")
+        receipt = self.submit(keypair, "Secrets", "store_secret", call_params)
+        attributes = receipt.require_event("Secrets", "SecretStored")
+        return _secret_id_from_attributes(attributes)
+
+
+class TxReceipt:
+    """The outcome of a submitted extrinsic, after finalization."""
+
+    __slots__ = ("tx_hash", "block_hash", "events")
+
+    def __init__(self, tx_hash: str, block_hash: str, events: List[Tuple]) -> None:
+        self.tx_hash = tx_hash
+        self.block_hash = block_hash
+        #: ``(pallet, event, attributes)`` for each event this extrinsic emitted.
+        self.events = events
+
+    def emitted(self, pallet: str, event: str) -> bool:
+        """Whether ``pallet.event`` fired."""
+        return any(p == pallet and e == event for p, e, _ in self.events)
+
+    def require_event(self, pallet: str, event: str):
+        """The attributes of ``pallet.event``, or raise.
+
+        A call that landed without the event it is defined to emit means the
+        runtime changed under us; returning ``None`` would push a confusing
+        failure downstream.
+        """
+        for p, e, attributes in self.events:
+            if p == pallet and e == event:
+                return attributes
+        emitted = ", ".join(f"{p}.{e}" for p, e, _ in self.events) or "none"
+        raise ChainError(
+            f"extrinsic finalized but emitted no {pallet}.{event} (saw: {emitted})",
+            pallet=pallet,
+            call=event,
+        )
+
+    def __repr__(self) -> str:
+        return f"TxReceipt(block={self.block_hash}, events={len(self.events)})"
+
+
+class ChainError(RuntimeError):
+    """A chain read or submission failed. Branch on ``pallet``/``call``, not on
+    the message text."""
+
+    def __init__(self, message: str, *, pallet: str = "", call: str = "") -> None:
+        super().__init__(message)
+        self.pallet = pallet
+        self.call = call

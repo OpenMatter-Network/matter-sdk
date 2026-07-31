@@ -98,7 +98,10 @@ impl ReqwestTransport {
     ) -> Result<T> {
         if let Some(len) = resp.content_length() {
             if len > MAX_RESPONSE_BYTES as u64 {
-                return Err(Self::err(endpoint, format!("response body too large ({len} bytes)")));
+                return Err(Self::err(
+                    endpoint,
+                    format!("response body too large ({len} bytes)"),
+                ));
             }
         }
         let mut buf: Vec<u8> = Vec::new();

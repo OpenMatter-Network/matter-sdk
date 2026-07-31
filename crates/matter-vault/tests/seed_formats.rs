@@ -18,8 +18,7 @@ use serde_json::json;
 /// `src/signer.rs` tests and every binding's conformance suite.
 const VECTOR_MNEMONIC: &str =
     "bottom drive obey lake curtain smoke basket hold race lonely fit walk";
-const VECTOR_SEED_HEX: &str =
-    "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e";
+const VECTOR_SEED_HEX: &str = "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e";
 const VECTOR_ACCOUNT_ID_HEX: &str =
     "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a";
 
@@ -29,7 +28,10 @@ fn emit_seed_format_vectors() {
     let from_mnemonic = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_MNEMONIC).unwrap();
     let from_hex = Sr25519Signer::from_uri_insecure_dev_only(VECTOR_SEED_HEX).unwrap();
     assert_eq!(from_mnemonic.account_id(), from_hex.account_id());
-    assert_eq!(hex::encode(from_mnemonic.account_id()), VECTOR_ACCOUNT_ID_HEX);
+    assert_eq!(
+        hex::encode(from_mnemonic.account_id()),
+        VECTOR_ACCOUNT_ID_HEX
+    );
 
     // Bare lowercase hex, per the testvectors/README.md convention.
     let vectors = json!({

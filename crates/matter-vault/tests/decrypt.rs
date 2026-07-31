@@ -368,8 +368,10 @@ async fn decrypt_excludes_a_node_serving_a_wrong_epoch() {
                 .unwrap(),
         })
         .collect();
-    let by_endpoint: BTreeMap<String, u64> =
-        nodes.iter().map(|n| (n.endpoint.clone(), n.index)).collect();
+    let by_endpoint: BTreeMap<String, u64> = nodes
+        .iter()
+        .map(|n| (n.endpoint.clone(), n.index))
+        .collect();
 
     let committee = FakeCommittee {
         ctx,

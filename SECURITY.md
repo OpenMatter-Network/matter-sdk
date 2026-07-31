@@ -40,9 +40,14 @@ What it does **not** protect against, by design:
 
 ## How the SDK handles secrets
 
-- **Your signing key never enters the SDK.** The primary API takes a `Signer` interface;
-  the SDK gives it canonical bytes and receives a signature. Keys can stay in an HSM,
-  cloud KMS, hardware wallet, or remote signer.
+- **You choose where your signing key lives; the SDK does not decide for you.** The
+  recommended posture is a `KeySigner` you implement: the SDK gives it canonical bytes
+  and receives a signature, so the key stays in an HSM, cloud KMS, hardware wallet, or
+  remote signer and never enters the SDK's address space. The SDK also supports an
+  `apiKey` it holds in process, for CI jobs and agents that must build a client from one
+  string; that container is zeroizing, redacted, non-serializable, and mainnet-gated,
+  but anything that can read the process can read the key. The trade is spelled out in
+  [`docs/secure-signing.md`](docs/secure-signing.md#what-you-are-trading).
 - **Recovered plaintext is zeroized.** It is returned in a buffer that wipes itself on
   drop and refuses to print its contents (`Debug`/`Display` are redacted).
 - **Nothing secret is logged.** The SDK follows a quiet-success / loud-typed-failure
@@ -50,14 +55,28 @@ What it does **not** protect against, by design:
 - **Inputs are validated at the boundary.** Wrong-length ids, oversized envelopes, and
   malformed hex are rejected with precise typed errors rather than silently coerced.
 
-## Local key helpers
+## Key-holding paths
 
-For examples and tests, the SDK ships helpers that load a signer from a raw seed (e.g.
-`Signer::from_seed_insecure_dev_only`). They:
+Two exist, and they are not equivalent.
+
+**`ApiKey` — supported, hardened.** Parses the encodings the OpenMatter dashboard mints
+and holds the key in process behind real guarantees: zeroizing buffers, a redacted
+`Debug`/`toString`/`%v`, no serialization, no accessor for the material, and a refusal to
+connect a signing client to mainnet without explicit confirmation. It also rejects a
+phrase-less URI such as `//Alice`, which most SURI parsers silently resolve to the public
+well-known development phrase. Use it when a key must live in the process anyway.
+
+**`*_insecure_dev_only` — unsupported.** For examples and tests, the SDK ships helpers
+that load a signer from raw material the caller already holds (e.g.
+`Sr25519Signer::from_seed_insecure_dev_only`). They:
 
 - carry `insecure`/`dev_only` in the name,
 - emit a runtime warning,
 - and are intended to be absent from production builds.
+
+The name is about custody, not location: these give a key none of the container
+guarantees above. If a key is going to live in your process, it should live in an
+`ApiKey`.
 
 A CI check fails the build if a production target depends on them. **Do not use them
 outside development.** See [`docs/secure-signing.md`](docs/secure-signing.md) for the

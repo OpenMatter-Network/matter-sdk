@@ -24,7 +24,8 @@ use subxt::backend::legacy::LegacyRpcMethods;
 use subxt::backend::rpc::RpcClient;
 use subxt::dynamic::{At, Value};
 use subxt::{OnlineClient, PolkadotConfig};
-use subxt_signer::{sr25519::Keypair, SecretUri};
+use subxt_signer::sr25519::Keypair;
+use subxt_signer::SecretUri;
 
 const DEFAULT_RPC: &str = "wss://node2.testnet.openmatter.network";
 const DEFAULT_SECRET: &str = "API_KEY=swordfish\nDATABASE_URL=postgres://prod";
@@ -69,8 +70,31 @@ async fn main() {
     }
 }
 
+/// Refuse to spend real funds without an explicit acknowledgement.
+///
+/// This harness pays gas, so an accidental run against mainnet costs money. The
+/// check is on the endpoint, not just on `MATTER_NETWORK`, because a typo'd
+/// `MATTER_RPC_URL` is the likelier mistake.
+fn guard_mainnet(rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let network = std::env::var("MATTER_NETWORK").unwrap_or_else(|_| "testnet".to_string());
+    let looks_like_mainnet = network == "mainnet" || rpc_url.contains("mainnet");
+    if !looks_like_mainnet {
+        return Ok(());
+    }
+    if std::env::var("MATTER_CONFIRM").is_ok_and(|v| v == "yes") {
+        eprintln!("WARNING: running against MAINNET with real funds (MATTER_CONFIRM=yes).");
+        return Ok(());
+    }
+    Err(format!(
+        "refusing to run a gas-paying harness against mainnet ({rpc_url}) without \
+         explicit confirmation: set MATTER_CONFIRM=yes. This spends real funds."
+    )
+    .into())
+}
+
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_url = std::env::var("MATTER_RPC_URL").unwrap_or_else(|_| DEFAULT_RPC.to_string());
+    guard_mainnet(&rpc_url)?;
     let seed_str = std::env::var("MATTER_SIGNER_SEED")
         .or_else(|_| std::env::var("TEST_KEY"))
         .map_err(|_| "set MATTER_SIGNER_SEED or TEST_KEY (0x-hex seed or mnemonic / SURI)")?;
@@ -94,7 +118,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Best-effort balance line (the extrinsic below is the real crash-early guard
     // if the account is unfunded).
     if let Ok(at) = api.storage().at_latest().await {
-        let addr = subxt::dynamic::storage("System", "Account", vec![Value::from_bytes(account_id.0)]);
+        let addr =
+            subxt::dynamic::storage("System", "Account", vec![Value::from_bytes(account_id.0)]);
         if let Ok(Some(v)) = at.fetch(&addr).await {
             if let Ok(val) = v.to_value() {
                 if let Some(free) = val.at("data").and_then(|d| d.at("free")) {
@@ -111,7 +136,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("Committee epoch={epoch}, joint_pk={}B", joint_pk.len());
 
     // 2. Seal locally, then publish with secrets.storeSecret (the gas-paying step).
-    let env = matter_vault::encrypt(&joint_pk, epoch, secret.as_bytes(), Aad::EnvV1.as_bytes(), None)?;
+    let env = matter_vault::encrypt(
+        &joint_pk,
+        epoch,
+        secret.as_bytes(),
+        Aad::EnvV1.as_bytes(),
+        None,
+    )?;
     println!(
         "Sealed {}B -> capsule {}B, proof {}B, ct {}B",
         secret.len(),
@@ -132,8 +163,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         vec![
             payload,
             Value::u128(epoch as u128),
-            Value::from_bytes(Vec::<u8>::new()),         // label (empty)
-            Value::from_bytes(Aad::EnvV1.as_bytes()),    // aad
+            Value::from_bytes(Vec::<u8>::new()), // label (empty)
+            Value::from_bytes(Aad::EnvV1.as_bytes()), // aad
         ],
     );
 
@@ -162,7 +193,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         decode(&call(&legacy, RT_THRESHOLD, Some(&secret_epoch.encode())).await?)?;
     let nodes_raw: Vec<(AccountId32Bytes, KgcNodeInfo)> =
         decode(&call(&legacy, RT_KGC_NODES, None).await?)?;
-    println!("Committee: {} nodes, threshold t={threshold}", nodes_raw.len());
+    println!(
+        "Committee: {} nodes, threshold t={threshold}",
+        nodes_raw.len()
+    );
 
     let mut nodes = Vec::with_capacity(nodes_raw.len());
     for (account, info) in &nodes_raw {
@@ -255,6 +289,10 @@ fn secret_id_from_events(
 
 fn normalize_endpoint(raw: &str) -> String {
     let s = raw.trim();
-    let with_scheme = if s.contains("://") { s.to_string() } else { format!("https://{s}") };
+    let with_scheme = if s.contains("://") {
+        s.to_string()
+    } else {
+        format!("https://{s}")
+    };
     with_scheme.trim_end_matches('/').to_string()
 }

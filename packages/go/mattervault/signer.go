@@ -5,6 +5,9 @@ import "fmt"
 // SCALE enum index of MultiSignature::Sr25519 (Ed25519=0, Sr25519=1, Ecdsa=2).
 const multisignatureSr25519 = 0x01
 
+// Length of a raw sr25519 signature, before MultiSignature framing.
+const sr25519SignatureBytes = 64
+
 // RequestAuth is the auth fields attached to a /partial-decrypt request.
 type RequestAuth struct {
 	Auth      string `json:"auth"`
@@ -18,7 +21,7 @@ type RequestAuth struct {
 // (MV-C1). The shell calls this once per node in the quorum.
 type Signer interface {
 	AuthScheme() string
-	Authorize(secretID uint64, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error)
+	Authorize(secretID SecretID, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error)
 }
 
 type substrateSigner struct {
@@ -28,7 +31,8 @@ type substrateSigner struct {
 
 // SubstrateSigner builds a signer from a 32-byte account id and an sr25519 sign
 // function. The sign callback is where your key lives — it receives the canonical
-// payload bytes and returns the 64-byte signature; the key never enters the SDK.
+// payload bytes and returns the 64-byte signature. The key behind THIS signer never
+// enters the SDK; an ApiKey is the supported path when a key must live in-process.
 func SubstrateSigner(accountID []byte, sign func([]byte) ([]byte, error)) (Signer, error) {
 	if len(accountID) != 32 {
 		return nil, fmt.Errorf("accountID must be 32 bytes, got %d", len(accountID))
@@ -38,9 +42,8 @@ func SubstrateSigner(accountID []byte, sign func([]byte) ([]byte, error)) (Signe
 
 func (s *substrateSigner) AuthScheme() string { return "substrate" }
 
-func (s *substrateSigner) Authorize(secretID uint64, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error) {
-	payloadID := secretIDBytes(secretID)
-	payload, err := SigningPayload(payloadID, subset, blockHash, recipientIndex)
+func (s *substrateSigner) Authorize(secretID SecretID, subset []uint64, recipientIndex uint64, blockHash [32]byte) (RequestAuth, error) {
+	payload, err := SigningPayload(secretID.Bytes(), subset, blockHash, recipientIndex)
 	if err != nil {
 		return RequestAuth{}, err
 	}
@@ -48,8 +51,8 @@ func (s *substrateSigner) Authorize(secretID uint64, subset []uint64, recipientI
 	if err != nil {
 		return RequestAuth{}, err
 	}
-	if len(sig) != 64 {
-		return RequestAuth{}, fmt.Errorf("sr25519 signature must be 64 bytes, got %d", len(sig))
+	if len(sig) != sr25519SignatureBytes {
+		return RequestAuth{}, fmt.Errorf("sr25519 signature must be %d bytes, got %d", sr25519SignatureBytes, len(sig))
 	}
 	multisig := append([]byte{multisignatureSr25519}, sig...)
 	return RequestAuth{Auth: "substrate", Requester: s.requester, Signature: toHex(multisig)}, nil

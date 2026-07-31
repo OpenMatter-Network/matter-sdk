@@ -24,6 +24,18 @@ use std::slice;
 
 use matter_vault_core as core;
 
+mod apikey;
+
+pub use apikey::{
+    mv_apikey_account_id,
+    mv_apikey_free,
+    mv_apikey_parse,
+    mv_apikey_scheme,
+    mv_apikey_sign,
+    MvApiKey,
+    MV_ERR_KEY,
+};
+
 /// Success.
 pub const MV_OK: i32 = 0;
 /// A pointer argument was null or a fixed-width field had the wrong length.
@@ -42,7 +54,7 @@ pub struct MvBuf {
 
 impl MvBuf {
     /// An empty buffer (used on error paths).
-    fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         MvBuf {
             ptr: std::ptr::null_mut(),
             len: 0,
@@ -51,7 +63,7 @@ impl MvBuf {
 }
 
 /// Move a `Vec<u8>` into an [`MvBuf`] the caller owns.
-fn into_buf(v: Vec<u8>) -> MvBuf {
+pub(crate) fn into_buf(v: Vec<u8>) -> MvBuf {
     let mut boxed = v.into_boxed_slice();
     let buf = MvBuf {
         ptr: boxed.as_mut_ptr(),

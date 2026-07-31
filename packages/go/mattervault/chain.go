@@ -1,7 +1,9 @@
-// Substrate chain client for the matter-kgc chain (GSRPC). Reads the committee
-// context via runtime-API state_calls and submits the gas-paying
-// secrets.store_secret extrinsic — the "your own Substrate client" half the SDK
-// deliberately leaves to you, here built on go-substrate-rpc-client.
+// Substrate chain client for MatterChain, built on go-substrate-rpc-client.
+//
+// Reads the committee context via runtime-API state_calls, and signs and submits
+// extrinsics — any pallet the runtime exposes, resolved by name from the metadata
+// loaded at connect. See generic.go for the untyped read surface and extrinsic.go
+// for why the signed extrinsic is assembled by hand.
 package mattervault
 
 import (
@@ -17,6 +19,13 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+)
+
+// How long StoreSecret waits for the stored secret to appear at the finalized
+// head: 40 attempts × 3s = 2 minutes.
+const (
+	storeFinalityAttempts = 40
+	storeFinalityInterval = 3 * time.Second
 )
 
 // ChainClient is a thin GSRPC wrapper over the matter-kgc chain.
@@ -43,6 +52,13 @@ func NewChainClient(url string) (*ChainClient, error) {
 		return nil, err
 	}
 	return &ChainClient{api: api, meta: meta}, nil
+}
+
+// Close releases the underlying websocket connection.
+func (c *ChainClient) Close() {
+	if c.api != nil && c.api.Client != nil {
+		c.api.Client.Close()
+	}
 }
 
 func (c *ChainClient) stateCall(method string, args []byte) ([]byte, error) {
@@ -181,14 +197,14 @@ func (c *ChainClient) ShareCommitment(epoch uint32, account []byte) ([]byte, err
 	return v, nil
 }
 
-func secretIDArg(id uint64) []byte {
-	arg := make([]byte, 16) // u128 little-endian
-	binary.LittleEndian.PutUint64(arg[:8], id)
-	return arg
+// secretIDArg renders a secret id as the SCALE u128 argument a runtime API takes.
+func secretIDArg(id SecretID) []byte {
+	arg := id.LEBytes()
+	return arg[:]
 }
 
 // SecretPayload reads a stored secret's envelope from chain.
-func (c *ChainClient) SecretPayload(id uint64) (*EncryptedSecret, error) {
+func (c *ChainClient) SecretPayload(id SecretID) (*EncryptedSecret, error) {
 	raw, err := c.stateCall("SecretsApi_secret_payload", secretIDArg(id))
 	if err != nil {
 		return nil, err
@@ -199,7 +215,7 @@ func (c *ChainClient) SecretPayload(id uint64) (*EncryptedSecret, error) {
 		return nil, err
 	}
 	if flag == 0 {
-		return nil, fmt.Errorf("secret %d not found on chain", id)
+		return nil, fmt.Errorf("secret %s not found on chain", id)
 	}
 	var w struct {
 		BindingID types.Bytes
@@ -219,7 +235,7 @@ func (c *ChainClient) SecretPayload(id uint64) (*EncryptedSecret, error) {
 }
 
 // SecretEpoch reads the epoch a stored secret was sealed under.
-func (c *ChainClient) SecretEpoch(id uint64) (uint32, error) {
+func (c *ChainClient) SecretEpoch(id SecretID) (uint32, error) {
 	raw, err := c.stateCall("SecretsApi_secret_epoch", secretIDArg(id))
 	if err != nil {
 		return 0, err
@@ -230,7 +246,7 @@ func (c *ChainClient) SecretEpoch(id uint64) (uint32, error) {
 		return 0, err
 	}
 	if flag == 0 {
-		return 0, fmt.Errorf("secret %d has no epoch", id)
+		return 0, fmt.Errorf("secret %s has no epoch", id)
 	}
 	var e types.U32
 	if err := dec.Decode(&e); err != nil {
@@ -267,20 +283,35 @@ func (c *ChainClient) accountNonce(pubkey []byte) (uint32, error) {
 	return binary.LittleEndian.Uint32(b[:4]), nil
 }
 
-func (c *ChainClient) nextSecretID() (uint64, error) {
+// NextSecretID reads the `Secrets.NextSecretId` counter — a u128 stored
+// little-endian. Useful as a rough count of secrets ever stored.
+//
+// Do NOT use it to predict the id a store will be assigned. StoreSecret used to do
+// exactly that, and it is a race: two concurrent submitters read the same value, so
+// confirming "id N exists" can pass on someone else's secret. Read the id from the
+// `Secrets.SecretStored` event instead — see FindStoredSecret.
+func (c *ChainClient) NextSecretID() (SecretID, error) {
 	key, err := types.CreateStorageKey(c.meta, "Secrets", "NextSecretId")
 	if err != nil {
-		return 0, err
+		return SecretID{}, err
 	}
 	raw, err := c.api.RPC.State.GetStorageRawLatest(key)
 	if err != nil {
-		return 0, err
+		return SecretID{}, err
 	}
 	b := []byte(*raw)
-	if len(b) < 8 {
-		return 0, nil
+	if len(b) < 16 {
+		// An unset counter reads as empty (or short) storage: the next id is 0.
+		return SecretID{}, nil
 	}
-	return binary.LittleEndian.Uint64(b[:8]), nil
+	var le [16]byte
+	copy(le[:], b[:16])
+	// Reverse to big-endian, which is what SecretIDFromBytes takes.
+	var be [16]byte
+	for i := range le {
+		be[len(le)-1-i] = le[i]
+	}
+	return SecretIDFromBytes(be), nil
 }
 
 func compactUint(v uint64) []byte {
@@ -294,16 +325,96 @@ func u32le(v uint32) []byte {
 	return b
 }
 
+// ExtrinsicSigner is what SubmitCall needs from a key holder: an on-chain
+// identity, and a way to sign the exact bytes it is handed.
+//
+// The payload arrives already blake2b-hashed when oversized (see
+// UnsignedExtrinsic.SigningPayload), so an implementation only has to produce a
+// raw sr25519 signature — it must not hash again.
+type ExtrinsicSigner interface {
+	AccountID() []byte
+	SignExtrinsic(payload []byte) ([]byte, error)
+}
+
+// KeyringSigner adapts a GSRPC KeyringPair to ExtrinsicSigner, for callers that
+// already hold one.
+type KeyringSigner struct{ Pair signature.KeyringPair }
+
+// AccountID returns the pair's 32-byte public key.
+func (k KeyringSigner) AccountID() []byte { return k.Pair.PublicKey }
+
+// SignExtrinsic signs with the pair's URI.
+//
+// `signature.Sign` blake2-hashes payloads over 256 bytes, and our caller has
+// already done so; re-hashing would produce a signature over the wrong bytes.
+// Passing an already-hashed 32-byte digest is below that threshold, so it is
+// signed verbatim — which is exactly what the runtime verifies.
+func (k KeyringSigner) SignExtrinsic(payload []byte) ([]byte, error) {
+	return signature.Sign(payload, k.Pair.URI)
+}
+
+// SubmitCall signs and submits any call, returning the transaction hash.
+//
+// Assembly walks the signed extensions the runtime's metadata declares rather
+// than assuming a fixed layout — see extrinsic.go for why. This is the single
+// submission path; every typed helper is a caller.
+func (c *ChainClient) SubmitCall(signer ExtrinsicSigner, call types.Call) (string, error) {
+	ctx, err := c.signingContext(signer.AccountID())
+	if err != nil {
+		return "", err
+	}
+	unsigned, err := PrepareExtrinsic(c.meta, call, ctx)
+	if err != nil {
+		return "", err
+	}
+	sig, err := signer.SignExtrinsic(unsigned.SigningPayload())
+	if err != nil {
+		return "", fmt.Errorf("sign extrinsic: %w", err)
+	}
+	full, err := unsigned.Assemble(signer.AccountID(), sig)
+	if err != nil {
+		return "", err
+	}
+
+	var txHash string
+	if err := c.api.Client.Call(&txHash, "author_submitExtrinsic", "0x"+hex.EncodeToString(full)); err != nil {
+		return "", fmt.Errorf("submit extrinsic: %w", err)
+	}
+	return txHash, nil
+}
+
+// signingContext gathers the chain and account state the signed extensions need.
+func (c *ChainClient) signingContext(accountID []byte) (SigningContext, error) {
+	var ctx SigningContext
+
+	genesis, err := c.api.RPC.Chain.GetBlockHash(0)
+	if err != nil {
+		return ctx, fmt.Errorf("genesis hash: %w", err)
+	}
+	rv, err := c.api.RPC.State.GetRuntimeVersionLatest()
+	if err != nil {
+		return ctx, fmt.Errorf("runtime version: %w", err)
+	}
+	nonce, err := c.accountNonce(accountID)
+	if err != nil {
+		return ctx, err
+	}
+
+	ctx.SpecVersion = uint32(rv.SpecVersion)
+	ctx.TransactionVersion = uint32(rv.TransactionVersion)
+	copy(ctx.GenesisHash[:], genesis[:])
+	// Immortal era: the mortality anchor is the genesis hash.
+	ctx.MortalityHash = ctx.GenesisHash
+	ctx.Nonce = nonce
+	return ctx, nil
+}
+
 // StoreSecret submits secrets.store_secret and returns the chain-assigned id.
 //
-// The extrinsic is hand-assembled rather than built with GSRPC's signer: this
-// runtime's signed extensions include CheckMetadataHash (and WeightReclaim),
-// which GSRPC does not encode, so its signed payload is misaligned and the
-// runtime rejects it. We add the CheckMetadataHash `mode = Disabled` byte to the
-// extra and the matching `None` to the additional-signed data. After submission
-// we poll the finalized head until the secret is readable, so a subsequent
-// decrypt sees it as authorized (the committee checks a finalized block).
-func (c *ChainClient) StoreSecret(kp signature.KeyringPair, env EncryptedSecret, epoch uint32, aad Aad) (uint64, error) {
+// After submission it polls the finalized head until the secret is readable
+// there, so a subsequent decrypt sees it as authorized — the committee checks a
+// finalized block, and resolving earlier yields an HTTP 403.
+func (c *ChainClient) StoreSecret(kp signature.KeyringPair, env EncryptedSecret, epoch uint32, aad Aad) (SecretID, error) {
 	payload := struct {
 		BindingID types.Bytes
 		Capsule   types.Bytes
@@ -313,81 +424,48 @@ func (c *ChainClient) StoreSecret(kp signature.KeyringPair, env EncryptedSecret,
 
 	call, err := types.NewCall(c.meta, "Secrets.store_secret", payload, types.NewU32(epoch), types.NewBytes([]byte{}), types.NewBytes(AadBytes(aad)))
 	if err != nil {
-		return 0, err
+		return SecretID{}, err
 	}
-	callBytes, err := codec.Encode(call)
+
+	txHash, err := c.SubmitCall(KeyringSigner{Pair: kp}, call)
 	if err != nil {
-		return 0, err
+		return SecretID{}, err
 	}
 
-	genesis, err := c.api.RPC.Chain.GetBlockHash(0)
-	if err != nil {
-		return 0, err
-	}
-	rv, err := c.api.RPC.State.GetRuntimeVersionLatest()
-	if err != nil {
-		return 0, err
-	}
-	nonce, err := c.accountNonce(kp.PublicKey)
-	if err != nil {
-		return 0, err
-	}
-	predicted, err := c.nextSecretID()
-	if err != nil {
-		return 0, err
-	}
-
-	// extra (per-extension, in metadata order): Era(immortal) ++ Compact(nonce)
-	// ++ Compact(tip=0) ++ CheckMetadataHash mode(Disabled).
-	extra := []byte{0x00}
-	extra = append(extra, compactUint(uint64(nonce))...)
-	extra = append(extra, compactUint(0)...)
-	extra = append(extra, 0x00)
-
-	// additionalSigned: SpecVersion ++ TxVersion ++ Genesis ++ Mortality-anchor
-	// (genesis for immortal) ++ CheckMetadataHash None.
-	additional := append([]byte{}, u32le(uint32(rv.SpecVersion))...)
-	additional = append(additional, u32le(uint32(rv.TransactionVersion))...)
-	additional = append(additional, genesis[:]...)
-	additional = append(additional, genesis[:]...)
-	additional = append(additional, 0x00)
-
-	signingPayload := append(append(append([]byte{}, callBytes...), extra...), additional...)
-	sig, err := signature.Sign(signingPayload, kp.URI) // blake2-hashes >256B, then sr25519
-	if err != nil {
-		return 0, err
-	}
-
-	// Assemble the signed extrinsic: version(0x84) ++ MultiAddress::Id(account)
-	// ++ MultiSignature::Sr25519(sig) ++ extra ++ call, length-prefixed.
-	body := []byte{0x84, 0x00}
-	body = append(body, kp.PublicKey...)
-	body = append(body, 0x01)
-	body = append(body, sig...)
-	body = append(body, extra...)
-	body = append(body, callBytes...)
-	full := append(compactUint(uint64(len(body))), body...)
-
-	var txHash string
-	if err := c.api.Client.Call(&txHash, "author_submitExtrinsic", "0x"+hex.EncodeToString(full)); err != nil {
-		return 0, err
-	}
-
-	// Poll the finalized head until the secret is readable there.
-	for i := 0; i < 40; i++ {
-		time.Sleep(3 * time.Second)
+	// Take the id from the chain's own `Secrets.SecretStored` event, matched on our
+	// account. This replaces reading the `NextSecretId` counter before submitting:
+	// two concurrent submitters read the same counter, so that was a prediction
+	// that could confirm someone else's secret.
+	//
+	// Scanning each newly finalized block also gives finality for free, which the
+	// committee requires — it authorizes a partial-decrypt against the finalized
+	// head, so acting earlier yields an HTTP 403.
+	var lastScanned types.Hash
+	for i := 0; i < storeFinalityAttempts; i++ {
+		time.Sleep(storeFinalityInterval)
 		fin, err := c.api.RPC.Chain.GetFinalizedHead()
-		if err != nil {
+		if err != nil || fin == lastScanned {
 			continue
 		}
-		if ok, _ := c.secretExistsAt(fin, predicted); ok {
-			return predicted, nil
+		lastScanned = fin
+
+		id, found, err := c.FindStoredSecret(fin, kp.PublicKey)
+		if err != nil {
+			// A decode failure on one block should not abandon the store: the
+			// extrinsic may land in the next one.
+			continue
+		}
+		if found {
+			return id, nil
 		}
 	}
-	return 0, fmt.Errorf("store submitted (tx %s) but secret %d was not finalized in time", txHash, predicted)
+	return SecretID{}, fmt.Errorf(
+		"store submitted (tx %s) but no Secrets.SecretStored event for this account was "+
+			"finalized in time; it may still land, so check the chain before resubmitting",
+		txHash)
 }
 
-func (c *ChainClient) secretExistsAt(at types.Hash, id uint64) (bool, error) {
+func (c *ChainClient) secretExistsAt(at types.Hash, id SecretID) (bool, error) {
 	var res string
 	argHex := codec.HexEncodeToString(secretIDArg(id))
 	if err := c.api.Client.Call(&res, "state_call", "SecretsApi_secret_payload", argHex, codec.HexEncodeToString(at[:])); err != nil {

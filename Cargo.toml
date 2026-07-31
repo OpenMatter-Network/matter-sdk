@@ -5,6 +5,10 @@
 #   crates/matter-vault-core/ — PURE, non-networked crypto + wire contract.
 #                               The single source of cryptographic truth; the
 #                               source for every language binding.
+#   crates/matter-vault-key/  — API-key ingestion + the KeySigner capability.
+#                               Also non-networked and wasm32-clean, so the TS
+#                               binding shares this derivation instead of
+#                               re-implementing it in @polkadot/util-crypto.
 #   crates/matter-vault/      — the Rust SDK: committee HTTP client, quorum
 #                               orchestration, Signer abstraction, call builders.
 #   crates/matter-vault-ffi/  — C ABI (cdylib) over the core, for the Go binding.
@@ -27,7 +31,7 @@
 #   ../matter-kgc/config-contract
 
 [workspace]
-members = ["crates/matter-vault-core", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e"]
+members = ["crates/matter-vault-core", "crates/matter-vault-key", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust"]
 # The wasm and python bindings build through their own toolchains (wasm-pack,
 # maturin), so they are excluded from the native workspace to keep `cargo build
 # --workspace` native-only.
@@ -58,6 +62,7 @@ matter-kgc-config = { git = "ssh://git@github.com/openmatter-network/matter-kgc.
 
 # --- Local crates. ---
 matter-vault-core = { path = "crates/matter-vault-core", default-features = false }
+matter-vault-key = { path = "crates/matter-vault-key", default-features = false }
 
 # --- Shared third-party deps (versions aligned with the matter-kgc workspace). ---
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

@@ -13,7 +13,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
+	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	mv "github.com/openmatter-network/matter-sdk/packages/go/mattervault"
@@ -39,8 +39,30 @@ func main() {
 	}
 }
 
+// guardMainnet refuses to spend real funds without an explicit acknowledgement.
+//
+// This harness pays gas, so an accidental run against mainnet costs money. The check
+// is on the endpoint, not just on MATTER_NETWORK, because a typo'd MATTER_RPC_URL is
+// the likelier mistake.
+func guardMainnet(rpcURL string) error {
+	network := getenv("MATTER_NETWORK", "testnet")
+	if network != "mainnet" && !strings.Contains(rpcURL, "mainnet") {
+		return nil
+	}
+	if os.Getenv("MATTER_CONFIRM") == "yes" {
+		fmt.Fprintln(os.Stderr, "WARNING: running against MAINNET with real funds (MATTER_CONFIRM=yes).")
+		return nil
+	}
+	return fmt.Errorf(
+		"refusing to run a gas-paying harness against mainnet (%s) without explicit "+
+			"confirmation: set MATTER_CONFIRM=yes. This spends real funds", rpcURL)
+}
+
 func run() error {
 	rpcURL := getenv("MATTER_RPC_URL", defaultRPC)
+	if err := guardMainnet(rpcURL); err != nil {
+		return err
+	}
 	seed := os.Getenv("MATTER_SIGNER_SEED")
 	if seed == "" {
 		seed = os.Getenv("TEST_KEY")
@@ -73,13 +95,13 @@ func run() error {
 	}
 	fmt.Printf("Connected. Committee epoch=%d, joint_pk=%dB\n", epoch, len(jointPk))
 
-	var secretID uint64
+	var secretID mv.SecretID
 	if existing != "" {
-		secretID, err = strconv.ParseUint(existing, 10, 64)
+		secretID, err = mv.ParseSecretID(existing)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Using existing secret %d.\n", secretID)
+		fmt.Printf("Using existing secret %s.\n", secretID)
 	} else {
 		env, err := mv.Encrypt(jointPk, epoch, []byte(secret), mv.AadBytes(aad), nil)
 		if err != nil {
@@ -91,7 +113,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Stored on chain: secret_id=%d.\n", secretID)
+		fmt.Printf("Stored on chain: secret_id=%s.\n", secretID)
 	}
 
 	secretEpoch, err := chain.SecretEpoch(secretID)

@@ -17,7 +17,7 @@ type CommitteeNode struct {
 
 // DecryptParams is everything needed to recover one secret (chain-derived fields supplied by you).
 type DecryptParams struct {
-	SecretID  uint64
+	SecretID  SecretID
 	Epoch     uint32
 	BindingID []byte
 	Aad       Aad
@@ -74,7 +74,7 @@ func Decrypt(transport Transport, signer Signer, p DecryptParams) ([]byte, error
 			return nil, err
 		}
 		req := PartialDecryptRequest{
-			SecretID:      secretIDHex(p.SecretID),
+			SecretID:      p.SecretID.Hex(),
 			Subset:        subset,
 			LagrangeCoeff: toHex(lambda),
 			Requester:     auth.Requester,
@@ -102,7 +102,7 @@ func Decrypt(transport Transport, signer Signer, p DecryptParams) ([]byte, error
 	}
 
 	// 5. Verify + aggregate + AEAD-open in the shared core.
-	pt, err := OpenSecret(p.SharedA, p.Capsule, secretIDBytes(p.SecretID), p.Epoch, p.BindingID, AadBytes(p.Aad), p.CT, partials)
+	pt, err := OpenSecret(p.SharedA, p.Capsule, p.SecretID.Bytes(), p.Epoch, p.BindingID, AadBytes(p.Aad), p.CT, partials)
 	if err != nil {
 		return nil, &DecryptError{"crypto", err.Error()}
 	}

@@ -1,0 +1,56 @@
+# Nightly tripwire: has the runtime moved under us?
+#
+# MatterChain ships forkless upgrades to two live networks, and this SDK resolves
+# pallets and calls **by name** against live metadata rather than vendoring types.
+# That means a `spec_version` bump alone is harmless — but a *rename* would break a
+# curated façade at call time, in a user's process.
+#
+# This job asks the live chains directly, every night, so a rename is a morning
+# notification rather than a support ticket. It is deliberately NOT part of PR CI: it
+# depends on an external service that changes independently of this repo, so a red
+# nightly is information, not a broken build.
+#
+# Read-only: no key, no funded account, no submission, no secrets.
+name: runtime-drift
+
+on:
+  schedule:
+    # 07:00 UTC daily, before European working hours.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+# Least privilege: the job only reads. A failing nightly already notifies; it does
+# not need write access to file an issue itself.
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - network: testnet
+            rpc: wss://node2.testnet.openmatter.network
+          - network: mainnet
+            rpc: wss://node1.mainnet.openmatter.network
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+
+      # `live_chain.rs` asserts that every curated (pallet, call) resolves in live
+      # metadata, that ExistentialDeposit still implies a sane decimal count, and
+      # that a read-only client refuses to submit.
+      - name: Check the curated surface against ${{ matrix.network }}
+        working-directory: matter-sdk
+        env:
+          MATTER_RPC_URL: ${{ matrix.rpc }}
+          MATTER_NETWORK: ${{ matrix.network }}
+        run: |
+          cargo test -p matter-vault --features chain --test live_chain \
+            -- --ignored --nocapture

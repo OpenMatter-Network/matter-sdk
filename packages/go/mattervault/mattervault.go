@@ -1,16 +1,20 @@
-// Package mattervault is the Go binding for MatterVault.
+// Package mattervault is the Go client for MatterVault and the OpenMatter chain.
 //
-// SCAFFOLD — proof-of-binding. The crypto calls below are wired through cgo to
-// the one shared Rust core (crates/matter-vault-ffi); the full committee client,
-// quorum orchestration, and Signer abstraction are tracked in docs/parity.md and
-// not yet implemented. What IS implemented here (Encrypt, SigningPayload,
-// LagrangeFor) calls real core crypto and must match the Rust/TS bindings against
-// testvectors/.
+// Cryptography and API-key derivation are wired through cgo to the one shared
+// Rust core (crates/matter-vault-ffi), so this binding agrees byte-for-byte with
+// Rust, TypeScript, and Python against testvectors/. On top of that core it adds
+// the committee HTTP client, quorum orchestration, the Signer abstraction, and a
+// chain client that signs and submits extrinsics.
 //
 // Build prerequisites:
 //
 //	cargo build -p matter-vault-ffi --release   # produces target/release/libmatter_vault_ffi.a
 //	go test ./...
+//
+// The cgo LDFLAGS link the cdylib, so a binary using this package needs the
+// library on its search path at run time:
+//
+//	LD_LIBRARY_PATH=target/release go run .
 package mattervault
 
 /*
@@ -31,6 +35,10 @@ import (
 var (
 	ErrInvalidArg = fmt.Errorf("matter-vault: invalid argument")
 	ErrCrypto     = fmt.Errorf("matter-vault: cryptographic operation failed")
+	// ErrBadAPIKey is returned when a key is empty, malformed, or names an
+	// unsupported scheme. The C boundary carries codes only, so the specific
+	// reason does not survive it — parse errors are reported generically here.
+	ErrBadAPIKey = fmt.Errorf("matter-vault: api key is empty, malformed, or names an unsupported scheme")
 )
 
 func errFromCode(rc C.int32_t) error {
@@ -39,6 +47,8 @@ func errFromCode(rc C.int32_t) error {
 		return nil
 	case C.MV_ERR_INVALID_ARG:
 		return ErrInvalidArg
+	case C.MV_ERR_KEY:
+		return ErrBadAPIKey
 	default:
 		return ErrCrypto
 	}

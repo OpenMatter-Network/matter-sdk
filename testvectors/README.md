@@ -11,9 +11,23 @@ their crypto stays identical.
 | `lagrange.json` | the bincode Lagrange coefficient for a node over a subset |
 | `open_secret.json` | a sealed secret + a real committee quorum; `openSecret` must recover `expected_plaintext_hex` |
 | `seed_formats.json` | one sr25519 secret in both encodings (`0x`-hex mini-secret and BIP39 mnemonic) must derive `account_id_hex` — pins key ingestion in every binding's companion signer library, and in the dashboard that mints API keys |
+| `api_keys.json` | the full API-key ingestion contract: `valid` keys must parse to `account_id_hex`, `invalid` keys must be rejected with the named error kind |
 
-All binary fields are bare lowercase hex (no `0x`). `secret_id` is a decimal string
-(it's a `u128`).
+`api_keys.json` is a deliberate **sibling** of `seed_formats.json`, not an extension of
+it. `seed_formats.json` is a positive derivation vector that the dashboard also replays;
+mixing rejection cases into an artifact shared across repos would muddy it. Two cases
+there are load-bearing beyond the obvious:
+
+- **Junctions must be applied.** `0x…//hard` derives a *different* account than `0x…`.
+  A binding that branches on the `0x` prefix and routes hex SURIs to a raw-seed
+  constructor silently drops the junctions and derives the root account instead.
+- **A phraseless SURI must be rejected.** `//Alice` makes most SURI parsers fall back to
+  the *public* well-known development phrase, so an unset environment variable would
+  otherwise mint a working, globally-controlled signer.
+
+All binary fields are bare lowercase hex (no `0x`) — except the `key` field of
+`api_keys.json`, which is the literal string a user would paste and therefore keeps its
+`0x` prefix and whitespace verbatim. `secret_id` is a decimal string (it's a `u128`).
 
 ## Regenerate
 
@@ -23,7 +37,13 @@ conformance suite:
 ```bash
 cargo test -p matter-vault-core --test roundtrip -- --ignored
 cargo test -p matter-vault --test seed_formats -- --ignored
+cargo test -p matter-vault-key --test parse -- --ignored
 ```
+
+Replayed by: `crates/matter-vault-key/tests/parse.rs` (Rust),
+`packages/typescript/test/api-key.test.ts`, `packages/go/mattervault/apikey_test.go`.
+Python replays `seed_formats.json` today and `api_keys.json` once its ingestion is
+aligned — see [`../docs/parity.md`](../docs/parity.md).
 
 `open_secret.json` is large (~4 MB) because RLWE capsules and ZK proofs are large;
 that is the real wire size, which is itself worth pinning.

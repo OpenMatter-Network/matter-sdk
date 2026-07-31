@@ -1,0 +1,136 @@
+# Live end-to-end verification against the public testnet.
+#
+# Structurally outside PR CI, for two reasons: it needs the funded `TEST_KEY` secret,
+# and it **spends gas**. A pull request from a fork must never be able to drain the
+# test account, so this is manual-or-scheduled only and never triggered by
+# `pull_request`.
+#
+# What it proves that no fake can: that the node accepts our extrinsic (real nonce,
+# era window, fee, weight), that the runtime APIs return shapes we decode, and that
+# the committee accepts each binding's sr25519 signature.
+name: e2e
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      language:
+        description: Which harness to run
+        required: false
+        default: all
+        type: choice
+        options: [all, rust, typescript, python, go]
+
+permissions:
+  contents: read
+
+env:
+  # Never mainnet from CI. The harnesses also refuse without MATTER_CONFIRM=yes,
+  # so this is belt and braces.
+  MATTER_NETWORK: testnet
+
+jobs:
+  # The client examples are read-only and cost nothing, so they run first as a
+  # cheap smoke test: if these fail, the gas-paying harnesses would too.
+  read-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - name: Read-only client example (no key, no gas)
+        working-directory: matter-sdk
+        run: cargo run -p matter-client-example
+
+  rust:
+    needs: read-only
+    if: ${{ github.event.inputs.language == 'rust' || github.event.inputs.language == 'all' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - name: Live store -> gas -> decrypt
+        working-directory: matter-sdk
+        env:
+          TEST_KEY: ${{ secrets.TEST_KEY }}
+        run: cargo run -p matter-vault-e2e
+
+  typescript:
+    needs: read-only
+    if: ${{ github.event.inputs.language == 'typescript' || github.event.inputs.language == 'all' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with: { targets: wasm32-unknown-unknown }
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Live store -> gas -> decrypt
+        working-directory: matter-sdk/examples/e2e
+        env:
+          TEST_KEY: ${{ secrets.TEST_KEY }}
+        run: |
+          npm --prefix ../../packages/typescript ci
+          npm --prefix ../../packages/typescript run build
+          npm install
+          npm start
+
+  python:
+    needs: read-only
+    if: ${{ github.event.inputs.language == 'python' || github.event.inputs.language == 'all' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Live store -> gas -> decrypt
+        working-directory: matter-sdk/bindings/python
+        env:
+          TEST_KEY: ${{ secrets.TEST_KEY }}
+        run: |
+          pip install maturin 'substrate-interface>=1.7'
+          maturin build --release
+          pip install --force-reinstall --no-deps target/wheels/matter_vault-*.whl
+          python ../../examples/python-e2e/run.py
+
+  go:
+    needs: read-only
+    if: ${{ github.event.inputs.language == 'go' || github.event.inputs.language == 'all' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Live store -> gas -> decrypt
+        working-directory: matter-sdk
+        env:
+          TEST_KEY: ${{ secrets.TEST_KEY }}
+        run: |
+          cargo build -p matter-vault-ffi --release
+          cd examples/go-e2e
+          LD_LIBRARY_PATH=../../target/release go run .

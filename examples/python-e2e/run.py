@@ -35,8 +35,28 @@ DEFAULT_RPC = "wss://node2.testnet.openmatter.network"
 DEFAULT_SECRET = "API_KEY=swordfish\nDATABASE_URL=postgres://prod"
 
 
+def guard_mainnet(rpc_url: str) -> None:
+    """Refuse to spend real funds without an explicit acknowledgement.
+
+    This harness pays gas, so an accidental run against mainnet costs money. The
+    check is on the endpoint, not just on ``MATTER_NETWORK``, because a typo'd
+    ``MATTER_RPC_URL`` is the likelier mistake.
+    """
+    network = os.environ.get("MATTER_NETWORK", "testnet")
+    if network != "mainnet" and "mainnet" not in rpc_url:
+        return
+    if os.environ.get("MATTER_CONFIRM") == "yes":
+        print("WARNING: running against MAINNET with real funds (MATTER_CONFIRM=yes).", file=sys.stderr)
+        return
+    raise SystemExit(
+        f"refusing to run a gas-paying harness against mainnet ({rpc_url}) without "
+        "explicit confirmation: set MATTER_CONFIRM=yes. This spends real funds."
+    )
+
+
 def main() -> int:
     rpc_url = os.environ.get("MATTER_RPC_URL", DEFAULT_RPC)
+    guard_mainnet(rpc_url)
     seed = os.environ.get("MATTER_SIGNER_SEED") or os.environ.get("TEST_KEY")
     if not seed:
         print("set MATTER_SIGNER_SEED or TEST_KEY (sr25519 SURI / 0x-seed)", file=sys.stderr)

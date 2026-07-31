@@ -16,6 +16,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 matter-vault-core = { workspace = true }
+# API-key ingestion, so the Go binding shares the derivation every other binding
+# uses rather than re-deriving with go-subkey.
+matter-vault-key = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }
 
 [lints]
 workspace = true

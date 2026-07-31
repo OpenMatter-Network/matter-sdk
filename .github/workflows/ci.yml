@@ -32,18 +32,39 @@ jobs:
       - name: Check fmt
         working-directory: matter-sdk
         run: cargo fmt --all --check -- --config ${{ env.FMT_CONFIG }}
-      - name: Clippy
+      # `matter-vault`'s chain client is behind a default-off `chain` feature, so a
+      # single default-feature run would never compile it. Both matrices are gated.
+      - name: Clippy (default features)
         working-directory: matter-sdk
         run: cargo clippy --workspace --all-targets -- -Dwarnings
+      - name: Clippy (chain feature)
+        working-directory: matter-sdk
+        run: cargo clippy -p matter-vault --features chain --all-targets -- -Dwarnings
       - name: Build
         working-directory: matter-sdk
         run: cargo build --workspace
-      - name: Test
+      - name: Test (default features)
         working-directory: matter-sdk
         run: cargo test --workspace
-      - name: Build core for wasm32
+      - name: Test (chain feature)
         working-directory: matter-sdk
-        run: cargo build -p matter-vault-core --target wasm32-unknown-unknown
+        run: cargo test -p matter-vault --features chain
+      # The `chain` feature must stay opt-out: `matter-ml` consumes this crate by git
+      # tag and needs neither subxt nor a tokio runtime. If the heavy subxt client
+      # appears in the default graph, the feature gate has leaked.
+      - name: Assert subxt stays out of the default dependency graph
+        working-directory: matter-sdk
+        run: |
+          if cargo tree -p matter-vault --edges normal | grep -qE '^[^a-zA-Z]*subxt v[0-9]'; then
+            echo "::error::the subxt client leaked into matter-vault's default features"
+            cargo tree -p matter-vault --edges normal | grep -E 'subxt'
+            exit 1
+          fi
+      - name: Build cores for wasm32
+        working-directory: matter-sdk
+        run: |
+          cargo build -p matter-vault-core --target wasm32-unknown-unknown
+          cargo build -p matter-vault-key --target wasm32-unknown-unknown
 
   typescript:
     runs-on: ubuntu-latest
@@ -65,12 +86,29 @@ jobs:
           npm ci
           npm run build
           npm test
+      # matter-vault advertises zero runtime dependencies, and the chain client
+      # lives in a separate package precisely to keep that true. Assert it.
+      - name: Assert matter-vault has no runtime dependencies
+        working-directory: matter-sdk/packages/typescript
+        run: |
+          deps=$(npm ls --omit=dev --depth=0 --parseable 2>/dev/null | tail -n +2)
+          if [ -n "$deps" ]; then
+            echo "::error::matter-vault gained a runtime dependency:"
+            echo "$deps"
+            exit 1
+          fi
+      - name: Build and test the chain client
+        working-directory: matter-sdk/packages/typescript-client
+        run: |
+          npm install
+          npm run typecheck
+          npm test
+          npm run build
 
-  # Bindings below the full-parity line (docs/parity.md). Their crypto surface is
-  # real and conformance-tested; allowed-fail until the orchestration is ported.
+  # Python and Go are gating now: every row in docs/parity.md is ✅, so a failure here
+  # is a real regression rather than an unfinished port.
   python:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
@@ -80,16 +118,29 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.0
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - name: Build the extension and run conformance
+      # `maturin develop` shells out to `uv pip`, which is unavailable in some
+      # environments; build-then-install always works and is what the README documents.
+      # `substrate-interface` is needed for the chain, client, and façade tests —
+      # without it they silently skip, which would make this job pass vacuously.
+      - name: Build the extension and run the full suite
         working-directory: matter-sdk/bindings/python
         run: |
-          pip install maturin pytest
-          maturin develop
+          pip install maturin pytest 'substrate-interface>=1.7'
+          maturin build --release
+          pip install --force-reinstall --no-deps target/wheels/matter_vault-*.whl
           pytest -q
+      # The chain, client, and façade tests guard on `pytest.importorskip`, so a
+      # missing substrate-interface would make this job pass with them all skipped.
+      - name: Assert the chain tests were not silently skipped
+        working-directory: matter-sdk/bindings/python
+        run: |
+          python -c "import substrateinterface" || {
+            echo "::error::substrate-interface missing; the chain tests would skip"
+            exit 1
+          }
 
   go:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }
@@ -99,8 +150,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.0
       - uses: actions/setup-go@v5
         with: { go-version: "1.22" }
-      - name: Build the FFI staticlib and run Go conformance
+      - name: Build the FFI library and run the full Go suite
         working-directory: matter-sdk
         run: |
           cargo build -p matter-vault-ffi --release
-          cd packages/go/mattervault && go test ./...
+          cd packages/go/mattervault
+          gofmt -l . | tee /tmp/unformatted
+          test ! -s /tmp/unformatted || { echo "::error::gofmt would reformat these"; exit 1; }
+          go vet ./...
+          go test ./...
+      # The examples are part of the surface: a client example that stops compiling
+      # is a broken quick-start, and nothing else in CI builds them.
+      - name: Build the Go examples
+        working-directory: matter-sdk
+        run: |
+          for example in examples/go-e2e examples/client-go; do
+            (cd "$example" && go build ./...)
+          done

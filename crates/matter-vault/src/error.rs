@@ -1,6 +1,7 @@
 //! The SDK error type.
 
 use matter_vault_core::CoreError;
+use matter_vault_key::KeyError;
 use thiserror::Error;
 
 /// Why an SDK operation failed.
@@ -15,6 +16,11 @@ pub enum SdkError {
     /// A cryptographic step failed (decode, proof rejected, AEAD). See [`CoreError`].
     #[error(transparent)]
     Core(#[from] CoreError),
+
+    /// An API key could not be ingested, or a key-backed signer refused to sign.
+    /// See [`KeyError`] — its variants never echo any part of the key.
+    #[error(transparent)]
+    Key(#[from] KeyError),
 
     /// An HTTP call to a committee node failed (connection, status, body).
     #[error("committee transport error for {endpoint}: {detail}")]
@@ -58,6 +64,67 @@ pub enum SdkError {
         /// The node endpoint involved.
         endpoint: String,
         /// What was wrong.
+        detail: String,
+    },
+
+    /// The client was built without a signer, so it cannot submit extrinsics or
+    /// authorize decryption. Build it with an API key or a signer.
+    #[error("this client is read-only: build it with an api key or a signer to submit")]
+    ReadOnly,
+
+    /// The connection configuration is inconsistent.
+    #[error("configuration error: {detail}")]
+    Config {
+        /// What is wrong with it.
+        detail: String,
+    },
+
+    /// A chain read or submission failed. `target` is the `pallet.item` involved.
+    #[error("chain error at {target}: {detail}")]
+    Chain {
+        /// The `pallet.call`, `pallet.storage`, or RPC method involved.
+        target: String,
+        /// A human-readable detail.
+        detail: String,
+    },
+
+    /// A signing client was pointed at mainnet without explicit confirmation.
+    /// Set `MATTER_CONFIRM=yes` or `MatterConfig::confirm_mainnet`.
+    #[error("refusing to build a signing client against mainnet {chain_name:?} (detected via {detected_via}) without explicit confirmation: set MATTER_CONFIRM=yes or MatterConfig::confirm_mainnet. This client can spend real funds")]
+    MainnetNotConfirmed {
+        /// The chain the endpoint actually serves.
+        chain_name: String,
+        /// How mainnet was detected: `"genesis-hash"` or `"token-symbol"`.
+        detected_via: &'static str,
+    },
+
+    /// The endpoint serves a different network than the config selected —
+    /// usually a typo'd RPC URL, caught before it costs anything.
+    #[error("expected the {expected} network but the endpoint serves {actual:?}")]
+    WrongNetwork {
+        /// The network the config asked for.
+        expected: String,
+        /// The chain the endpoint actually serves.
+        actual: String,
+    },
+
+    /// A submitted extrinsic did not finalize within the configured budget. It
+    /// may still finalize later — check the chain before resubmitting, or the
+    /// call may be applied twice.
+    #[error("{pallet}.{call} did not finalize within {waited:?}; it may still land, so check the chain before resubmitting")]
+    FinalityTimeout {
+        /// The pallet submitted to.
+        pallet: String,
+        /// The call submitted.
+        call: String,
+        /// How long the client waited.
+        waited: std::time::Duration,
+    },
+
+    /// An amount string could not be converted to plancks.
+    #[error("invalid amount: {detail}")]
+    BadAmount {
+        /// What was wrong with it.
         detail: String,
     },
 }

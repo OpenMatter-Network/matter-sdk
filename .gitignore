@@ -31,3 +31,7 @@ target/wheels/
 *.swp
 .idea/
 .vscode/
+
+# Go example binaries (named after their directory by `go build`).
+examples/go-e2e/go-e2e
+examples/client-go/client-go

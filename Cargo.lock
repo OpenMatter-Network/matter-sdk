@@ -65,6 +65,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "anyhow"
+version = "1.0.104"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1765,6 +1771,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "matter-client-example"
+version = "0.9.1"
+dependencies = [
+ "anyhow",
+ "matter-vault",
+ "tokio",
+]
+
+[[package]]
 name = "matter-crypto"
 version = "0.8.0"
 source = "git+ssh://git@github.com/openmatter-network/matter-crypto.git?tag=v0.8.1#0f7ae62260c687b15211be39ba1d213803358ba7"
@@ -1809,13 +1824,15 @@ dependencies = [
  "matter-crypto",
  "matter-kgc-config",
  "matter-vault-core",
+ "matter-vault-key",
+ "parity-scale-codec",
  "reqwest",
  "serde",
  "serde_json",
+ "subxt",
  "subxt-signer",
  "thiserror 2.0.18",
  "tokio",
- "zeroize",
 ]
 
 [[package]]
@@ -1863,7 +1880,21 @@ dependencies = [
 name = "matter-vault-ffi"
 version = "0.9.1"
 dependencies = [
+ "hex",
  "matter-vault-core",
+ "matter-vault-key",
+]
+
+[[package]]
+name = "matter-vault-key"
+version = "0.9.1"
+dependencies = [
+ "getrandom 0.2.17",
+ "hex",
+ "serde_json",
+ "subxt-signer",
+ "thiserror 2.0.18",
+ "zeroize",
 ]
 
 [[package]]

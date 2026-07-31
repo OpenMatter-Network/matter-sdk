@@ -1,8 +1,11 @@
 """Ready-to-submit on-chain call arguments (substrate-interface ``call_params``).
 
-The SDK never submits transactions or holds keys — you submit these with your own
-Substrate client. The builders take an ``Aad`` tag so a secret can't be stored
-under a different AAD than it was sealed with.
+The builders take an ``Aad`` tag so a secret can't be stored under a different AAD
+than it was sealed with.
+
+These are for callers who submit with their own Substrate client.
+:class:`~matter_vault.client.MatterClient` can submit them for you, which is the
+shorter path for most callers.
 """
 
 from typing import Tuple, Union
@@ -48,12 +51,52 @@ def rotate_secret(
     }
 
 
-def grant_access(secret_id: int, grantee: bytes) -> dict:
-    """``call_params`` for granting another account decryption access.
+ACCOUNT_ID_BYTES = 32
 
-    ``grantee`` is the 32-byte account id; the chain wraps it in its grant-target
-    enum on submission.
+
+def grant_to_user(account: bytes) -> dict:
+    """A ``GrantTarget`` naming an account."""
+    if len(account) != ACCOUNT_ID_BYTES:
+        raise ValueError(f"account must be {ACCOUNT_ID_BYTES} bytes, got {len(account)}")
+    return {"User": to_hex(account)}
+
+
+def grant_to_deployment(deployment: int) -> dict:
+    """A ``GrantTarget`` naming a deployment.
+
+    Authorizes whichever resource is currently assigned to it, so the owner need
+    not name an account that only exists after assignment.
     """
-    if len(grantee) != 32:
-        raise ValueError("grantee must be a 32-byte account id")
-    return {"secret_id": int(secret_id), "grantee": to_hex(grantee)}
+    return {"Deployment": int(deployment)}
+
+
+def grant_access(secret_id: int, target: dict) -> dict:
+    """``call_params`` for ``secrets.grant_access(secret_id, target)``.
+
+    ``target`` is a ``GrantTarget`` from :func:`grant_to_user` or
+    :func:`grant_to_deployment`.
+
+    The chain's ``GrantTarget<AccountId>`` is an **enum**, not a bare account id.
+    This builder previously emitted a raw 32-byte ``grantee`` with a docstring
+    claiming the chain would wrap it — nothing did, so the call data was dead on
+    arrival. Nothing caught it because no end-to-end test exercised ``grant``.
+    """
+    return {"secret_id": int(secret_id), "target": target}
+
+
+def revoke_access(secret_id: int, target: dict) -> dict:
+    """``call_params`` for ``secrets.revoke_access(secret_id, target)``.
+
+    The target must match the grant exactly, or this is a no-op on chain.
+    Revocation is how a leaked signer is contained, so it is a first-class call
+    rather than something callers hand-roll.
+    """
+    return {"secret_id": int(secret_id), "target": target}
+
+
+def delete_secret(secret_id: int) -> dict:
+    """``call_params`` for ``secrets.delete_secret(secret_id)``.
+
+    Removes the secret and every grant on it. Owner only, and irreversible.
+    """
+    return {"secret_id": int(secret_id)}

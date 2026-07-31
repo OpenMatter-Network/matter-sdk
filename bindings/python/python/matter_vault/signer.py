@@ -1,6 +1,6 @@
 """The bring-your-own-signer abstraction.
 
-Your key never enters the SDK: you provide a function that signs the canonical
+The key behind *this* signer never enters the SDK: you provide a function that signs
 payload, and the SDK frames the result into the request's auth fields.
 """
 

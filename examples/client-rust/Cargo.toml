@@ -1,0 +1,23 @@
+[package]
+name = "matter-client-example"
+description = "Connect to OpenMatter from an apiKey and exercise the generic surface plus a curated façade. Read-only unless MATTER_SUBMIT=yes."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
+[dependencies]
+matter-vault = { path = "../../crates/matter-vault", features = ["chain"] }
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+anyhow = "1"
+
+[lints]
+workspace = true

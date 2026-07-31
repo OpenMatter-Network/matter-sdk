@@ -10,8 +10,20 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+default = []
+# The OpenMatter chain client: connect, read state, and sign/submit any pallet
+# call. Off by default so the existing dependency graph is preserved byte-for-byte
+# — `matter-ml` consumes this crate as a git-tag dependency and needs neither
+# subxt nor a tokio runtime. Verify with `cargo tree -p matter-vault`.
+chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio"]
+
 [dependencies]
 matter-vault-core = { workspace = true }
+# API-key ingestion + the `KeySigner` capability every auth path is framed from.
+# Owns the sr25519 dependency, so this crate no longer takes `subxt-signer`
+# directly.
+matter-vault-key = { workspace = true }
 # Re-used for the on-chain extrinsic argument types in `calls`.
 matter-kgc-config = { workspace = true, features = ["wire"] }
 
@@ -19,21 +31,26 @@ serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
-zeroize = { workspace = true }
 
 # Committee HTTP transport. The caller drives the async runtime (e.g. tokio).
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
-# sr25519 signing for the Substrate auth path. `default-features = false` keeps
-# the heavy `subxt` client out; we only need the keypair + signing primitive,
-# which is byte-compatible with the chain's `MultiSignature` verification.
-subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+# --- `chain` feature only. ---
+# Dynamic (metadata-driven) extrinsic and storage access, so every pallet the
+# runtime exposes is reachable without vendoring metadata into this repo.
+subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"], optional = true }
+parity-scale-codec = { version = "3", features = ["derive"], optional = true }
+tokio = { version = "1.47.1", features = ["rt", "time"], optional = true }
 
 [dev-dependencies]
 # The fake-committee integration test computes *real* partials with matter-crypto.
 matter-crypto = { workspace = true }
 bincode = { workspace = true }
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+# The MV-C1 replay test models an attacker's keypair and a verifying committee
+# node, so it needs the raw sr25519 primitive. Dev-only: the shipped crate signs
+# exclusively through `matter-vault-key`.
+subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
 
 [lints]
 workspace = true
