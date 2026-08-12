@@ -13,7 +13,8 @@
 #                               orchestration, Signer abstraction, call builders.
 #   crates/matter-vault-ffi/  — C ABI (cdylib) over the core, for the Go binding.
 #   bindings/wasm/            — wasm-bindgen binding over the core (drives the TS SDK).
-#   bindings/python/          — PyO3/maturin binding over the core (scaffold).
+#   bindings/python/          — PyO3/maturin binding over the cores + a pure-Python
+#                               online layer (chain client via the [sdk] extra).
 #
 # Dependency policy
 # -----------------
@@ -22,13 +23,11 @@
 # codec live in `matter-kgc-config`. We DEPEND on those — we never re-implement
 # them (one audited implementation, no cross-language drift).
 #
-# For local development these are PATH dependencies on sibling checkouts. At
-# release they switch to pinned git tags (the matter-kgc convention). Keeping
-# them as paths here guarantees an offline, reproducible build of the tracer.
-# Expected sibling layout:
-#   ../matter-crypto/crypto
-#   ../matter-kgc/kgc-proto
-#   ../matter-kgc/config-contract
+# They are pinned as GIT-TAG dependencies (the matter-kgc convention) — see
+# [workspace.dependencies] below. Locally they fetch over SSH with your GitHub
+# credentials (.cargo/config.toml sets net.git-fetch-with-cli); CI rewrites the
+# remotes to HTTPS + PAT via .github/actions/fetch-core-crates. Bump the tags
+# here and in Cargo.lock together.
 
 [workspace]
 members = ["crates/matter-vault-core", "crates/matter-vault-key", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust"]
@@ -41,7 +40,7 @@ resolver = "2"
 [workspace.package]
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
-version = "0.9.1"
+version = "1.0.0"
 homepage = "https://openmatter.network"
 repository = "https://github.com/openmatter-network/matter-sdk"
 edition = "2021"

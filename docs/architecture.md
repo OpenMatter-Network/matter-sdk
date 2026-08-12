@@ -38,8 +38,9 @@ emits fixtures into [`testvectors/`](../testvectors); every binding replays them
   `openSecret` must recover the known plaintext.
 
 Rust, TypeScript, Python, and Go all pass these today. This is what lets ergonomics
-differ while cryptography cannot. The same mechanism now pins two non-cryptographic
-contracts as well: API-key ingestion (`api_keys.json`) and the curated façade surface
+differ while cryptography cannot. The same mechanism now pins three non-cryptographic
+contracts as well: seed-format key derivation (`seed_formats.json`), the full API-key
+ingestion contract (`api_keys.json`), and the curated façade surface
 (`facade_calls.json`).
 
 ## Data flow
@@ -98,7 +99,8 @@ spread over a year yields nothing.
 | Path | Role |
 |---|---|
 | `crates/matter-vault-core` | pure crypto + wire types + AAD registry; the source of truth |
-| `crates/matter-vault` | Rust SDK: `CommitteeClient`, `decrypt`, `Signer`, `calls` |
+| `crates/matter-vault-key` | API-key ingestion + `KeySigner` — the second pure core, wasm-clean, one derivation for every binding |
+| `crates/matter-vault` | Rust SDK: `decrypt`, `Signer`, `calls`; `chain::MatterClient` + façades behind the `chain` feature |
 | `crates/matter-vault-ffi` | C ABI over the core (foundation for Go/cgo) |
 | `bindings/wasm` | wasm-bindgen binding (drives the TS package) |
 | `bindings/python` | PyO3 binding (`matter_vault` extension) |

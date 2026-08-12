@@ -1,16 +1,17 @@
 //! The curated façade surface, pinned as a fixture every language replays.
 //!
-//! The façades are hand-written per language, so the risk is that they drift:
-//! TypeScript grows a `secrets.purge` that Rust does not have, or two languages
-//! disagree about which pallet call a method maps to. Code generation was
-//! considered and rejected for now — only two languages have a client, and a
-//! generated four-line wrapper is less reviewable than the wrapper itself. So
-//! instead of generating, **pin**: one fixture, emitted from Rust, replayed by
-//! every binding, exactly the mechanism `testvectors/` already uses for crypto.
+//! The façades are hand-written per language (all four have a client), so the
+//! risk is that they drift: TypeScript grows a `secrets.purge` that Rust does not
+//! have, or two languages disagree about which pallet call a method maps to. Code
+//! generation was considered and rejected for now — a generated four-line wrapper
+//! is less reviewable than the wrapper itself. So instead of generating, **pin**:
+//! one fixture, emitted from Rust, replayed by every binding, exactly the
+//! mechanism `testvectors/` already uses for crypto.
 //!
-//! The fixture is checked both ways. A row without an implementation fails, and
-//! an implementation without a row fails — otherwise it would only catch half the
-//! drift.
+//! TypeScript, Python, and Go check the fixture both ways by reflection: a row
+//! without an implementation fails, and an implementation without a row fails —
+//! otherwise it would only catch half the drift. Rust has no reflection, so this
+//! file pins the same list by hand instead.
 //!
 //! Regenerate with:
 //!

@@ -43,11 +43,14 @@ be four chances to get lattice crypto subtly wrong).
 
 | Layer | What it is | Where |
 |---|---|---|
-| **Core** | Pure, non-networked crypto + wire contract: `encrypt`, `open_secret`, signing payload, Lagrange, proof verify. | `crates/matter-vault-core` |
-| **Rust SDK** | Committee HTTP client, quorum + retry, `Signer`, call builders. | `crates/matter-vault` |
-| **wasm binding** | `wasm-bindgen` over the core; drives the TS package. | `bindings/wasm` |
-| **TypeScript SDK** | Ergonomic TS over wasm + the orchestration shell. | `packages/typescript` |
-| **Python / Go** | PyO3 + cgo bindings over the same core. | `bindings/python`, `packages/go` |
+| **Crypto core** | Pure, non-networked crypto + wire contract: `encrypt`, `open_secret`, signing payload, Lagrange, proof verify. | `crates/matter-vault-core` |
+| **Key core** | API-key ingestion + signing (`ApiKey`, `KeySigner`) — wasm-clean, so every language shares one derivation. | `crates/matter-vault-key` |
+| **Rust SDK** | Committee HTTP client, quorum + retry, `Signer`, call builders; the chain client + façades behind the `chain` feature. | `crates/matter-vault` |
+| **C ABI** | FFI over the cores; drives the Go binding. | `crates/matter-vault-ffi` |
+| **wasm binding** | `wasm-bindgen` over the cores; drives the TS packages. | `bindings/wasm` |
+| **TypeScript** | `matter-vault` (seal/recover, zero runtime deps) + `matter-client` (chain client + façades). | `packages/typescript`, `packages/typescript-client` |
+| **Python** | PyO3 binding + pure-Python online layer; chain client via the `[sdk]` extra. | `bindings/python` |
+| **Go** | cgo over the C ABI + native online layer and chain client. | `packages/go/mattervault` |
 
 Networking, the quorum loop, and **signing** are idiomatic per language; only the
 cryptography is shared. A [conformance vector suite](testvectors/) generated from
@@ -59,7 +62,7 @@ One string in, a working client out. The key is read from the environment — ne
 argv or source.
 
 ```ts
-import { MatterClient, ApiKey } from "@openmatter-network/matter-client";
+import { MatterClient, ApiKey, Aad, storeSecret } from "@openmatter-network/matter-client";
 
 const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
 
@@ -69,11 +72,12 @@ await client.tx("Staking", "bond", [client.parseAmount("10"), { Staked: null }])
 
 // Reads and runtime APIs go through the same surface.
 const account = await client.query("System", "Account", [client.accountId]);
-const epoch = await client.runtimeApi("KgcApi", "dkg_epoch", []);
+const epoch = await client.runtimeApi("KgcApi_dkg_epoch");
 
-// And the MatterVault path, on the same key.
-const secretId = await client.secrets.store("API_KEY=swordfish", { aad: Aad.EnvV1 });
-const plaintext = await client.secrets.recover(secretId, { aad: Aad.EnvV1 });
+// And the MatterVault path, on the same key: seal client-side with `encrypt()`,
+// store on-chain. The chain assigns the id in the `Secrets.SecretStored` event;
+// recovery is the threshold `decrypt()` — see docs/client-guide.md for the full path.
+const receipt = await client.secrets.store(storeSecret(sealed, epoch, "prod", Aad.EnvV1));
 ```
 
 Defaults are testnet, and a *signing* client refuses to touch mainnet without explicit
@@ -108,8 +112,11 @@ recovered only when a `t`-of-`n` quorum cooperates:
 
 ## Language support
 
-All four are at **full parity**: same constructors, same generic surface, same five
-façades, same guards.
+All four are at **full parity**: same generic surface, same five façades, same
+guards, and matching constructors — with one honest asymmetry: Python's
+bring-your-own-key path is `connect_with_keypair` (an in-process
+`substrate-interface` keypair), not yet a remote-signer seam like
+`connect_with_signer` elsewhere. See [`docs/client-guide.md`](docs/client-guide.md#connecting).
 
 | Language | Seal & recover | `apiKey` | Chain client | Façades | Chain client enabled by |
 |---|:--:|:--:|:--:|:--:|---|
@@ -232,23 +239,16 @@ and even during decryption, no node ever sees your secret.
 
 ## Building from source
 
-This repo currently builds against sibling checkouts of the private core crates.
-Clone them next to `matter-sdk`:
-
-```
-your-code/
-  matter-sdk/        ← this repo
-  matter-crypto/     ← github.com/openmatter-network/matter-crypto
-  matter-kgc/        ← github.com/openmatter-network/matter-kgc
-```
+The private core crates are pinned as **git-tag dependencies** — `matter-crypto`
+`v0.8.1` and `matter-kgc-{proto,config}` `v0.10.0`, fetched over SSH — so you need
+a GitHub SSH key with access to the `openmatter-network` repos. (`.cargo/config.toml`
+sets `net.git-fetch-with-cli`, so cargo honors your git credentials; CI swaps in an
+HTTPS token instead — see `.github/actions/fetch-core-crates`.)
 
 ```bash
 cargo test -p matter-vault-core   # crypto core + roundtrip
 cargo test -p matter-vault        # Rust SDK
 ```
-
-(At release these become pinned git-tag / registry dependencies; see the top of
-`Cargo.toml`.)
 
 ### Live end-to-end test
 

@@ -1,6 +1,6 @@
 [package]
 name = "matter-vault"
-description = "The Rust SDK for MatterVault: seal secrets under the matter-kgc committee and recover them via a signed, threshold /partial-decrypt quorum. Wraps the pure matter-vault-core with a committee HTTP client, quorum orchestration, a bring-your-own Signer abstraction, and on-chain call builders."
+description = "The Rust SDK for OpenMatter: seal secrets under the matter-kgc committee and recover them via a signed, threshold /partial-decrypt quorum, plus (behind the `chain` feature) a metadata-driven MatterChain client — generic tx/query/runtimeApi over every pallet and curated typed façades. Wraps the pure matter-vault-core with a committee HTTP client, quorum orchestration, a bring-your-own Signer abstraction, and on-chain call builders."
 version.workspace = true
 license.workspace = true
 authors.workspace = true

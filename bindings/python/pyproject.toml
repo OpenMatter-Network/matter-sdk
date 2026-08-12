@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "matter-vault"
-version = "0.1.0"
-description = "Python SDK for MatterVault (scaffold): threshold secret management on the matter-kgc committee."
+version = "1.0.0"
+description = "Python SDK for OpenMatter: threshold secret management on the matter-kgc committee, plus a MatterChain client (generic tx/query/runtime_api and typed façades) via the [sdk] extra."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Open Matter", email = "admin@openmatter.network" }]

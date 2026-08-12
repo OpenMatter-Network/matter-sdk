@@ -61,7 +61,7 @@ Two exist, and they are not equivalent.
 
 **`ApiKey` — supported, hardened.** Parses the encodings the OpenMatter dashboard mints
 and holds the key in process behind real guarantees: zeroizing buffers, a redacted
-`Debug`/`toString`/`%v`, no serialization, no accessor for the material, and a refusal to
+`Debug`/`toString`/`%v`, no serialization of key material, no accessor for the material, and a refusal to
 connect a signing client to mainnet without explicit confirmation. It also rejects a
 phrase-less URI such as `//Alice`, which most SURI parsers silently resolve to the public
 well-known development phrase. Use it when a key must live in the process anyway.
@@ -78,7 +78,8 @@ The name is about custody, not location: these give a key none of the container
 guarantees above. If a key is going to live in your process, it should live in an
 `ApiKey`.
 
-A CI check fails the build if a production target depends on them. **Do not use them
+A CI check fails the build if they are referenced anywhere in shipped library code —
+only their definition site, tests, and the examples may use them. **Do not use them
 outside development.** See [`docs/secure-signing.md`](docs/secure-signing.md) for the
 HSM/KMS integration patterns you should use instead.
 

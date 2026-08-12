@@ -24,7 +24,7 @@ The LDFLAGS link the **cdylib**, so a binary using this package needs the librar
 its search path at run time:
 
 ```bash
-LD_LIBRARY_PATH=../../target/release go run .
+LD_LIBRARY_PATH=../../../target/release go run .
 ```
 
 ## Quick start

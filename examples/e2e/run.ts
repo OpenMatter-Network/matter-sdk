@@ -9,12 +9,12 @@
 // callback.
 //
 // Config (env, so keys never land in shell history / argv):
-//   MATTER_RPC_URL     ws(s):// endpoint of the chain node            (required)
-//   MATTER_SIGNER_SEED sr25519 SURI: mnemonic, "//Alice", or 0x-seed  (required)
+//   MATTER_RPC_URL     ws(s):// endpoint of the chain node (default: testnet)
+//   MATTER_SIGNER_SEED sr25519 SURI: mnemonic or 0x-seed; falls back to TEST_KEY
 //   MATTER_NETWORK     "testnet" (default) | "mainnet"
 //   MATTER_SECRET      plaintext to seal (default: a sample env line)
 //   MATTER_SECRET_ID   decrypt this existing secret instead of storing a new one
-//   MATTER_AAD         env (default) | tls | storage | dek
+//   MATTER_AAD         env (default) | tls | storage | dek | dataset
 //   MATTER_CONFIRM     "yes" — required to act against mainnet
 //
 // Run:  cd examples/e2e && npm install && npm start
@@ -45,7 +45,11 @@ const AAD_TAGS: Record<string, Aad> = {
   tls: Aad.TlsV1,
   storage: Aad.StorageCredsV1,
   dek: Aad.VolumeDekV1,
+  dataset: Aad.DatasetSourceCredsV1,
 };
+
+/** Same default as the Rust/Python/Go harnesses. */
+const DEFAULT_RPC_URL = "wss://node2.testnet.openmatter.network";
 
 interface Config {
   rpcUrl: string;
@@ -57,9 +61,9 @@ interface Config {
 }
 
 function readConfig(): Config | null {
-  const rpcUrl = process.env.MATTER_RPC_URL;
-  const seed = process.env.MATTER_SIGNER_SEED;
-  if (!rpcUrl || !seed) return null;
+  const rpcUrl = process.env.MATTER_RPC_URL ?? DEFAULT_RPC_URL;
+  const seed = process.env.MATTER_SIGNER_SEED ?? process.env.TEST_KEY;
+  if (!seed) return null;
 
   const network = (process.env.MATTER_NETWORK ?? "testnet").toLowerCase();
   if (network === "mainnet" && process.env.MATTER_CONFIRM !== "yes") {
@@ -85,13 +89,13 @@ function usage(): void {
   console.error(
     [
       "MatterVault e2e test — set these env vars and re-run:",
-      "  MATTER_RPC_URL=wss://<node>      (required)",
-      "  MATTER_SIGNER_SEED=<sr25519 SURI> (required; a FUNDED account)",
-      "  MATTER_NETWORK=testnet|mainnet   (default testnet)",
-      "  MATTER_SECRET='KEY=VALUE'        (optional)",
-      "  MATTER_SECRET_ID=<u128>          (optional: decrypt existing, skip store)",
-      "  MATTER_AAD=env|tls|storage|dek   (default env)",
-      "  MATTER_CONFIRM=yes               (required for mainnet)",
+      "  MATTER_SIGNER_SEED=<sr25519 SURI>  (required; a FUNDED account. TEST_KEY also accepted)",
+      "  MATTER_RPC_URL=wss://<node>        (default: testnet)",
+      "  MATTER_NETWORK=testnet|mainnet     (default testnet)",
+      "  MATTER_SECRET='KEY=VALUE'          (optional)",
+      "  MATTER_SECRET_ID=<u128>            (optional: decrypt existing, skip store)",
+      "  MATTER_AAD=env|tls|storage|dek|dataset  (default env)",
+      "  MATTER_CONFIRM=yes                 (required for mainnet)",
     ].join("\n"),
   );
 }

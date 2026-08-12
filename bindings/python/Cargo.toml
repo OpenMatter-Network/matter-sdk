@@ -1,7 +1,7 @@
 [package]
 name = "matter-vault-python"
 description = "PyO3 binding over matter-vault-core for the Python MatterVault SDK."
-version = "0.1.0"
+version = "1.0.0"
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
 edition = "2021"

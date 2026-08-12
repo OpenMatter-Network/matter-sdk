@@ -1,6 +1,7 @@
 # Data Marketplace: data-source credential delivery via MatterVault
 
-Status: **Design — approved for implementation** (2026-07-18)
+Status: **Implemented** (designed 2026-07-18; the SDK-side pieces — `Aad::DatasetSourceCredsV1`
+and `recover_secret` — shipped with the v1.0.0 chain-client expansion)
 Feature: OpenMatter Data Marketplace · Companion docs: `matter-node/docs/data-marketplace-datasets.md`,
 `matter-org-meta/docs/dataset-public-blobs.md`, `matter-ml/docs/data-source-connectors.md`,
 `datavisor_v2/docs/data-marketplace-spec.md`
@@ -23,17 +24,20 @@ This maps exactly onto the SDK's built-in model (**seal → store on-chain → g
 threshold-decrypts**); the SDK deliberately gains **no agent transport**. Changes in this repo
 are small and additive.
 
-## What gets added (this repo)
+## What was added (this repo — all landed)
 
 | Piece | Where |
 |---|---|
-| `Aad::DatasetSourceCredsV1 = "matter-dataset/source-creds/v1"` | `crates/matter-vault-core/src/aad.rs` (enum is `#[non_exhaustive]`/append-only — non-breaking) + TS mirror in `packages/typescript` |
+| `Aad::DatasetSourceCredsV1 = "matter-dataset/source-creds/v1"` | `crates/matter-vault-core/src/aad.rs` (enum is `#[non_exhaustive]`/append-only — non-breaking), mirrored in all four bindings |
 | Documented canonical payload schema for the new AAD (below) | this doc + rustdoc on the variant |
-| (Nice-to-have) `recover_secret` one-call helper for embedded Rust consumers | `crates/matter-vault/src/lib.rs`, thin composition over the existing `committee`/`transport`/`open_secret` orchestration |
+| `recover_secret` one-call helper for embedded Rust consumers | `crates/matter-vault/src/lib.rs`, thin composition over the existing `committee`/`transport`/`open_secret` orchestration |
 | Consumer guidance for the matter-ml agent | this doc |
 
-Explicit non-goals: no SDK→agent HTTP client; no transaction submission (apps keep their own
-chain clients per the SDK's existing contract); no new crypto (seal/decrypt paths are unchanged).
+Explicit non-goals: no SDK→agent HTTP client; no new crypto (seal/decrypt paths are
+unchanged). (When this was designed the SDK also had no transaction submission; it has
+since gained a general chain client — `MatterClient`, see
+[`client-guide.md`](client-guide.md) — so a consumer may now store/grant through the
+SDK rather than its own Substrate client. The sealed-secret flow is unchanged.)
 
 ## Why this shape
 
@@ -108,20 +112,21 @@ Unknown fields must be ignored by consumers (forward compatibility); breaking ch
   freshness in `PartialDecryptRequest` (existing MV-C1 anti-replay).
 - **What the SDK may persist**: nothing (unchanged — the SDK is stateless).
 
-### Rust consumer helper (nice-to-have)
+### Rust consumer helper (shipped)
 
-Embedded consumers (the agent) currently must compose chain-state reads + transport + subset
-selection + `open_secret` themselves. A thin
+Embedded consumers (the agent) would otherwise compose chain-state reads + transport +
+subset selection + `open_secret` themselves. The shipped wrapper keeps the agent's
+`vault.rs` to ~a page:
 
 ```rust
 pub async fn recover_secret(
-    committee: &CommitteeInfo, transport: &impl Transport,
-    signer: &impl Signer, secret: &EncryptedSecret, aad: Aad,
+    committee: &CommitteeInfo, transport: &impl Transport, signer: &impl Signer,
+    secret_id: u128, secret: &EncryptedSecret, aad: Aad,
 ) -> Result<Plaintext>
 ```
 
-wrapper (pure composition of existing pieces; no new crypto) would keep the agent's `vault.rs`
-to ~a page. Ship if cheap; the agent can inline the composition otherwise.
+(pure composition of existing pieces; no new crypto — see
+`crates/matter-vault/src/lib.rs`).
 
 ## Interacts with
 
@@ -132,23 +137,16 @@ to ~a page. Ship if cheap; the agent can inline the composition otherwise.
 | matter-node | `pallet-secrets` (store/grant/revoke/rotate extrinsics; `SecretsApi::is_authorized` gates KGC partial-decrypts). No `pallet-datasets` coupling in the SDK |
 | KGC committee | unchanged transport (`/health`, `/partial-decrypt`) |
 
-## Version-drift caveat (important)
-
-This checkout is `0.1.0` (Rust workspace and TS package), while datavisor pins
-`@openmatter-network/matter-vault ^0.9.0` from GitHub Packages — the published line is ahead
-of/diverged from this tree. **Before implementing, reconcile**: land the `Aad` addition on
-whatever branch actually feeds the published packages, and have the agent depend on the published
-crate/tag, not a path to this checkout. The `Aad` registry is append-only, so the addition is
-safe on any line.
-
 ## Open questions
 
 1. Should the grant target be the agent's *ephemeral* session account (per-run grants, specced
    above) or should the agent grow a persistent identity for standing grants? Ephemeral is
    consistent with the agent's zero-persistence posture; persistent would enable unattended
    scheduled re-ingest later.
-2. `recover_secret` helper: ship in this repo or inline in the agent? (Preference: here — a
-   second embedded consumer is likely.)
-3. Confirm the ed25519 session key is acceptable to the KGC auth path everywhere
+2. Confirm the ed25519 session key is acceptable to the KGC auth path everywhere
    (`MultiSignature::Ed25519` is supported in the wire types; verify node-side verification and
    `is_authorized` account mapping during implementation).
+
+(A third question — ship `recover_secret` here or inline it in the agent — was resolved by
+shipping it here. An earlier version-drift caveat about this checkout being `0.1.0` while the
+published line was at `0.9.x` is obsolete: the tree and its manifests are on the `1.0.0` line.)

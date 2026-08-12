@@ -32,8 +32,11 @@ per-language shells. This table tracks how far each binding has progressed.
 | Curated typed façades (`facade_calls.json`) | ✅ | ✅ | ✅ | ✅ |
 | **Live client example** (apiKey → read → dry-run submit) | ✅ | ✅ | ✅ | ✅ |
 
-✅ implemented & tested. **All four bindings are at full parity**: same constructors,
-same generic surface, same five façades, same guards.
+✅ implemented & tested. **All four bindings are at full parity**: same generic
+surface, same five façades, same guards, and matching constructors — with one
+deliberate asymmetry: Python's bring-your-own-key constructor is
+`connect_with_keypair` (an in-process `substrate-interface` keypair), not yet the
+remote-signer seam `connect_with_signer` provides elsewhere.
 
 **How that parity is enforced, not just claimed.** Three fixtures, all emitted by Rust
 and replayed by every binding:
@@ -41,8 +44,11 @@ and replayed by every binding:
 - `api_keys.json` — one derivation. Rust natively, TypeScript through wasm, Python
   through PyO3, Go through the C ABI, so the four `examples/client-*` programs print
   the *same account id* for the same key.
-- `facade_calls.json` — one façade surface, checked **both ways** in each language: a
-  fixture row without a method fails, and a method without a row fails.
+- `facade_calls.json` — one façade surface, checked **both ways** in TypeScript,
+  Python, and Go: a fixture row without a method fails, and a method without a row
+  fails. Rust has no reflection, so its emitter test pins the same list instead —
+  which is also why its two typed grant conveniences (`grant_to_user`,
+  `grant_to_deployment`, thin wrappers over `grant`) sit outside the fixture.
 - the live-metadata test — every curated `(pallet, call)` must exist on chain
   (`cargo test -p matter-vault --features chain --test live_chain -- --ignored`).
 
@@ -95,8 +101,9 @@ The same mechanism now covers two non-cryptographic contracts:
   substitute the public development phrase, so an unset environment variable would
   otherwise mint a globally-known signer).
 - **`facade_calls.json`** — the curated façade surface: which `(façade, method)` pairs
-  exist and which `(pallet, call)` each maps to. Replayed **both ways**, so a fixture row
-  without an implementation fails *and* an implementation without a row fails.
+  exist and which `(pallet, call)` each maps to. Replayed **both ways** in TypeScript,
+  Python, and Go, so a fixture row without an implementation fails *and* an
+  implementation without a row fails; Rust pins the emitter list instead.
 
 ## Notes & remaining work
 
@@ -116,18 +123,19 @@ there is one derivation and nothing to diverge. `ChainClient.keypair_from_seed` 
 for callers who need a real `Keypair`, and now raises rather than silently dropping
 junctions.
 
-**Remaining.** The Ethereum/EIP-712 path is the one gap, and it is reserved rather than
-missing: `ApiKey` carries a scheme discriminant, so a `secp256k1:` key reports
-"unsupported scheme" instead of failing to parse, and implementing it will not be a
-breaking change. `pallet-eth-signing` and `pallet-staking-gateway` are the on-chain
-counterparts, deliberately left out of the staking façade until that scheme lands.
+**Remaining.** The Ethereum/EIP-712 path is the one signer gap, and it is reserved
+rather than missing: only the Substrate sr25519 path is implemented across bindings,
+but `ApiKey` carries a scheme discriminant (a `secp256k1:` key reports "unsupported
+scheme" instead of failing to parse) and the wire types already carry the Ethereum
+fields — so the remaining work, porting the dashboard's EIP-712 typed-data builder,
+will not be a breaking change. `pallet-eth-signing` and `pallet-staking-gateway` are
+the on-chain counterparts, deliberately left out of the staking façade until that
+scheme lands.
 
 Mainnet's genesis hash is also still unpinned — its RPC endpoint did not answer when
 this was written — so the mainnet guard falls back to the token symbol. Pin
 `MAINNET_GENESIS` from `chain_getBlockHash(0)` when the endpoint is reachable.
 
-**Ethereum (EIP-712) signer.** Still the one gap: only the Substrate sr25519 signer path
-is implemented across bindings; the wire types already carry the Ethereum fields. Porting
-the dashboard's EIP-712 typed-data builder is the remaining work. The `secp256k1` scheme
-token is reserved in `ApiKey`, so an Ethereum key reports "unsupported scheme" rather than
-failing to parse, and adding it will not be a breaking change.
+Python's remote-signer seam is the other gap: its bring-your-own-key path takes an
+in-process keypair (`connect_with_keypair`) rather than a `connect_with_signer`
+callback, so the key-never-in-process posture is not yet reachable from Python.

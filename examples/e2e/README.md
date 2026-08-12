@@ -18,9 +18,8 @@ callback — it never sees the key.
 cd examples/e2e
 npm install
 
-# Testnet (default):
-export MATTER_RPC_URL=wss://<your-testnet-node>
-export MATTER_SIGNER_SEED='<mnemonic | //Account | 0x-seed>'   # a FUNDED account
+# Testnet (default endpoint baked in; override with MATTER_RPC_URL):
+export MATTER_SIGNER_SEED='<mnemonic | 0x-seed>'   # a FUNDED account; TEST_KEY also accepted
 npm start
 
 # Mainnet (guarded — posts on-chain, spends real fees):
@@ -33,13 +32,13 @@ npm start
 
 | Var | Meaning |
 |---|---|
-| `MATTER_RPC_URL` | ws(s) endpoint of the chain node (**required**) |
-| `MATTER_SIGNER_SEED` | sr25519 SURI of a **funded** account (**required**) |
+| `MATTER_RPC_URL` | ws(s) endpoint of the chain node (defaults to the public testnet node) |
+| `MATTER_SIGNER_SEED` | sr25519 SURI of a **funded** account (**required**; falls back to `TEST_KEY`) |
 | `MATTER_NETWORK` | `testnet` (default) or `mainnet` |
 | `MATTER_CONFIRM` | must be `yes` to act against mainnet |
 | `MATTER_SECRET` | plaintext to seal (default: a sample env line) |
 | `MATTER_SECRET_ID` | decrypt this existing secret instead of storing a new one |
-| `MATTER_AAD` | `env` (default) / `tls` / `storage` / `dek` |
+| `MATTER_AAD` | `env` (default) / `tls` / `storage` / `dek` / `dataset` |
 
 Keys are read from the environment, never from argv, so they don't land in shell
 history. Prefer a throwaway funded account for testing.

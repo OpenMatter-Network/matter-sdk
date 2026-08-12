@@ -6,15 +6,16 @@
 // the committee HTTP client, quorum orchestration, the Signer abstraction, and a
 // chain client that signs and submits extrinsics.
 //
-// Build prerequisites:
+// Build prerequisites (from the repo root):
 //
-//	cargo build -p matter-vault-ffi --release   # produces target/release/libmatter_vault_ffi.a
+//	cargo build -p matter-vault-ffi --release   # produces target/release/libmatter_vault_ffi.{a,so}
 //	go test ./...
 //
 // The cgo LDFLAGS link the cdylib, so a binary using this package needs the
-// library on its search path at run time:
+// repo root's target/release on its search path at run time — e.g. from this
+// directory:
 //
-//	LD_LIBRARY_PATH=target/release go run .
+//	LD_LIBRARY_PATH=../../../target/release go run .
 package mattervault
 
 /*

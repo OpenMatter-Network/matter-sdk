@@ -1,7 +1,7 @@
 name: Release
 
 # Build per-language release artifacts when a version tag (v*) is pushed, e.g.
-# v0.1.0. Mirrors matter-node's release flow: the private cryptographic core
+# v1.0.0. Mirrors matter-node's release flow: the private cryptographic core
 # crates are fetched with a read-only PAT (secrets.DEPS_PAT) via the shared
 # fetch-core-crates action, not an SSH deploy key. Each job attaches its artifact
 # to the GitHub Release for the tag.

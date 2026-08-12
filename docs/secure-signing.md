@@ -97,8 +97,8 @@ to remember:
 | Guardrail | What it does |
 |---|---|
 | **Zeroized** | The mini-secret and every intermediate derivation live in zeroizing buffers and wipe on drop. No hex or SURI copy of the seed is left in freed heap — the MV-M3 lesson applied to a path we expect production traffic on. |
-| **Redacted** | `Debug`, `repr`, `toString`, `String()`, `%v`, and `%+v` all render `ApiKey(sr25519, 0x…, <redacted>)`. There is no formatting path that prints the key, including from inside a struct, slice, or map. |
-| **Non-serializable** | No `Serialize`, no `toJSON`, no `MarshalJSON`. Go's `MarshalJSON` *errors* rather than emitting a placeholder, because a silent placeholder would pass code review. It cannot reach a config dump, a structured-log field, or a crash report by accident. |
+| **Redacted** | No formatting path prints the key, including from inside a struct, slice, or map: `toString`, `repr`, `String()`, `%v`, and `%+v` render `ApiKey(sr25519, 0x…, <redacted>)`, and Rust's `Debug` renders the struct form with `material: "<redacted>"`. |
+| **Non-serializable** | Key material cannot reach a config dump, a structured-log field, or a crash report by accident: no `Serialize` in Rust, no pickle/copy in Python. Go's `MarshalJSON` *errors* rather than emitting a placeholder, because a silent placeholder would pass code review. TypeScript's `toJSON` exists but yields only the redacted display string, so `JSON.stringify` never sees the key. |
 | **No secret accessor** | There is no method that returns the key bytes. The only outputs are the public account id and signatures. In TypeScript and Go the material never leaves Rust memory at all. |
 | **Not clonable** | Rust's `ApiKey` is not `Clone`; share one with `Arc`. One key, one place to wipe. |
 | **Errors never echo the key** | A rejection names *what* was wrong, never any part of the input. Upstream parsers are not careful here — `subxt-signer` renders `Invalid character 'g' at position 5`, disclosing a character of the secret and its offset — so the SDK never forwards an upstream source. |

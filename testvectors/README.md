@@ -12,6 +12,7 @@ their crypto stays identical.
 | `open_secret.json` | a sealed secret + a real committee quorum; `openSecret` must recover `expected_plaintext_hex` |
 | `seed_formats.json` | one sr25519 secret in both encodings (`0x`-hex mini-secret and BIP39 mnemonic) must derive `account_id_hex` — pins key ingestion in every binding's companion signer library, and in the dashboard that mints API keys |
 | `api_keys.json` | the full API-key ingestion contract: `valid` keys must parse to `account_id_hex`, `invalid` keys must be rejected with the named error kind |
+| `facade_calls.json` | the curated façade surface: which `(façade, method)` pairs exist and which `(pallet, call)` each maps to — 30 rows across the five façades |
 
 `api_keys.json` is a deliberate **sibling** of `seed_formats.json`, not an extension of
 it. `seed_formats.json` is a positive derivation vector that the dashboard also replays;
@@ -38,12 +39,17 @@ conformance suite:
 cargo test -p matter-vault-core --test roundtrip -- --ignored
 cargo test -p matter-vault --test seed_formats -- --ignored
 cargo test -p matter-vault-key --test parse -- --ignored
+cargo test -p matter-vault --features chain --test facade_calls -- --ignored
 ```
 
-Replayed by: `crates/matter-vault-key/tests/parse.rs` (Rust),
-`packages/typescript/test/api-key.test.ts`, `packages/go/mattervault/apikey_test.go`.
-Python replays `seed_formats.json` today and `api_keys.json` once its ingestion is
-aligned — see [`../docs/parity.md`](../docs/parity.md).
+`api_keys.json` is replayed by `crates/matter-vault-key/tests/parse.rs` (Rust),
+`packages/typescript/test/api-key.test.ts`, `bindings/python/tests/test_api_key.py`,
+and `packages/go/mattervault/apikey_test.go`. `facade_calls.json` is replayed by
+`packages/typescript-client/test/facade.test.ts`, `bindings/python/tests/test_facade.py`,
+and `packages/go/mattervault/facade_test.go` — each checks **both ways** (a fixture
+row without a method fails, and a method without a row fails); Rust has no
+reflection, so its emitter test pins the same list instead. See
+[`../docs/parity.md`](../docs/parity.md).
 
 `open_secret.json` is large (~4 MB) because RLWE capsules and ZK proofs are large;
 that is the real wire size, which is itself worth pinning.

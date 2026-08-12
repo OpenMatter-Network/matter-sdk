@@ -60,6 +60,19 @@ jobs:
             cargo tree -p matter-vault --edges normal | grep -E 'subxt'
             exit 1
           fi
+      # SECURITY.md promises the `*_insecure_dev_only` helpers never ship in a
+      # production target. Library source under src/ is what ships; the definition
+      # site, tests/, and examples/ are their only sanctioned homes.
+      - name: Assert insecure_dev_only helpers stay out of shipped library code
+        working-directory: matter-sdk
+        run: |
+          hits=$(grep -rln "insecure_dev_only" --include='*.rs' crates/*/src bindings/*/src \
+            | grep -v '^crates/matter-vault/src/signer.rs$' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::insecure_dev_only referenced outside its definition site (see SECURITY.md):"
+            echo "$hits"
+            exit 1
+          fi
       - name: Build cores for wasm32
         working-directory: matter-sdk
         run: |

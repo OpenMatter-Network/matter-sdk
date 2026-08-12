@@ -17,6 +17,13 @@ run time.
 | `connect_with_signer` | the key is in an HSM, KMS, or remote signer. **Recommended for production.** |
 | `from_env` | you want the environment to decide, including "no key ⇒ read-only" |
 
+Names follow each language's convention (`connectWithApiKey`, `ConnectFromEnv`, …).
+**One asymmetry:** Python's bring-your-own-key constructor is `connect_with_keypair`
+— it takes an in-process `substrate-interface` keypair (built from a keystore or an
+unwrapped KMS blob), not the remote-signer seam the other three offer, so the
+key-never-in-process posture is not yet reachable from Python. A `connect_with_signer`
+seam there is tracked in [`parity.md`](parity.md#notes--remaining-work).
+
 ```rust
 use matter_vault::chain::{MatterClient, MatterConfig, Network};
 use matter_vault::ApiKey;
@@ -147,8 +154,10 @@ façade can be wrong about a *name* but never about the wire format.
 
 **A façade is a convenience, not a gate.** Anything not covered is one
 `client.tx(...)` away, and that is a supported thing to do, not a workaround. The
-surface is pinned by `testvectors/facade_calls.json`, replayed both ways so that a
-fixture row without a method fails *and* a method without a row fails.
+surface is pinned by `testvectors/facade_calls.json`, replayed both ways in
+TypeScript, Python, and Go so that a fixture row without a method fails *and* a
+method without a row fails; Rust has no reflection, so its emitter test pins the
+same list instead.
 
 `pallet-staking-gateway` is deliberately absent: it is the Ethereum
 meta-transaction path, and belongs with the reserved `secp256k1` scheme.
@@ -166,6 +175,25 @@ The `Deployment` variant exists so an owner can say "whatever runs this
 deployment" without naming an account that only exists after assignment. (The
 enum is not cosmetic: earlier builders emitted a raw 32-byte grantee, which the
 runtime cannot decode — the call data was dead on arrival.)
+
+## Receipts and events
+
+`tx` (and every façade method) resolves at **finalization** with a receipt carrying
+the transaction hash, block hash, and the events the extrinsic emitted. Events are
+how the chain hands back what it assigned — most importantly the secret id, which
+arrives in the `Secrets.SecretStored` event, not as a return value:
+
+- **Rust / Python:** `receipt.emitted("Secrets", "SecretStored")`; Python adds
+  `receipt.require_event(...)`, which raises if the event is absent.
+- **TypeScript:** the receipt carries `[pallet, event]` name pairs; check with the
+  free function `emitted(receipt, "Secrets", "SecretStored")`.
+- **Go:** `client.Tx` returns the finalized block hash; decode events from it with
+  `ChainClient.FindEvent`, or `FindStoredSecret(blockHash, owner)` +
+  `SecretIDFromEvent` for the secret-id case.
+
+Match `SecretStored` on the **owner account**, never on a pre-read of the
+`Secrets.NextSecretId` counter — two submitters racing the counter would each
+pick up the other's secret. Go's `FindStoredSecret` does the owner-match for you.
 
 ## Amounts
 
@@ -224,6 +252,7 @@ and using them is not a bug report:
   it as `config.backend` — which is also how the client is unit-tested without a
   node.
 - **Python:** `client.chain`, the underlying `ChainClient`.
+- **Go:** `client.Chain()`, the underlying `ChainClient`.
 
 ## Cross-language differences
 
@@ -237,8 +266,11 @@ The surface is the same; the idioms are not.
 | Façade access | `client.secrets()` | `client.secrets` | `client.secrets` | `client.Secrets()` |
 | Method names | `snake_case` | `camelCase` | `snake_case` | `PascalCase` |
 
-All four expose the same five façades and the same thirty methods; only the naming
-convention differs, and `testvectors/facade_calls.json` pins the mapping in each.
+All four expose the same five façades and the same thirty fixture-pinned methods;
+only the naming convention differs, and `testvectors/facade_calls.json` pins the
+mapping. Rust adds two typed conveniences on top — `grant_to_user` and
+`grant_to_deployment`, thin wrappers that shape a `GrantTarget` and delegate to
+`grant`.
 
 Go's amounts are `*big.Int` rather than a fixed integer because `uint64` overflows at
 10¹⁸ — a modest balance on this chain does not fit.
