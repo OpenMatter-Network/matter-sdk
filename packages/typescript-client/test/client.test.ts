@@ -7,11 +7,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  Access,
   ApiKey,
   ChainProperties,
   ClientError,
   MatterClient,
   Network,
+  Scope,
+  ScopeSet,
   TESTNET_GENESIS,
   decimalsDisagree,
   decimalsFromExistentialDeposit,
@@ -21,6 +24,7 @@ import {
   oneToken,
   parseAmount,
   type ChainBackend,
+  type Mode,
   type TxReceipt,
 } from "../src/index.js";
 
@@ -48,11 +52,22 @@ class FakeBackend implements ChainBackend {
   #properties: ChainProperties;
   #signs: boolean;
   #onSubmit?: () => Promise<TxReceipt>;
+  #mode: Mode = { kind: "direct" };
 
   constructor(props = properties(), signs = true, onSubmit?: () => Promise<TxReceipt>) {
     this.#properties = props;
     this.#signs = signs;
     this.#onSubmit = onSubmit;
+  }
+
+  /** Pretend the chain granted this key a scoped proxy on `principal`. */
+  delegateTo(principal: Uint8Array, scopes: ScopeSet): this {
+    this.#mode = { kind: "delegated", principal, scopes };
+    return this;
+  }
+
+  mode(): Mode {
+    return this.#mode;
   }
 
   async properties(): Promise<ChainProperties> {
@@ -295,5 +310,117 @@ describe("configuration", () => {
     const { Aad, encrypt } = await import("../src/index.js");
     expect(Aad.EnvV1).toBeDefined();
     expect(typeof encrypt).toBe("function");
+  });
+});
+
+// --- delegated keys --------------------------------------------------------
+
+describe("a delegated client", () => {
+  const PRINCIPAL = new Uint8Array(32).fill(9);
+  const DEPLOY_W = ScopeSet.single(Scope.Deployments, Access.Write);
+
+  async function delegated(scopes = DEPLOY_W): Promise<[MatterClient, FakeBackend]> {
+    const backend = new FakeBackend().delegateTo(PRINCIPAL, scopes);
+    const client = await MatterClient.connectWithApiKey(new ApiKey(SEED_HEX), {
+      network: Network.Testnet,
+      backend,
+    });
+    return [client, backend];
+  }
+
+  it("reports who it acts for and what it may do", async () => {
+    const [client] = await delegated();
+    expect(client.mode.kind).toBe("delegated");
+    expect(client.principal).toEqual(PRINCIPAL);
+    expect(client.scopes?.toString()).toBe("deployments:w");
+    expect(client.principalAddress).toBe("ss58:32");
+  });
+
+  it("submits a call its scopes cover", async () => {
+    const [client, backend] = await delegated();
+    await client.tx("Jobs", "cancel_deployment", [1n]);
+    expect(backend.submitted).toEqual([["Jobs", "cancel_deployment", [1n]]]);
+  });
+
+  it("refuses an out-of-scope call before submitting", async () => {
+    const [client, backend] = await delegated();
+    // Naming the missing scope is the whole point: the chain's own answer to a
+    // balance-less key is a complaint about fees.
+    await expect(client.tx("Volumes", "retire_volume", [1n])).rejects.toMatchObject({
+      kind: "not-permitted",
+    });
+    await expect(client.tx("Volumes", "retire_volume", [1n])).rejects.toThrow(/volumes:w/);
+    expect(backend.submitted).toEqual([]);
+  });
+
+  it("refuses calls no key may ever make", async () => {
+    const [client, backend] = await delegated(ScopeSet.ALL);
+    for (const [pallet, call] of [
+      ["Balances", "transfer_all"],
+      ["Staking", "bond"],
+      ["Sudo", "sudo"],
+      // Nesting one of these would let a key launder authority through a batch.
+      ["Utility", "batch_all"],
+      ["Proxy", "proxy"],
+    ] as const) {
+      await expect(client.tx(pallet, call, [])).rejects.toMatchObject({
+        kind: "never-admitted",
+      });
+    }
+    expect(backend.submitted).toEqual([]);
+  });
+
+  it("reads the deployment request's arguments, failing safe when it cannot", async () => {
+    const [client, backend] = await delegated();
+    // Clearing a secret ref needs only deployments:w.
+    await client.tx("Jobs", "set_deployment_secret_ref", [1n, null]);
+    expect(backend.submitted.length).toBe(1);
+
+    // Setting one also needs secrets:r, which this key lacks.
+    await expect(
+      client.tx("Jobs", "set_deployment_secret_ref", [1n, 7n]),
+    ).rejects.toMatchObject({ kind: "not-permitted" });
+
+    // And an argument that is simply absent is unreadable, so it takes the
+    // wider requirement rather than the convenient one.
+    await expect(client.tx("Jobs", "set_deployment_secret_ref", [1n])).rejects.toMatchObject({
+      kind: "not-permitted",
+    });
+    expect(backend.submitted.length).toBe(1);
+  });
+
+  it("checks nothing when the client acts as itself", async () => {
+    const backend = new FakeBackend();
+    const client = await MatterClient.connectWithApiKey(new ApiKey(SEED_HEX), {
+      network: Network.Testnet,
+      backend,
+    });
+    expect(client.mode.kind).toBe("direct");
+    expect(client.scopes).toBeUndefined();
+    // A direct client is bounded by what its account can do on chain, not by a
+    // scope set, so the local table must not gate it.
+    await client.tx("Balances", "transfer_all", []);
+    expect(backend.submitted).toEqual([["Balances", "transfer_all", []]]);
+  });
+});
+
+describe("diagnostics", () => {
+  it("routes connect diagnostics to the configured logger instead of the console", async () => {
+    // A library that writes to the console decides for its host where its
+    // output goes. This one asks.
+    const lines: string[] = [];
+    const logger = {
+      info: (message: string) => lines.push(`info: ${message}`),
+      warn: (message: string) => lines.push(`warn: ${message}`),
+    };
+
+    await MatterClient.connect({
+      backend: new FakeBackend(properties({ tokenDecimalsDeclared: 18, tokenDecimalsEffective: 12 })),
+      logger,
+    });
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("warn:");
+    expect(lines[0]).toContain("tokenDecimals");
   });
 });

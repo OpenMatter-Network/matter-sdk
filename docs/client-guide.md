@@ -10,12 +10,16 @@ Four constructors, four distinct intents. There is deliberately no builder — a
 builder would let you set both an API key and a signer and defer "which wins?" to
 run time.
 
-| Constructor | Use when |
-|---|---|
-| `connect` | read-only tooling: explorers, dashboards, health checks |
-| `connect_with_api_key` | a key must live in the process: CI, agents, ephemeral workers |
-| `connect_with_signer` | the key is in an HSM, KMS, or remote signer. **Recommended for production.** |
-| `from_env` | you want the environment to decide, including "no key ⇒ read-only" |
+| Constructor | Use when | What it can reach |
+|---|---|---|
+| `connect` | read-only tooling: explorers, dashboards, health checks | every read; no writes |
+| `connect_with_api_key` | a key must live in the process: CI, agents, ephemeral workers | every read, plus the writes the key's scopes admit — as the member who minted it |
+| `connect_with_signer` | the key is in an HSM, KMS, or remote signer. **Recommended for production.** | as above; a human or org signer reaches everything that account can do |
+| `from_env` | you want the environment to decide, including "no key ⇒ read-only" | whichever of the above the environment produced |
+
+A member-tied key is bounded twice: by the runtime's proxy filter, and by the same table
+mirrored locally so the refusal names the missing scope. A human seed or HSM key is
+bounded only by what its account can do.
 
 Names follow each language's convention (`connectWithApiKey`, `ConnectFromEnv`, …).
 **One asymmetry:** Python's bring-your-own-key constructor is `connect_with_keypair`
@@ -110,6 +114,92 @@ that catches it before a user does:
 cargo test -p matter-vault --features chain --test live_chain -- --ignored
 ```
 
+## Keys and scopes
+
+An OpenMatter API key acts **for the member who minted it**, not for itself. The client
+resolves that at connect and adapts: a member-tied key wraps every write in
+`proxy.proxy(member, null, call)`, and a human seed or HSM key signs directly. Nothing
+about your calling code changes.
+
+```rust
+let client = MatterClient::connect_with_api_key(config, key).await?;
+match client.mode() {
+    Mode::Delegated { principal, scopes } => // acts for `principal`, bounded by `scopes`
+    Mode::Direct => // acts as itself
+}
+```
+
+At connect the client says which it found, through your logger rather than to your
+console:
+
+```
+INFO acting for a member principal=5GrwvaEF… scopes="deployments:w, secrets:r"
+```
+
+The principal is SS58 in every binding, so it can be compared directly against what the
+dashboard showed whoever minted the key. Where the line goes is the host's decision, not
+this library's: Rust emits it through `tracing` and says nothing until a subscriber is
+installed, Python through the `matter_vault.client` logger, Go through
+`Config.Logger` (default `slog.Default()`), and TypeScript through `MatterConfig.logger`
+(default the console).
+
+A key you expected to be delegated but which resolves `Direct` is revoked, or was minted
+against a different network. That line is the first thing to check, because the chain's
+own complaint about it is unhelpful — see below.
+
+**A revoked key stays delegated.** If the grant disappears mid-session, the client does
+not fall back to signing for itself: a key with no balance would then fail for want of
+fees, and you would read "cannot pay some fees" instead of `KeyRevoked`. It keeps
+wrapping, and keeps telling you why.
+
+### Scopes are checked locally first, and that is not paranoia
+
+The runtime is the enforcer; the client mirrors its table only so the error is legible.
+A delegated key holds **no balance**, so when the runtime refuses one of its calls the
+node rejects the transaction for want of fees. The chain's answer to "your key may not
+do that" is therefore `Inability to pay some fees`, which names neither the call nor the
+scope. So the client refuses first:
+
+```
+key lacks volumes:w for Volumes.retire_volume; it holds deployments:w
+```
+
+Two calls need their *arguments* read, not just their names — `Jobs.request_deployment`
+and `Jobs.set_deployment_secret_ref` require `secrets:r` on top of `deployments:w` when
+they reference a secret, because shipping a secret into a container the key controls is
+a read of it. Where the client cannot read the argument it demands the **wider** set: a
+spurious local rejection is a nuisance, while the opposite default would let through a
+call the chain then refuses.
+
+### A delegated failure is not a silent success
+
+`proxy.proxy` succeeds as an extrinsic even when the call it wrapped fails; the failure
+rides in a `Proxy.ProxyExecuted` event. The client unwraps it and returns the error a
+direct call would have produced, so a failed delegated call never reads as a win.
+
+### Minting keys
+
+Member-signed — a key can never mint or revoke on itself, because the roster calls are
+on the runtime's never-admitted list precisely so it cannot widen its own authority:
+
+```rust
+client.keys().authorize(agent_account, "deployments:w".parse()?).await?;
+let held = client.keys().lookup(agent_account).await?;   // Option<(principal, scopes)>
+client.keys().revoke(agent_account).await?;
+```
+
+Only the principal can revoke their own key: the chain answers `NotKeyPrincipal` to
+anyone else, an org Owner included.
+
+`authorize` is an upsert, so re-scoping a live key is the same call. Revocation cuts off
+the key's committee decrypt rights too, on the next request — with one caveat: a key
+that held `secrets:w` may have granted itself per-secret access, and **those grants
+survive revocation**. Sweep them.
+
+`MATTER_PRINCIPAL` forces a principal when the chain's pointer is stale but the proxy
+still stands. It disables the local scope check (the chain cannot report scopes for a
+pointer it has lost), warns loudly, and leaves enforcement entirely to the runtime.
+
 ## The curated façades
 
 Typed wrappers for the domains most integrations reach for daily:
@@ -121,6 +211,7 @@ Typed wrappers for the domains most integrations reach for daily:
 | `resources` | `pallet-resources` |
 | `staking` | `pallet_staking` + `NominationPools` |
 | `orgs` | `pallet-organizations` + `pallet-budgets` |
+| `keys` | `pallet-budgets`' roster calls — mint and revoke API keys |
 
 ```rust
 client.staking().bond(client.parse_amount("10")?, payee).await?;
@@ -231,6 +322,11 @@ warning at connect and trusts the runtime.
 
 Branch on the discriminant, never on message text.
 
+Python raises subclasses of `ChainError` with the same names (`NotPermittedError`,
+`NeverAdmittedError`, `KeyRevokedError`, `UnsponsoredError`, `DispatchError`); Go
+returns a `*ChainError` whose `Kind` carries the same string as the TypeScript column,
+matched with `errors.As`.
+
 | Rust `SdkError` | TypeScript `kind` | Meaning |
 |---|---|---|
 | `ReadOnly` | `read-only` | no signer; build with a key or a signer |
@@ -239,6 +335,11 @@ Branch on the discriminant, never on message text.
 | `MainnetNotConfirmed` | `mainnet-not-confirmed` | signing client, mainnet, no confirmation |
 | `WrongNetwork` | `wrong-network` | the endpoint serves a different chain than configured |
 | `FinalityTimeout` | `finality-timeout` | may still land — check before resubmitting |
+| `NotPermitted` | `not-permitted` | the key's scopes do not cover this call; names the missing scope |
+| `NeverAdmitted` | `never-admitted` | no key may make this call, whatever its scopes |
+| `Dispatch` | `dispatch` | the delegated call landed but the wrapped call failed |
+| `KeyRevoked` | `key-revoked` | the key's proxy is gone or now points elsewhere; re-authorize it |
+| `Unsponsored` | `unsponsored` | neither the member nor their billing org could cover the fee |
 | `BadAmount` | (`AmountError`) | not convertible to plancks |
 | `Key` | — | key ingestion failed; never echoes the key |
 

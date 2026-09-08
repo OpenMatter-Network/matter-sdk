@@ -36,11 +36,16 @@ export * from "@openmatter-network/matter-vault";
 export { MatterClient } from "./client.js";
 export type { MatterConfig } from "./client.js";
 export { ClientError } from "./errors.js";
+export { defaultLogger } from "./logger.js";
+export type { ClientLogger } from "./logger.js";
 export type { ClientErrorKind } from "./errors.js";
 export { emitted } from "./backend.js";
+export type { Mode } from "./backend.js";
+export { Access, Scope, ScopeSet, requiredScopes } from "./scopes.js";
 export type { ChainBackend, TxReceipt } from "./backend.js";
 export {
   DeploymentsFacade,
+  KeysFacade,
   OrgsFacade,
   ResourcesFacade,
   SecretsFacade,

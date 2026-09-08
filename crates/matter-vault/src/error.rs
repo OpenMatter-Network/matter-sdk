@@ -88,6 +88,68 @@ pub enum SdkError {
         detail: String,
     },
 
+    /// A member-tied API key was asked for a call its scopes do not cover.
+    ///
+    /// Caught before submission. The runtime would refuse it too, but a
+    /// balance-less delegated key gets refused in the *pool* — for having no
+    /// funds — so the chain's own answer to this is `Inability to pay some
+    /// fees`, which names neither the call nor the missing scope.
+    #[error("key lacks {required} for {pallet}.{call}; it holds {held}")]
+    NotPermitted {
+        /// The pallet involved.
+        pallet: String,
+        /// The call involved.
+        call: String,
+        /// What the call needs.
+        required: matter_vault_key::ScopeSet,
+        /// What the key actually has.
+        held: matter_vault_key::ScopeSet,
+    },
+
+    /// The call is not admitted to *any* API key, whatever its scopes: token
+    /// movement, staking, governance, `sudo`, root-only and provider-signed
+    /// calls, org lifecycle, and the roster calls a key would otherwise use to
+    /// widen itself.
+    #[error("{pallet}.{call} is never admitted to an api key; sign it with the member's own key")]
+    NeverAdmitted {
+        /// The pallet involved.
+        pallet: String,
+        /// The call involved.
+        call: String,
+    },
+
+    /// A delegated call landed and the outer `proxy.proxy` succeeded, but the
+    /// call it wrapped failed. This is the error a direct dispatch would have
+    /// returned; `proxy.proxy` reports it as an event rather than a dispatch
+    /// error, which is why it needs a variant of its own.
+    #[error("{pallet}.{call} failed under delegation: {detail}")]
+    Dispatch {
+        /// The pallet involved.
+        pallet: String,
+        /// The call involved.
+        call: String,
+        /// The wrapped call's own error, decoded through metadata.
+        detail: String,
+    },
+
+    /// The key's proxy is gone — revoked, or removed by the member directly.
+    /// Re-resolving confirmed it, so this is not transient.
+    #[error("this api key is no longer registered; it was revoked or re-scoped")]
+    KeyRevoked,
+
+    /// A delegated call was refused in the pool for want of gas. The key never
+    /// pays; the member does, or their billing org. So this means neither could
+    /// cover it, not that the key is broke.
+    #[error("{pallet}.{call} was not sponsored: neither {principal} nor their billing org could cover the fee")]
+    Unsponsored {
+        /// The member the call would have run as.
+        principal: String,
+        /// The pallet involved.
+        pallet: String,
+        /// The call involved.
+        call: String,
+    },
+
     /// A signing client was pointed at mainnet without explicit confirmation.
     /// Set `MATTER_CONFIRM=yes` or `MatterConfig::confirm_mainnet`.
     #[error("refusing to build a signing client against mainnet {chain_name:?} (detected via {detected_via}) without explicit confirmation: set MATTER_CONFIRM=yes or MatterConfig::confirm_mainnet. This client can spend real funds")]

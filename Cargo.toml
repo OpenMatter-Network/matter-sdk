@@ -30,7 +30,7 @@
 # here and in Cargo.lock together.
 
 [workspace]
-members = ["crates/matter-vault-core", "crates/matter-vault-key", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust"]
+members = ["crates/matter-vault-core", "crates/matter-vault-key", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust", "examples/delegated-e2e"]
 # The wasm and python bindings build through their own toolchains (wasm-pack,
 # maturin), so they are excluded from the native workspace to keep `cargo build
 # --workspace` native-only.
@@ -40,7 +40,7 @@ resolver = "2"
 [workspace.package]
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
-version = "1.0.0"
+version = "1.1.0"
 homepage = "https://openmatter.network"
 repository = "https://github.com/openmatter-network/matter-sdk"
 edition = "2021"

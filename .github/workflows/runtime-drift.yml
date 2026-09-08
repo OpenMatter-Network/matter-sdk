@@ -44,8 +44,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.0
 
       # `live_chain.rs` asserts that every curated (pallet, call) resolves in live
-      # metadata, that ExistentialDeposit still implies a sane decimal count, and
-      # that a read-only client refuses to submit.
+      # metadata, that ExistentialDeposit still implies a sane decimal count, that
+      # a read-only client refuses to submit, and that the scoped-key surface still
+      # matches: the agent-key runtime API and call, the proxy dispatch shape, and
+      # a classification for every call of all ten scoped pallets. That last one is
+      # why this job matters — a forkless upgrade can add a call without changing a
+      # line of this repo, and the local scope check would then refuse something the
+      # chain would have admitted.
       - name: Check the curated surface against ${{ matrix.network }}
         working-directory: matter-sdk
         env:

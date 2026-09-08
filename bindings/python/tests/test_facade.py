@@ -18,6 +18,7 @@ pytest.importorskip("substrateinterface")
 
 from matter_vault.facade import (  # noqa: E402
     DeploymentsFacade,
+    KeysFacade,
     OrgsFacade,
     ResourcesFacade,
     SecretsFacade,
@@ -32,11 +33,31 @@ FACADES = {
     "resources": ResourcesFacade,
     "staking": StakingFacade,
     "orgs": OrgsFacade,
+    "keys": KeysFacade,
 }
 
 
+def _fixture():
+    return json.loads(VECTORS.read_text())
+
+
 def _calls():
-    return json.loads(VECTORS.read_text())["calls"]
+    return _fixture()["calls"]
+
+
+def _runtime_api_calls():
+    return _fixture()["runtime_api_calls"]
+
+
+class _RecordingChain:
+    """The read side a façade may reach for, recorded rather than performed."""
+
+    def __init__(self) -> None:
+        self.agent_key_calls = []
+
+    def agent_key(self, key):
+        self.agent_key_calls.append(bytes(key))
+        return None
 
 
 class _RecordingClient:
@@ -44,6 +65,7 @@ class _RecordingClient:
 
     def __init__(self) -> None:
         self.calls = []
+        self.chain = _RecordingChain()
 
     def tx(self, pallet, call, params):
         self.calls.append((pallet, call, params))
@@ -103,11 +125,26 @@ def test_each_method_routes_to_its_pinned_call(row):
     assert (pallet, call) == (row["pallet"], row["call"])
 
 
+@pytest.mark.parametrize("row", _runtime_api_calls(), ids=lambda r: f"{r['facade']}.{r['method']}")
+def test_reads_route_through_the_named_state_call(row):
+    # Reads cannot go in the `calls` table — they have no (pallet, call) — but
+    # dropping one would still be drift, so they are pinned separately.
+    client = _RecordingClient()
+    facade = FACADES[row["facade"]](client)
+    method = getattr(facade, row["method"], None)
+    assert callable(method), f"{row['facade']}.{row['method']} is missing"
+
+    assert method(b"\x00" * 32) is None
+    assert client.chain.agent_key_calls == [b"\x00" * 32]
+    assert client.calls == [], "a read must not submit an extrinsic"
+
+
 def test_no_facade_method_is_unpinned():
     # The other direction: an extra method here would be a surface Rust does not
-    # have, which is drift even though every fixture row passes.
+    # have, which is drift even though every fixture row passes. Both tables
+    # count — a façade's surface is their union.
     expected = {}
-    for row in _calls():
+    for row in _calls() + _runtime_api_calls():
         expected.setdefault(row["facade"], set()).add(row["method"])
 
     for name, cls in FACADES.items():

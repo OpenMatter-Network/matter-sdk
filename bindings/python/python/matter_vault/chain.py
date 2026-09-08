@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Tuple
 
 from scalecodec.base import ScaleBytes
 from substrateinterface import Keypair, KeypairType, SubstrateInterface
+from substrateinterface.exceptions import SubstrateRequestException
 from substrateinterface.utils.ss58 import ss58_decode, ss58_encode
 
 # A bare 32-byte hex mini-secret: no derivation junctions, no ``///password``.
@@ -25,6 +26,16 @@ _BARE_MINI_SECRET = re.compile(r"0x[0-9a-fA-F]{64}")
 
 #: Scheme tokens ``ApiKey`` accepts as a prefix, stripped before derivation.
 _SCHEME_PREFIX = "sr25519:"
+
+#: Scoped API keys arrived in runtime spec 322, which added both the
+#: ``Budgets.authorize_agent_key`` call and the ``BudgetsApi_agent_key`` runtime
+#: API. V14 metadata carries calls but not runtime-API declarations, so the call
+#: is what a substrate-interface client can see locally — and seeing it is how
+#: this binding tells a pre-322 chain from a chain that failed to answer. The
+#: dashboard gates on the same call for the same reason.
+_AGENT_KEY_PALLET = "Budgets"
+_AGENT_KEY_CALL = "authorize_agent_key"
+_AGENT_KEY_API = "BudgetsApi_agent_key"
 
 
 def _strip_scheme(text: str) -> str:
@@ -111,6 +122,28 @@ def _account_bytes(acct) -> bytes:
     if isinstance(acct, str):
         return bytes.fromhex(acct[2:]) if acct.startswith("0x") else bytes.fromhex(ss58_decode(acct))
     return bytes(acct)
+
+
+def _proxy_result(attributes):
+    """The ``Err`` payload of a ``Proxy.ProxyExecuted`` event, or ``None`` if the
+    wrapped call succeeded.
+
+    The event carries one ``DispatchResult`` field, but scalecodec renders it
+    differently depending on the metadata it loaded: as ``{"Err": …}`` /
+    ``{"Ok": …}``, as a bare ``{"result": {...}}`` mapping, or as a single-element
+    sequence. Reading all three shapes is cheaper than pinning one and finding out
+    in production which one this node emits.
+    """
+    if isinstance(attributes, (list, tuple)):
+        attributes = attributes[0] if attributes else None
+    if isinstance(attributes, dict) and "result" in attributes:
+        attributes = attributes["result"]
+    if not isinstance(attributes, dict):
+        return None
+    if "Err" in attributes:
+        return attributes["Err"]
+    # An explicit Ok, or a shape with neither arm, is not a failure.
+    return None
 
 
 def _normalize_endpoint(raw: str) -> str:
@@ -268,7 +301,58 @@ class ChainClient:
         """Read any pallet constant from the live metadata."""
         return self.substrate.get_constant(pallet, name).value
 
-    def submit(self, keypair: Keypair, pallet: str, call: str, params: dict) -> "TxReceipt":
+    def supports_agent_keys(self) -> bool:
+        """Whether this runtime has scoped API keys (spec 322 or later).
+
+        Read from the live metadata the client already holds, not from a probe:
+        ``get_metadata_call_function`` answers ``None`` for a call the runtime
+        does not define.
+        """
+        return (
+            self.substrate.get_metadata_call_function(_AGENT_KEY_PALLET, _AGENT_KEY_CALL)
+            is not None
+        )
+
+    def agent_key(self, key: bytes):
+        """``BudgetsApi_agent_key(key)`` — who ``key`` acts for, and what it may do.
+
+        Returns ``(principal_bytes, scope_bits)``, or ``None`` when this chain
+        has no scoped keys at all or has them and says this key is not
+        registered. Both of those are answers; a lookup that *failed* is not,
+        and raises :class:`ChainError` rather than being reported as "no
+        delegation" — a client that resolved Direct because a socket blinked
+        would sign every later write as its own balance-less account and fail
+        with a fee error that names nothing.
+
+        The account decodes as an explicit ``[u8; 32]`` for the same reason
+        :meth:`nodes` does — scalecodec misreads ``AccountId`` as an enum once
+        full metadata is loaded.
+        """
+        if not self.supports_agent_keys():
+            return None
+        try:
+            raw = self._call(_AGENT_KEY_API, bytes(key))
+        except SubstrateRequestException as exc:
+            raise ChainError(
+                f"{_AGENT_KEY_API} failed: {exc}",
+                pallet=_AGENT_KEY_PALLET,
+                call="agent_key",
+            ) from exc
+        # A decode failure here is a shape bug, not an absent grant: let it out.
+        v = self._decode("Option<([u8; 32], u32)>", raw)
+        if v is None:
+            return None
+        principal, bits = v
+        return (_account_bytes(principal), int(bits))
+
+    def submit(
+        self,
+        keypair: Keypair,
+        pallet: str,
+        call: str,
+        params: dict,
+        principal: Optional[bytes] = None,
+    ) -> "TxReceipt":
         """Sign and submit any call, waiting for FINALIZATION.
 
         Resolution is by name against the live metadata, so this reaches every
@@ -277,8 +361,22 @@ class ChainClient:
         Finalization, not inclusion: the committee authorizes a partial-decrypt
         against a finalized block, so resolving earlier gets an HTTP 403. That was
         a real bug in the TypeScript harness before it was fixed.
+
+        With ``principal`` set the call is wrapped in ``proxy.proxy`` and runs as
+        that member — the only way a member-tied API key can act, since its own
+        account has neither authority nor a balance.
         """
         composed = self.substrate.compose_call(pallet, call, params)
+        if principal is not None:
+            composed = self.substrate.compose_call(
+                "Proxy",
+                "proxy",
+                {
+                    "real": {"Id": principal},
+                    "force_proxy_type": None,
+                    "call": composed,
+                },
+            )
         # Read the nonce from System.Account directly: get_account_nonce() can
         # report 0 on this runtime, which signs a stale tx ("outdated", 1010).
         nonce = int(
@@ -287,15 +385,47 @@ class ChainClient:
         extrinsic = self.substrate.create_signed_extrinsic(
             call=composed, keypair=keypair, nonce=nonce
         )
-        receipt = self.substrate.submit_extrinsic(
-            extrinsic, wait_for_inclusion=True, wait_for_finalization=True
-        )
-        if not receipt.is_success:
+        try:
+            receipt = self.substrate.submit_extrinsic(
+                extrinsic, wait_for_inclusion=True, wait_for_finalization=True
+            )
+        except SubstrateRequestException as exc:
+            if _is_pool_rejection(exc):
+                raise PoolRejectedError(
+                    f"{pallet}.{call} was refused by the node at validation: {exc}",
+                    pallet=pallet,
+                    call=call,
+                ) from exc
             raise ChainError(
-                f"{pallet}.{call} failed on chain: {receipt.error_message}",
+                f"{pallet}.{call} could not be submitted: {exc}", pallet=pallet, call=call
+            ) from exc
+
+        if not receipt.is_success:
+            detail = receipt.error_message
+            module, name = "", ""
+            if isinstance(detail, dict):
+                module = str(detail.get("type", ""))
+                name = str(detail.get("name", ""))
+            raise OuterDispatchError(
+                f"{pallet}.{call} failed on chain: {detail}",
                 pallet=pallet,
                 call=call,
+                module=module,
+                name=name,
             )
+
+        # `proxy.proxy` succeeds as an extrinsic even when the call it wrapped
+        # failed, and `receipt.is_success` above cannot see that: substrate-
+        # interface only special-cases System.ExtrinsicSuccess/ExtrinsicFailed.
+        # Without this every delegated failure would read as a win.
+        if principal is not None:
+            failure = self._wrapped_failure(receipt)
+            if failure is not None:
+                raise DispatchError(
+                    f"{pallet}.{call} failed under delegation: {failure}",
+                    pallet=pallet,
+                    call=call,
+                )
 
         events = []
         for event in receipt.triggered_events:
@@ -306,6 +436,31 @@ class ChainClient:
             block_hash=receipt.block_hash,
             events=events,
         )
+
+    def _wrapped_failure(self, receipt) -> Optional[str]:
+        """The wrapped call's own error from ``Proxy.ProxyExecuted``, or ``None``.
+
+        Resolved through the same ``get_module_error`` substrate-interface uses
+        for ``ExtrinsicFailed``, so a delegated failure reads like a direct one.
+        """
+        for event in receipt.triggered_events:
+            e = event.value["event"]
+            if e.get("module_id") != "Proxy" or e.get("event_id") != "ProxyExecuted":
+                continue
+            result = _proxy_result(e.get("attributes"))
+            if result is None:
+                return None
+            module = result.get("Module") if isinstance(result, dict) else None
+            if isinstance(module, dict):
+                try:
+                    meta = self.substrate.metadata.get_module_error(
+                        module_index=module["index"], error_index=module["error"][0]
+                    )
+                    return f"{meta.name}: {' '.join(meta.docs).strip()}"
+                except Exception:
+                    pass
+            return str(result)
+        return None
 
     # --- extrinsic ---------------------------------------------------------
 
@@ -365,3 +520,51 @@ class ChainError(RuntimeError):
         super().__init__(message)
         self.pallet = pallet
         self.call = call
+
+
+class PoolRejectedError(ChainError):
+    """The node refused the extrinsic at validation, before any block.
+
+    A balance-less key whose call the runtime will not admit is not sponsored at
+    fee time, so it is refused here — which is why a revoked key reports
+    "cannot pay fees" and never ``Proxy.NotProxy``. The two causes are
+    indistinguishable from the message, so the client re-reads the grant rather
+    than guessing.
+    """
+
+
+class OuterDispatchError(ChainError):
+    """The ``proxy.proxy`` extrinsic itself failed, as opposed to the call it
+    wrapped."""
+
+    def __init__(
+        self, message: str, *, pallet: str = "", call: str = "", module: str = "", name: str = ""
+    ) -> None:
+        super().__init__(message, pallet=pallet, call=call)
+        self.module = module
+        self.name = name
+
+
+class DispatchError(ChainError):
+    """A delegated call landed, but the call it wrapped was refused."""
+
+
+#: Substrate's "Invalid Transaction" JSON-RPC error code.
+_POOL_REJECTION_CODE = 1010
+
+#: Markers for a pool rejection when the JSON-RPC code is unavailable. The same
+#: list the Rust client uses, so the bindings agree on what one looks like.
+_POOL_REJECTION_MARKERS = ("1010", "Inability to pay", "InvalidTransaction")
+
+
+def _is_pool_rejection(exc: BaseException) -> bool:
+    """Whether ``exc`` is the node refusing a transaction at validation.
+
+    substrate-interface raises the whole JSON-RPC error dict from
+    ``submit_extrinsic`` and a bare string elsewhere, so both are read.
+    """
+    args = getattr(exc, "args", ())
+    if args and isinstance(args[0], dict) and args[0].get("code") == _POOL_REJECTION_CODE:
+        return True
+    text = str(exc)
+    return any(marker in text for marker in _POOL_REJECTION_MARKERS)

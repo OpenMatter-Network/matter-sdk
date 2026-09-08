@@ -30,13 +30,22 @@ per-language shells. This table tracks how far each binding has progressed.
 | Generic `tx` / `query` / `runtimeApi` | ✅ | ✅ | ✅ | ✅ |
 | `MatterClient` + mainnet guard | ✅ | ✅ | ✅ | ✅ |
 | Curated typed façades (`facade_calls.json`) | ✅ | ✅ | ✅ | ✅ |
+| `ScopeSet` + local scope table (`scope_bits.json`, `required_scopes.json`) | ✅ | ✅ | ✅ | ✅ |
+| Delegated-key mode resolution at connect | ✅ | ✅ | ✅ | ✅ |
+| `proxy.proxy` wrapping of writes | ✅ | ✅ | ✅ | ✅ |
+| `ProxyExecuted` unwrapping (a wrapped failure is not a success) | ✅ | ✅ | ✅ | ✅ |
+| `keys` façade (mint / revoke / lookup) | ✅ | ✅ | ✅ | ✅ |
+| Pre-322 detection from metadata, never from a failed call | ✅ | ✅ | ✅ | ✅ |
+| Pool rejection / `Proxy.NotProxy` → `KeyRevoked` / `Unsponsored` | ✅ | ✅ | ✅ | ✅ |
+| Grant re-read after a refused write (a re-scope names the fresh set) | ✅ | ✅ | ✅ | ✅ |
+| Argument-sensitive scope rows read the argument | ✅ | ✅ | ✅ | ✅ |
+| Diagnostics through the host's logger, not stdout/stderr | ✅ | ✅ | ✅ | ✅ |
 | **Live client example** (apiKey → read → dry-run submit) | ✅ | ✅ | ✅ | ✅ |
 
-✅ implemented & tested. **All four bindings are at full parity**: same generic
-surface, same five façades, same guards, and matching constructors — with one
-deliberate asymmetry: Python's bring-your-own-key constructor is
-`connect_with_keypair` (an in-process `substrate-interface` keypair), not yet the
-remote-signer seam `connect_with_signer` provides elsewhere.
+✅ implemented & tested. **All four bindings drive a member-tied scoped key**: same
+generic surface, same six façades, same guards, matching constructors, and one shared
+scope contract. One asymmetry remains deliberate and is described below — Python's
+bring-your-own-key constructor.
 
 **How that parity is enforced, not just claimed.** Three fixtures, all emitted by Rust
 and replayed by every binding:
@@ -49,6 +58,15 @@ and replayed by every binding:
   fails. Rust has no reflection, so its emitter test pins the same list instead —
   which is also why its two typed grant conveniences (`grant_to_user`,
   `grant_to_deployment`, thin wrappers over `grant`) sit outside the fixture.
+- `scope_bits.json` and `required_scopes.json` — the `ScopeSet` bit layout and what
+  each of the 155 calls of the ten scoped pallets requires. Replayed both ways, like
+  the façade fixture. They are fixtures rather than shared code on purpose: a scope set
+  is not cryptography, so it does not belong behind `matter-vault-ffi`, and the two
+  `arg_sensitive` rows must read call arguments *before* anything is encoded, which
+  could not cross that boundary without shipping the whole argument tree. Porting the
+  table found a real divergence the moment TypeScript replayed it — TS had conflated
+  "argument absent" with "argument is `None`", which quietly inverted the fail-safe
+  direction for one row.
 - the live-metadata test — every curated `(pallet, call)` must exist on chain
   (`cargo test -p matter-vault --features chain --test live_chain -- --ignored`).
 
@@ -58,6 +76,39 @@ default-off `chain` cargo feature and TypeScript's is a separate package
 cargo feature that is off is genuinely not compiled while npm installs any declared
 dependency. Python's is the optional `[sdk]` extra. Go's is always present, since cgo
 already binds the core.
+
+**How each binding wraps.** Rust nests through subxt's own `DefaultPayload::into_value`,
+which exists for exactly this; TypeScript hands `api.tx.proxy.proxy` the inner call
+object; Python nests one `compose_call` inside another; Go passes the inner `types.Call`
+as an argument, which works because `types.Call` has no custom `Encode` and the generic
+reflection encoder emits `pallet ++ call ++ args` — correct, but correct *by accident*,
+so `scopes_test.go` pins the bytes rather than trusting it.
+
+**One trap per binding, worth knowing.** substrate-interface's `receipt.is_success`
+reports **true** when the wrapped call failed, because it only special-cases
+`System.ExtrinsicSuccess`/`ExtrinsicFailed`; Python therefore scans
+`triggered_events` itself. @polkadot's `result.dispatchError` likewise sees only the
+*outer* extrinsic. And Python must resolve the mode from `connect_with_keypair` as well
+as `connect_with_api_key`, since that is its only bring-your-own-key path.
+
+**Go used to be the exception here, and no longer is.** `Tx` stays non-blocking by
+design — it returns a transaction hash — but `TxAndWait` follows the extrinsic to
+finalization and raises on a wrapped failure like the other three. It locates the
+extrinsic by matching the exact bytes it submitted, which sidesteps decoding a signed
+extrinsic whose extension list this binding hand-assembles.
+
+The decode underneath it changed too, and the reason is worth recording. `ProxyFailure`
+previously read GSRPC's *rendered* event field and looked for `"Err"`. That registry
+discards variant names, so `Ok(())` and `Err(Other)` both arrive as a bare byte 0 and
+neither renders as either string: the check reported "no failure" for every input,
+including real ones. It is now decoded from the SCALE bytes, where the order of a
+`Result<(), DispatchError>` is the wire contract rather than a rendering detail.
+
+Go also reads a call's arguments now. `Tx` receives an already-encoded `types.Call`, so
+the two argument-sensitive rows decode it against metadata rather than judging by name
+— narrowing **only** when the field decodes to exactly `Option::None`, and taking the
+wider set for anything unreadable. That is still the fail-safe direction, and it is
+asserted rather than assumed.
 
 **Signed-extrinsic assembly** is ✅ everywhere but by different means. Rust uses subxt,
 TypeScript `@polkadot/api`, and Python `substrate-interface`; only Go hand-assembles, so

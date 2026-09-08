@@ -44,11 +44,13 @@
 
 mod amount;
 mod facade;
+mod mode;
+pub mod scopes_table;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use matter_vault_key::{AccountId, ApiKey, KeySigner};
+use matter_vault_key::{AccountId, ApiKey, KeySigner, ScopeSet};
 use subxt::backend::legacy::LegacyRpcMethods;
 use subxt::backend::rpc::RpcClient;
 use subxt::config::DefaultExtrinsicParamsBuilder;
@@ -57,7 +59,9 @@ use subxt::utils::{AccountId32, MultiSignature};
 use subxt::{OnlineClient, PolkadotConfig};
 
 pub use self::amount::{format_amount, one_token, parse_amount};
-pub use self::facade::{Deployments, Orgs, Resources, Secrets, Staking};
+pub use self::facade::{Deployments, Keys, Orgs, Resources, Secrets, Staking};
+pub use self::mode::Mode;
+use self::mode::Refresh;
 use crate::error::{Result, SdkError};
 
 /// Default RPC endpoint per network.
@@ -76,6 +80,15 @@ const MAINNET_TOKEN_SYMBOL: &str = "MTR";
 /// the convention the e2e harnesses already use.
 const CONFIRM_ENV: &str = "MATTER_CONFIRM";
 const CONFIRM_VALUE: &str = "yes";
+
+/// `pallet-proxy`'s dispatch surface, as a delegated key uses it.
+const PROXY_PALLET: &str = "Proxy";
+const PROXY_CALL: &str = "proxy";
+/// Carries the wrapped call's `DispatchResult` — the only place a delegated
+/// call's own failure is reported.
+const PROXY_EXECUTED_EVENT: &str = "ProxyExecuted";
+/// pallet-proxy's "no such delegation", i.e. the key was revoked or rebound.
+const NOT_PROXY_ERROR: &str = "NotProxy";
 
 /// `Balances.ExistentialDeposit` is `UNIT / 1000`, i.e. `10^(decimals - 3)`.
 const ED_DECIMAL_OFFSET: u32 = 3;
@@ -253,6 +266,11 @@ pub struct MatterClient {
     signer: Option<Arc<dyn KeySigner>>,
     properties: ChainProperties,
     config: MatterConfig,
+    /// Resolved once at connect and refreshed only after a submission has
+    /// already failed, to tell a revocation from a re-scope from an unpayable
+    /// call. `RwLock` rather than a plain field because every method takes
+    /// `&self`; the guard is never held across an await.
+    mode: RwLock<Mode>,
 }
 
 impl MatterClient {
@@ -320,14 +338,33 @@ impl MatterClient {
 
         let properties = read_properties(&api, &rpc).await?;
 
-        let client = Self {
+        let mut client = Self {
             api,
             rpc,
             signer,
             properties,
             config,
+            mode: RwLock::new(Mode::Direct),
         };
+        // Guards first: refusing to touch mainnet unconfirmed should not cost a
+        // round trip, and a wrong-network client has nothing to resolve.
         client.enforce_network_guards()?;
+
+        if let Some(account) = client.account() {
+            let resolved = mode::resolve(&client.api, account).await?;
+            if let Mode::Delegated { principal, scopes } = &resolved {
+                // Said once, and worth saying: a key that was *meant* to be
+                // delegated but resolved `Direct` is the first thing anyone
+                // debugging a `Payment` rejection needs to see. SS58, because
+                // that is the form the dashboard showed whoever minted the key.
+                tracing::info!(
+                    principal = %AccountId32(*principal.as_bytes()),
+                    %scopes,
+                    "acting for a member"
+                );
+            }
+            client.mode = RwLock::new(resolved);
+        }
         Ok(client)
     }
 
@@ -376,6 +413,44 @@ impl MatterClient {
     /// The signing identity as a typed account id.
     pub fn account(&self) -> Option<AccountId> {
         self.signer.as_ref().map(|s| s.account_id())
+    }
+
+    /// Whether this client signs for itself or acts for a member.
+    ///
+    /// Resolved once at connect. A member-tied API key is [`Mode::Delegated`];
+    /// a human seed, an HSM key, a legacy project-tied key, and anything on a
+    /// pre-322 chain are all [`Mode::Direct`].
+    pub fn mode(&self) -> Mode {
+        self.read_mode()
+    }
+
+    /// The cached mode. A poisoned lock still holds a valid `Mode`: the only
+    /// writer replaces it wholesale, so there is no torn state to protect
+    /// against, and refusing to read it would turn an unrelated panic into a
+    /// dead client.
+    fn read_mode(&self) -> Mode {
+        self.mode
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// The member this client acts for, or `None` when it acts as itself.
+    pub fn principal(&self) -> Option<AccountId> {
+        self.read_mode().principal()
+    }
+
+    /// What this client's key is permitted to do, or `None` when the chain
+    /// grants it no scoped proxy.
+    pub fn scopes(&self) -> Option<ScopeSet> {
+        self.read_mode().scopes()
+    }
+
+    /// The member this client acts for, as SS58 — the form the dashboard showed
+    /// whoever minted the key. `None` when it acts as itself.
+    pub fn principal_address(&self) -> Option<String> {
+        self.principal()
+            .map(|id| AccountId32(*id.as_bytes()).to_string())
     }
 
     /// The signing identity's SS58 address, or `None` for a read-only client.
@@ -431,7 +506,10 @@ impl MatterClient {
     /// decrypting a secret stored in a merely-included block returns HTTP 403.
     pub async fn tx(&self, pallet: &str, call: &str, args: Vec<Value>) -> Result<TxReceipt> {
         let signer = self.require_signer()?;
-        let payload = subxt::dynamic::tx(pallet, call, args);
+        // Kept for the failure path: if the key turns out to have been re-scoped
+        // mid-flight, this is what the fresh set has to cover.
+        let required = scopes_table::required_scopes(pallet, call, &args);
+        let payload = self.build_payload(pallet, call, args)?;
         let account = AccountId32(*signer.account_id().as_bytes());
 
         let mut partial = self
@@ -452,10 +530,11 @@ impl MatterClient {
             partial.sign_with_account_and_signature(&account, &MultiSignature::Sr25519(signature));
 
         let in_block = tokio::time::timeout(self.config.finality_timeout, async {
-            submittable
-                .submit_and_watch()
-                .await
-                .map_err(|e| chain_error(pallet, call, e))?
+            let watching = match submittable.submit_and_watch().await {
+                Ok(watching) => watching,
+                Err(e) => return Err(self.submission_error(pallet, call, required, e).await),
+            };
+            watching
                 .wait_for_finalized()
                 .await
                 .map_err(|e| chain_error(pallet, call, e))
@@ -472,22 +551,232 @@ impl MatterClient {
 
         // `wait_for_success` turns a dispatch error into an `Err`, so a call that
         // landed but failed does not read as success.
-        let finalized = in_block
-            .wait_for_success()
-            .await
-            .map_err(|e| chain_error(pallet, call, e))?;
+        let finalized = match in_block.wait_for_success().await {
+            Ok(events) => events,
+            Err(e) => return Err(self.outer_dispatch_error(pallet, call, e).await),
+        };
 
-        let events = finalized
+        let events: Vec<(String, String)> = finalized
             .iter()
             .filter_map(|e| e.ok())
             .map(|e| (e.pallet_name().to_string(), e.variant_name().to_string()))
             .collect();
+
+        // A `proxy.proxy` extrinsic succeeds even when the call it wrapped
+        // failed — the failure is an event, not a dispatch error — so without
+        // this every delegated failure would read as success.
+        if self.read_mode().is_delegated() {
+            if let Some(failure) = self.inner_dispatch_error(&finalized)? {
+                return Err(SdkError::Dispatch {
+                    pallet: pallet.to_string(),
+                    call: call.to_string(),
+                    detail: failure,
+                });
+            }
+        }
 
         Ok(TxReceipt {
             tx_hash,
             block_hash,
             events,
         })
+    }
+
+    /// The call to sign: the caller's own in [`Mode::Direct`], or wrapped in
+    /// `proxy.proxy(principal, None, call)` when this client acts for a member.
+    ///
+    /// The local scope check lives here, before anything is submitted, so a
+    /// key that cannot make the call is told which scope it lacks rather than
+    /// being refused in the pool for having no balance.
+    fn build_payload(
+        &self,
+        pallet: &str,
+        call: &str,
+        args: Vec<Value>,
+    ) -> Result<subxt::tx::DynamicPayload> {
+        let mode = self.read_mode();
+        let Mode::Delegated { principal, scopes } = &mode else {
+            return Ok(subxt::dynamic::tx(pallet, call, args));
+        };
+
+        // The runtime never admits these inside a proxy, and nesting one would
+        // let a key launder authority through a batch.
+        if matches!(pallet, "Proxy" | "Utility" | "EthSigning") {
+            return Err(SdkError::NeverAdmitted {
+                pallet: pallet.to_string(),
+                call: call.to_string(),
+            });
+        }
+
+        match scopes_table::required_scopes(pallet, call, &args) {
+            None => {
+                return Err(SdkError::NeverAdmitted {
+                    pallet: pallet.to_string(),
+                    call: call.to_string(),
+                })
+            }
+            Some(required) if !scopes.is_superset(required) => {
+                return Err(SdkError::NotPermitted {
+                    pallet: pallet.to_string(),
+                    call: call.to_string(),
+                    required,
+                    held: *scopes,
+                })
+            }
+            Some(_) => {}
+        }
+
+        Ok(proxy_payload(principal, pallet, call, args))
+    }
+
+    /// Classify a failure to get the extrinsic into the pool.
+    ///
+    /// This is where a **revoked** key lands, which is not obvious. A key holds
+    /// no funds by design, and the fee for a call the runtime will not admit is
+    /// not sponsored — so the node refuses the transaction at validation, for
+    /// want of money, and it never reaches a block. `Proxy.NotProxy` is
+    /// therefore not what a caller sees; `InvalidTransaction` (1010) is.
+    ///
+    /// The two causes of that one code — the delegation is gone, or nobody can
+    /// pay — are indistinguishable from the message, and subxt does not decode
+    /// pool rejections into typed variants. So rather than guess from text,
+    /// **ask the chain**: re-read the key's grant and let the answer decide.
+    /// That is one extra round trip on a path that has already failed.
+    async fn submission_error(
+        &self,
+        pallet: &str,
+        call: &str,
+        required: Option<ScopeSet>,
+        e: subxt::Error,
+    ) -> SdkError {
+        let mode = self.read_mode();
+        let Mode::Delegated { principal, .. } = &mode else {
+            return chain_error(pallet, call, e);
+        };
+        if !is_pool_rejection(&e) {
+            return chain_error(pallet, call, e);
+        }
+
+        match self.refresh_delegation().await {
+            Ok(Refresh::Gone) => SdkError::KeyRevoked,
+            Ok(Refresh::Rescoped { held }) => {
+                // The scopes moved under us. If the call is now out of scope,
+                // name the missing one with the *fresh* set: blaming the payer
+                // for a permissions change would send the reader somewhere else
+                // entirely.
+                match required {
+                    Some(required) if !held.is_superset(required) => SdkError::NotPermitted {
+                        pallet: pallet.to_string(),
+                        call: call.to_string(),
+                        required,
+                        held,
+                    },
+                    _ => SdkError::Unsponsored {
+                        principal: principal.to_string(),
+                        pallet: pallet.to_string(),
+                        call: call.to_string(),
+                    },
+                }
+            }
+            Ok(Refresh::Unchanged) => SdkError::Unsponsored {
+                principal: principal.to_string(),
+                pallet: pallet.to_string(),
+                call: call.to_string(),
+            },
+            // The lookup itself failed, so we know nothing new; report the
+            // original refusal rather than a diagnostic error about it.
+            Err(_) => chain_error(pallet, call, e),
+        }
+    }
+
+    /// Re-read the chain's grant, updating the cached scopes if they moved.
+    ///
+    /// Called only after a submission has failed. A grant that is *gone* does
+    /// not reset the mode to [`Mode::Direct`]: a revoked key that started
+    /// signing directly would fail the next call for want of funds it was never
+    /// meant to hold, and the caller would read "cannot pay fees" instead of
+    /// "your key was revoked".
+    async fn refresh_delegation(&self) -> Result<Refresh> {
+        let previous = self.read_mode();
+        let Some(key) = self.account() else {
+            return Ok(Refresh::Unchanged);
+        };
+        let outcome = mode::after_refresh(&previous, mode::lookup(&self.api, key).await?);
+        if let (Refresh::Rescoped { held }, Mode::Delegated { principal, .. }) =
+            (outcome, &previous)
+        {
+            *self
+                .mode
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Mode::Delegated {
+                principal: *principal,
+                scopes: held,
+            };
+        }
+        Ok(outcome)
+    }
+
+    /// Classify a failure of the `proxy.proxy` extrinsic itself, as opposed to
+    /// the call it wrapped.
+    ///
+    /// `Proxy.NotProxy` means pallet-proxy found no matching definition for
+    /// this (key, member) pair, which in practice means the key was revoked or
+    /// rebound since connect. Confirm that against the chain before saying so:
+    /// the mode was resolved once at connect and this client deliberately does
+    /// not mutate it, so a stale cache is exactly the situation to check.
+    async fn outer_dispatch_error(&self, pallet: &str, call: &str, e: subxt::Error) -> SdkError {
+        let is_not_proxy = matches!(
+            &e,
+            subxt::Error::Runtime(subxt::error::DispatchError::Module(m))
+                if matches!(m.details(), Ok(d) if d.pallet.name() == PROXY_PALLET && d.variant.name == NOT_PROXY_ERROR)
+        );
+        if !is_not_proxy {
+            return chain_error(pallet, call, e);
+        }
+
+        match self.refresh_delegation().await {
+            Ok(Refresh::Gone) => SdkError::KeyRevoked,
+            // The proxy is still there and still ours: something else about the
+            // dispatch was wrong, so do not blame revocation for it.
+            Ok(_) => chain_error(pallet, call, e),
+            Err(lookup_failed) => lookup_failed,
+        }
+    }
+
+    /// The `DispatchError` of the call a `Proxy.ProxyExecuted` event reports,
+    /// rendered through metadata, or `None` if the inner call succeeded.
+    fn inner_dispatch_error(
+        &self,
+        events: &subxt::blocks::ExtrinsicEvents<PolkadotConfig>,
+    ) -> Result<Option<String>> {
+        let Some(executed) = events
+            .iter()
+            .filter_map(|e| e.ok())
+            .find(|e| e.pallet_name() == PROXY_PALLET && e.variant_name() == PROXY_EXECUTED_EVENT)
+        else {
+            return Ok(None);
+        };
+
+        // The event's one field is a `DispatchResult`, so the first byte is the
+        // `Result` discriminant and the error itself starts after it. Decoding
+        // from offset zero would read the discriminant as a pallet index.
+        let bytes = executed.field_bytes();
+        match bytes.first() {
+            None => Ok(Some("Proxy.ProxyExecuted carried no result".to_string())),
+            Some(0) => Ok(None),
+            Some(1) => {
+                let decoded =
+                    subxt::error::DispatchError::decode_from(&bytes[1..], self.api.metadata())
+                        .map_err(|e| SdkError::Chain {
+                            target: format!("{PROXY_PALLET}.{PROXY_EXECUTED_EVENT}"),
+                            detail: format!("could not decode the wrapped call's error: {e}"),
+                        })?;
+                Ok(Some(decoded.to_string()))
+            }
+            Some(other) => Ok(Some(format!(
+                "Proxy.ProxyExecuted carried an unknown result discriminant {other}"
+            ))),
+        }
     }
 
     /// Read a storage entry. `keys` are the map keys, empty for a plain value.
@@ -585,6 +874,20 @@ impl MatterClient {
         Orgs(self)
     }
 
+    /// Minting and revoking member-tied API keys. Member-signed: a key may
+    /// never call these on itself.
+    pub fn keys(&self) -> Keys<'_> {
+        Keys(self)
+    }
+
+    /// Who `key` acts for and what it may do, per the chain.
+    ///
+    /// `None` if the key holds no scoped proxy — never registered, revoked, or
+    /// a chain older than the scoped-key runtime.
+    pub async fn agent_key(&self, key: AccountId) -> Result<Option<(AccountId, ScopeSet)>> {
+        mode::lookup(&self.api, key).await
+    }
+
     fn require_signer(&self) -> Result<&Arc<dyn KeySigner>> {
         self.signer.as_ref().ok_or(SdkError::ReadOnly)
     }
@@ -647,13 +950,11 @@ async fn read_properties(
 
     if properties.decimals_disagree() {
         // Loud once, then trust the runtime. Quiet success, loud surprise.
-        eprintln!(
-            "WARNING: {} reports tokenDecimals={} in its chain spec but is executing a \
-             runtime whose ExistentialDeposit implies {}. Using {} for all arithmetic.",
-            properties.chain_name,
-            properties.token_decimals_declared,
-            properties.token_decimals_effective,
-            properties.token_decimals_effective,
+        tracing::warn!(
+            chain = %properties.chain_name,
+            declared = properties.token_decimals_declared,
+            effective = properties.token_decimals_effective,
+            "chain spec and runtime disagree on token decimals; using the runtime's"
         );
     }
     Ok(properties)
@@ -699,9 +1000,129 @@ fn chain_error(pallet: &str, item: &str, e: impl std::fmt::Display) -> SdkError 
     }
 }
 
+/// Substrate's JSON-RPC code for a transaction the pool refused to accept.
+const INVALID_TRANSACTION_CODE: &str = "1010";
+
+/// Whether the node refused the transaction at validation, before any block.
+///
+/// Matched on the numeric code rather than the prose: the message is the node's
+/// to word, and `1010` is the part of it that is a contract. The fee wording is
+/// accepted too because older nodes surface it that way.
+fn is_pool_rejection(e: &subxt::Error) -> bool {
+    let text = e.to_string();
+    text.contains(INVALID_TRANSACTION_CODE)
+        || text.contains("Inability to pay")
+        || text.contains("InvalidTransaction")
+}
+
+/// `Proxy.proxy(MultiAddress::Id(principal), None, call)`.
+///
+/// The inner call is built by the same `dynamic::tx` the direct path uses and
+/// then converted with `into_value()`, which is subxt's own way of nesting one
+/// dynamic call inside another. Encoding it by hand would mean re-deriving the
+/// `RuntimeCall` layout that metadata already describes.
+///
+/// `force_proxy_type` is `None` rather than `Some(Scoped(..))`: the runtime
+/// accepts either, `None` is what its tests pin, and pallet-proxy picks the
+/// smallest matching definition anyway. Forcing the type would also mean
+/// encoding a `ScopeSet` as the single-field composite it is in metadata, which
+/// is one more shape to get wrong for no benefit.
+fn proxy_payload(
+    principal: &AccountId,
+    pallet: &str,
+    call: &str,
+    args: Vec<Value>,
+) -> subxt::tx::DynamicPayload {
+    let inner = subxt::dynamic::tx(pallet, call, args).into_value();
+    subxt::dynamic::tx(
+        PROXY_PALLET,
+        PROXY_CALL,
+        vec![
+            Value::unnamed_variant("Id", [Value::from_bytes(principal.as_bytes())]),
+            Value::unnamed_variant("None", []),
+            inner,
+        ],
+    )
+}
+
+/// Metadata from a `matter-node` at spec 322, for tests that need real type
+/// information. See `scopes_table`'s test module for the regeneration recipe.
+#[cfg(test)]
+pub(super) fn test_metadata() -> subxt::Metadata {
+    use parity_scale_codec::Decode;
+    let bytes: &[u8] = include_bytes!("../../../../testvectors/spec322_metadata.scale");
+    subxt::Metadata::decode(&mut &bytes[..]).expect("fixture decodes as subxt metadata")
+}
+
 #[cfg(test)]
 mod tests {
+    use subxt::tx::Payload;
+
     use super::*;
+
+    /// The whole delegated path rests on nesting one dynamic call inside
+    /// another, so assert the bytes rather than the shape.
+    ///
+    /// `Proxy.proxy(MultiAddress::Id(principal), None, inner)` encodes as the
+    /// proxy pallet and call indices, then `Id`'s variant byte and 32 account
+    /// bytes, then `None`'s variant byte, then the inner call — which must be
+    /// byte-identical to what the *direct* path would have submitted.
+    #[test]
+    fn wrapping_encodes_the_inner_call_verbatim() {
+        let metadata = test_metadata();
+        let principal = AccountId::from([9u8; 32]);
+
+        let direct = subxt::dynamic::tx("Jobs", "cancel_deployment", vec![Value::u128(42)]);
+        let inner_bytes = direct
+            .encode_call_data(&metadata)
+            .expect("the inner call encodes on its own");
+
+        let wrapped = proxy_payload(
+            &principal,
+            "Jobs",
+            "cancel_deployment",
+            vec![Value::u128(42)],
+        );
+        let outer_bytes = wrapped
+            .encode_call_data(&metadata)
+            .expect("the wrapped call encodes");
+
+        let proxy = metadata
+            .pallet_by_name(PROXY_PALLET)
+            .expect("Proxy pallet in metadata");
+        let proxy_call_index = proxy
+            .call_variant_by_name(PROXY_CALL)
+            .expect("Proxy.proxy in metadata")
+            .index;
+
+        let mut expected = vec![proxy.index(), proxy_call_index];
+        // MultiAddress::Id is variant 0, then the raw account.
+        expected.push(0);
+        expected.extend_from_slice(principal.as_bytes());
+        // Option::None is variant 0.
+        expected.push(0);
+        expected.extend_from_slice(&inner_bytes);
+
+        assert_eq!(outer_bytes, expected);
+    }
+
+    /// A `RuntimeCall` is `pallet_index ++ call_index ++ args`, so the nested
+    /// call must carry Jobs' own indices — not be re-encoded as something else.
+    #[test]
+    fn the_nested_call_keeps_its_own_pallet_and_call_indices() {
+        let metadata = test_metadata();
+        let jobs = metadata.pallet_by_name("Jobs").expect("Jobs pallet");
+        let cancel = jobs
+            .call_variant_by_name("cancel_deployment")
+            .expect("Jobs.cancel_deployment");
+
+        let inner = subxt::dynamic::tx("Jobs", "cancel_deployment", vec![Value::u128(42)])
+            .encode_call_data(&metadata)
+            .unwrap();
+
+        assert_eq!(inner[0], jobs.index());
+        assert_eq!(inner[1], cancel.index);
+    }
 
     #[test]
     fn existential_deposit_implies_the_documented_decimal_counts() {

@@ -39,12 +39,36 @@ from .transport import Transport, UrllibTransport
 # The chain layer is optional (needs the [sdk] extra). Import failure is recorded
 # rather than swallowed: a bare `None` turned "you didn't install the extra" into
 # an AttributeError three frames away from the cause.
+# Scopes are pure Python with no chain dependency, so they import either way —
+# a caller can build and render a ScopeSet without installing the [sdk] extra.
+from .scopes import Access, Scope, ScopeSet, required_scopes
+
 _CHAIN_IMPORT_ERROR = None
 try:
-    from .chain import ApiKeySigner, ChainClient, ChainError, TxReceipt, api_key_signer
-    from .client import ChainProperties, MatterClient, Network, format_amount, parse_amount
+    from .chain import (
+        ApiKeySigner,
+        ChainClient,
+        ChainError,
+        DispatchError,
+        OuterDispatchError,
+        PoolRejectedError,
+        TxReceipt,
+        api_key_signer,
+    )
+    from .client import (
+        ChainProperties,
+        KeyRevokedError,
+        MatterClient,
+        NeverAdmittedError,
+        Network,
+        NotPermittedError,
+        UnsponsoredError,
+        format_amount,
+        parse_amount,
+    )
     from .facade import (
         DeploymentsFacade,
+        KeysFacade,
         OrgsFacade,
         ResourcesFacade,
         SecretsFacade,
@@ -77,6 +101,14 @@ except ImportError as exc:  # pragma: no cover - depends on the install extra
     ResourcesFacade = _needs_sdk_extra("ResourcesFacade")  # type: ignore[assignment]
     StakingFacade = _needs_sdk_extra("StakingFacade")  # type: ignore[assignment]
     OrgsFacade = _needs_sdk_extra("OrgsFacade")  # type: ignore[assignment]
+    KeysFacade = _needs_sdk_extra("KeysFacade")  # type: ignore[assignment]
+    NotPermittedError = _needs_sdk_extra("NotPermittedError")  # type: ignore[assignment]
+    NeverAdmittedError = _needs_sdk_extra("NeverAdmittedError")  # type: ignore[assignment]
+    KeyRevokedError = _needs_sdk_extra("KeyRevokedError")  # type: ignore[assignment]
+    UnsponsoredError = _needs_sdk_extra("UnsponsoredError")  # type: ignore[assignment]
+    DispatchError = _needs_sdk_extra("DispatchError")  # type: ignore[assignment]
+    PoolRejectedError = _needs_sdk_extra("PoolRejectedError")  # type: ignore[assignment]
+    OuterDispatchError = _needs_sdk_extra("OuterDispatchError")  # type: ignore[assignment]
 
 __all__ = [
     # crypto core
@@ -123,6 +155,18 @@ __all__ = [
     "ResourcesFacade",
     "StakingFacade",
     "OrgsFacade",
+    "KeysFacade",
+    "NotPermittedError",
+    "NeverAdmittedError",
+    "KeyRevokedError",
+    "UnsponsoredError",
+    "DispatchError",
+    "PoolRejectedError",
+    "OuterDispatchError",
+    "Access",
+    "Scope",
+    "ScopeSet",
+    "required_scopes",
     "to_hex",
     "from_hex",
     "secret_id_to_hex",

@@ -8,6 +8,26 @@
 // WeightReclaim signed extensions.
 
 import type { ChainProperties } from "./network.js";
+import type { ScopeSet } from "./scopes.js";
+
+/**
+ * Who this client's signature speaks for.
+ *
+ * Under runtime spec 322 a member-tied API key has no authority of its own: it
+ * is a delegate holding a scoped proxy on the account of the member who minted
+ * it, and everything it does it does as that member. A key that holds no such
+ * proxy — a human seed, an HSM key, a legacy project-tied key, or any key on a
+ * pre-322 chain — is `direct`, which is the behaviour that predates all of this.
+ */
+export type Mode =
+  | { readonly kind: "direct" }
+  | {
+      readonly kind: "delegated";
+      /** The member every call actually runs as, and who pays for it. */
+      readonly principal: Uint8Array;
+      /** What the chain says this key may do. */
+      readonly scopes: ScopeSet;
+    };
 
 /** The outcome of a submitted extrinsic, after finalization. */
 export interface TxReceipt {
@@ -32,6 +52,23 @@ export function emitted(receipt: TxReceipt, pallet: string, event: string): bool
 export interface ChainBackend {
   /** Chain identity and unit metadata, read once at connect. */
   properties(): Promise<ChainProperties>;
+
+  /**
+   * Who this backend's signature speaks for, resolved once at connect.
+   *
+   * Optional so a hand-rolled test backend need not implement it; an absent
+   * implementation means `direct`.
+   */
+  mode?(): Mode;
+
+  /**
+   * Who `key` acts for and what it may do, per the chain — `undefined` when it
+   * holds no scoped proxy.
+   *
+   * On the backend because decoding `Option<(AccountId32, u32)>` needs the
+   * chain registry. Optional for the same reason `mode` is.
+   */
+  agentKey?(key: Uint8Array): Promise<readonly [Uint8Array, ScopeSet] | undefined>;
 
   /**
    * Sign and submit `pallet.call(args)`, resolving only once **finalized**.

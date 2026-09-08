@@ -212,3 +212,90 @@ async fn pointing_testnet_config_at_mainnet_is_caught() {
         Ok(_) => panic!("a testnet config accepted a mainnet endpoint"),
     }
 }
+
+/// The scoped-key surface, checked against the runtime that is actually live.
+///
+/// The unit tests pin this against a checked-in spec-322 blob, which proves the
+/// table was right when it was written. This proves it is right now. A forkless
+/// upgrade that adds a call to a scoped pallet makes the table incomplete
+/// without changing a line of this repo, and the local pre-flight check would
+/// then refuse a call the chain would have admitted.
+#[tokio::test]
+#[ignore = "needs the live testnet"]
+async fn the_scoped_key_surface_matches_the_live_runtime() {
+    use matter_vault::chain::scopes_table::{required_scopes, SCOPED_PALLETS};
+
+    let client = testnet().await;
+    let metadata = client.subxt().metadata();
+
+    // The runtime API the client resolves a key's principal from.
+    assert!(
+        metadata
+            .runtime_api_trait_by_name("BudgetsApi")
+            .and_then(|t| t.method_by_name("agent_key"))
+            .is_some(),
+        "the live runtime no longer declares BudgetsApi_agent_key, so no key can \
+         discover who it acts for"
+    );
+
+    // The call Python and Go gate on, which must ship with that runtime API.
+    assert!(
+        metadata
+            .pallet_by_name("Budgets")
+            .and_then(|p| p.call_variant_by_name("authorize_agent_key"))
+            .is_some(),
+        "Budgets.authorize_agent_key is gone, and the Python and Go bindings gate \
+         their whole delegated path on it"
+    );
+
+    // The dispatch shape every delegated write takes.
+    let proxy = metadata
+        .pallet_by_name("Proxy")
+        .expect("the live runtime has a Proxy pallet");
+    assert!(proxy.call_variant_by_name("proxy").is_some());
+    // Events are resolved by walking the pallet's event variants: subxt indexes
+    // them by index, not by name.
+    assert!(
+        proxy
+            .event_variants()
+            .is_some_and(|variants| variants.iter().any(|v| v.name == "ProxyExecuted")),
+        "without ProxyExecuted a failed wrapped call cannot be told from a successful one"
+    );
+
+    // Every call of every scoped pallet must be classified one way or the other.
+    let mut unclassified = Vec::new();
+    for pallet in SCOPED_PALLETS {
+        let variants = metadata
+            .pallet_by_name(pallet)
+            .and_then(|p| p.call_variants())
+            .unwrap_or_else(|| {
+                panic!("{pallet} is a scoped pallet but the live runtime has no such pallet")
+            });
+        for variant in variants {
+            // Args only matter for the two argument-sensitive rows, which are
+            // covered by unit tests; an empty slice still yields a `Some`.
+            if required_scopes(pallet, variant.name.as_str(), &[]).is_none()
+                && !is_known_never_admitted(pallet, variant.name.as_str())
+            {
+                unclassified.push(format!("{pallet}.{}", variant.name));
+            }
+        }
+    }
+    assert!(
+        unclassified.is_empty(),
+        "the live runtime has calls this SDK's scope table does not classify: {unclassified:?}. \
+         See the regeneration recipe in crates/matter-vault/src/chain/scopes_table.rs."
+    );
+}
+
+/// Whether the table deliberately admits nothing for this call.
+///
+/// `required_scopes` returns `None` both for "no key may make this" and for
+/// "this call is new and nobody has classified it", so the live test needs the
+/// never-list to tell them apart. It reads the same one the unit test does:
+/// a second copy here drifted from the first within an hour of being written.
+fn is_known_never_admitted(pallet: &str, call: &str) -> bool {
+    matter_vault::chain::scopes_table::NEVER_ADMITTED
+        .iter()
+        .any(|(p, denied)| *p == pallet && denied.contains(&call))
+}

@@ -33,6 +33,13 @@ type Event struct {
 	Name string
 	// Fields are the decoded event fields, in declaration order.
 	Fields registry.DecodedFields
+	// ExtrinsicIndex is which extrinsic in the block emitted this event, or nil
+	// for events from block initialization or finalization.
+	//
+	// A block holds every extrinsic's events in one flat vector, so matching on
+	// pallet and name alone can pick up somebody else's. Anything that must
+	// attribute an event to *our* submission has to compare this.
+	ExtrinsicIndex *uint32
 }
 
 // String renders "Pallet.Name", the form used in errors and logs.
@@ -79,14 +86,24 @@ func (c *ChainClient) FindEvent(blockHash types.Hash, pallet, name string) (Even
 
 // splitEventName turns the retriever's "Pallet.Name" into its two parts.
 func splitEventName(e *parser.Event) Event {
+	var index *uint32
+	if e.Phase != nil && e.Phase.IsApplyExtrinsic {
+		at := e.Phase.AsApplyExtrinsic
+		index = &at
+	}
 	for i := 0; i < len(e.Name); i++ {
 		if e.Name[i] == '.' {
-			return Event{Pallet: e.Name[:i], Name: e.Name[i+1:], Fields: e.Fields}
+			return Event{
+				Pallet:         e.Name[:i],
+				Name:           e.Name[i+1:],
+				Fields:         e.Fields,
+				ExtrinsicIndex: index,
+			}
 		}
 	}
 	// No separator: keep the whole thing as the name rather than silently
 	// dropping it, so an unexpected shape is visible instead of missing.
-	return Event{Name: e.Name, Fields: e.Fields}
+	return Event{Name: e.Name, Fields: e.Fields, ExtrinsicIndex: index}
 }
 
 // SecretIDFromEvent reads a u128 secret id out of a decoded event's first field.
@@ -163,4 +180,67 @@ func (c *ChainClient) FindStoredSecret(blockHash types.Hash, owner []byte) (Secr
 		return id, true, nil
 	}
 	return SecretID{}, false, nil
+}
+
+// ProxyFailure reports the wrapped call's own error from the
+// `Proxy.ProxyExecuted` event emitted by extrinsic `index` in `blockHash`.
+//
+// This is the only place a delegated call's real outcome lives. The outer
+// `proxy.proxy` extrinsic succeeds whenever the proxy *dispatched* something, so
+// a caller that stops at "the extrinsic landed" cannot tell a completed call from
+// a refused one.
+//
+// The extrinsic index matters: a block's events are one flat vector, so matching
+// on pallet and name alone would happily report someone else's proxy failure.
+func (c *ChainClient) ProxyFailure(blockHash types.Hash, index uint32) (string, bool, error) {
+	outcome, err := c.outcomeAt(blockHash, index)
+	if err != nil {
+		return "", false, err
+	}
+	if outcome.Proxied == nil {
+		return "", false, nil
+	}
+	return c.describeDispatchError(*outcome.Proxied), true, nil
+}
+
+// ProxyFailures reports every wrapped-call failure in a block, as
+// "extrinsic N: <error>".
+//
+// The diagnosis half of the delegated path. A domain check remains the way to
+// confirm a call worked — it proves the effect rather than the transaction, which
+// is why WaitForFinalized takes a predicate — but when that check times out under
+// a member-tied key, the reason is here and nowhere else: the outer proxy.proxy
+// extrinsic succeeded, so nothing else in the block records that the call was
+// refused.
+func (c *ChainClient) ProxyFailures(blockHash types.Hash) ([]string, error) {
+	events, err := c.EventsAt(blockHash)
+	if err != nil {
+		return nil, err
+	}
+	// Which extrinsics emitted a ProxyExecuted at all, so each is decoded once
+	// from bytes rather than the whole block being walked per extrinsic.
+	seen := map[uint32]struct{}{}
+	var indices []uint32
+	for _, e := range events {
+		if e.Pallet != proxyPallet || e.Name != proxyExecutedEvent || e.ExtrinsicIndex == nil {
+			continue
+		}
+		if _, ok := seen[*e.ExtrinsicIndex]; ok {
+			continue
+		}
+		seen[*e.ExtrinsicIndex] = struct{}{}
+		indices = append(indices, *e.ExtrinsicIndex)
+	}
+
+	var failures []string
+	for _, index := range indices {
+		detail, failed, err := c.ProxyFailure(blockHash, index)
+		if err != nil {
+			return nil, err
+		}
+		if failed {
+			failures = append(failures, fmt.Sprintf("extrinsic %d: %s", index, detail))
+		}
+	}
+	return failures, nil
 }

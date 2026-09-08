@@ -16,7 +16,7 @@ default = []
 # call. Off by default so the existing dependency graph is preserved byte-for-byte
 # — `matter-ml` consumes this crate as a git-tag dependency and needs neither
 # subxt nor a tokio runtime. Verify with `cargo tree -p matter-vault`.
-chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio"]
+chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio", "dep:tracing"]
 
 [dependencies]
 matter-vault-core = { workspace = true }
@@ -41,6 +41,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"], optional = true }
 parity-scale-codec = { version = "3", features = ["derive"], optional = true }
 tokio = { version = "1.47.1", features = ["rt", "time"], optional = true }
+# Connect diagnostics. A facade, not a logger: with no subscriber installed these
+# lines cost nothing and say nothing, which is what a library should do. subxt
+# already pulls it in, so a consumer's subscriber shows both at once.
+tracing = { version = "0.1", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 # The fake-committee integration test computes *real* partials with matter-crypto.

@@ -48,10 +48,12 @@
 mod apikey;
 mod error;
 mod scheme;
+mod scopes;
 mod signer;
 mod suri;
 
 pub use apikey::ApiKey;
 pub use error::{KeyError, Result};
 pub use scheme::{AccountId, KeyScheme};
+pub use scopes::{Access, Scope, ScopeParseError, ScopeSet};
 pub use signer::KeySigner;

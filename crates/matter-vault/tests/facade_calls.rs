@@ -222,17 +222,46 @@ const FACADE_CALLS: &[(&str, &str, &str, &str, &[&str])] = &[
         "revoke_project_secrets_agent",
         &["org", "project", "who"],
     ),
+    // --- keys ---
+    // Member-signed, never key-signed: the runtime puts the roster calls on its
+    // never-admitted list so a key cannot widen itself. `keys.lookup` is a
+    // runtime-API read, not an extrinsic, so it has no row here.
+    (
+        "keys",
+        "authorize",
+        "Budgets",
+        "authorize_agent_key",
+        &["key", "scopes"],
+    ),
+    ("keys", "revoke", "Budgets", "revoke_agent_key", &["key"]),
 ];
+
+/// Façade methods that are **reads**, not extrinsics: `(façade, method,
+/// state_call, ordered arg names)`.
+///
+/// They need pinning for the same reason the extrinsics do — a binding that
+/// grows or drops one has drifted — but they route through a runtime API rather
+/// than a `(pallet, call)` pair, so they cannot share the table above without
+/// giving every row two meanings.
+const FACADE_RUNTIME_API_CALLS: &[(&str, &str, &str, &[&str])] =
+    &[("keys", "lookup", "BudgetsApi_agent_key", &["key"])];
 
 #[test]
 fn every_row_is_unique() {
     // A duplicated (façade, method) row would let two rows disagree about the
-    // same method and still pass.
+    // same method and still pass — and a method may not appear in both tables,
+    // since it cannot be an extrinsic and a read at once.
     let mut seen = BTreeSet::new();
     for (facade, method, ..) in FACADE_CALLS {
         assert!(
             seen.insert((*facade, *method)),
             "duplicate row for {facade}.{method}"
+        );
+    }
+    for (facade, method, ..) in FACADE_RUNTIME_API_CALLS {
+        assert!(
+            seen.insert((*facade, *method)),
+            "{facade}.{method} is pinned as both an extrinsic and a read"
         );
     }
 }
@@ -257,14 +286,48 @@ fn pallet_and_call_names_are_runtime_shaped() {
 }
 
 #[test]
-fn the_curated_facades_are_the_five_documented_ones() {
+fn runtime_api_rows_name_a_state_call() {
+    // `Trait_method`, which is what `state_call` takes — not a `pallet.call`.
+    for (facade, method, state_call, _) in FACADE_RUNTIME_API_CALLS {
+        let (trait_name, method_name) = state_call
+            .split_once('_')
+            .unwrap_or_else(|| panic!("{facade}.{method}: {state_call:?} is not Trait_method"));
+        assert!(
+            trait_name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_uppercase()),
+            "{facade}.{method}: {trait_name:?} should be the PascalCase runtime-API trait"
+        );
+        assert!(
+            method_name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
+            "{facade}.{method}: {method_name:?} should be snake_case"
+        );
+    }
+}
+
+#[test]
+fn the_curated_facades_are_the_six_documented_ones() {
     // The set of façades is a documented promise (README, docs/parity.md). Adding
-    // a sixth should be a deliberate act that updates those too, not a silent
+    // a seventh should be a deliberate act that updates those too, not a silent
     // consequence of adding a row.
-    let facades: BTreeSet<&str> = FACADE_CALLS.iter().map(|(f, ..)| *f).collect();
+    let facades: BTreeSet<&str> = FACADE_CALLS
+        .iter()
+        .map(|(f, ..)| *f)
+        .chain(FACADE_RUNTIME_API_CALLS.iter().map(|(f, ..)| *f))
+        .collect();
     assert_eq!(
         facades,
-        BTreeSet::from(["secrets", "deployments", "orgs", "resources", "staking"]),
+        BTreeSet::from([
+            "secrets",
+            "deployments",
+            "orgs",
+            "resources",
+            "staking",
+            "keys",
+        ]),
     );
 }
 
@@ -306,13 +369,29 @@ fn emit_facade_call_vectors() {
         })
         .collect();
 
+    let runtime_api_calls: Vec<_> = FACADE_RUNTIME_API_CALLS
+        .iter()
+        .map(|(facade, method, state_call, args)| {
+            json!({
+                "facade": facade,
+                "method": method,
+                "state_call": state_call,
+                "args": args,
+            })
+        })
+        .collect();
+
     let vectors = json!({
         "comment": "The curated typed façade surface. Every binding with a chain \
-                    client must expose exactly these (facade, method) pairs, each \
-                    mapping to the named (pallet, call) with these ordered args. \
-                    Method names are snake_case here; bindings apply their own \
-                    convention (TypeScript camelCases them).",
+                    client must expose exactly these (facade, method) pairs — the \
+                    union of both arrays, and no more. `calls` are extrinsics, each \
+                    mapping to the named (pallet, call) with these ordered args; \
+                    `runtime_api_calls` are reads routed through a `state_call` \
+                    instead, which is why they cannot share the same table. Method \
+                    names are snake_case here; bindings apply their own convention \
+                    (TypeScript camelCases them).",
         "calls": calls,
+        "runtime_api_calls": runtime_api_calls,
     });
 
     let path = concat!(

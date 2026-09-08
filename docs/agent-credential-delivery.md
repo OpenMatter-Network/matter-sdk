@@ -150,3 +150,25 @@ pub async fn recover_secret(
 (A third question — ship `recover_secret` here or inline it in the agent — was resolved by
 shipping it here. An earlier version-drift caveat about this checkout being `0.1.0` while the
 published line was at `0.9.x` is obsolete: the tree and its manifests are on the `1.0.0` line.)
+
+## The credential, since spec 322
+
+An agent credential is no longer just a seed. What the dashboard hands out is
+`(key seed, principal, scopes)` — but only the seed is a variable:
+
+```
+MATTER_API_KEY="0x…"
+# Acts as you (5Grwva…) with: deployments:w, secrets:r
+# Public key: 5D7JnW…
+```
+
+The principal and the scopes are **comments**. The SDK discovers both from the
+chain at connect (`BudgetsApi_agent_key`), so a credential that names a stale
+principal cannot cause the client to act on it, and a re-scope in the dashboard
+takes effect without reissuing anything.
+
+For this document's flow that changes one thing and leaves the rest alone: an
+agent whose key holds `Secrets:Read` can decrypt whatever its member can, so the
+per-secret `grant_access` to the agent's own account is no longer required. The
+seal, store and threshold-decrypt path is unchanged. See
+[`scoped-api-keys.md`](scoped-api-keys.md).

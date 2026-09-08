@@ -61,6 +61,12 @@ the core guarantees every binding agrees byte-for-byte. See [`docs/architecture.
 One string in, a working client out. The key is read from the environment — never from
 argv or source.
 
+**Your key acts as the member who minted it.** A key minted in the dashboard holds no
+authority and no balance of its own: it is a delegate on that member's account, bounded
+by the scopes they granted, and the member pays. The client resolves that at connect and
+wraps every write accordingly, so nothing about the code below changes either way. See
+[Keys and scopes](docs/client-guide.md#keys-and-scopes).
+
 ```ts
 import { MatterClient, ApiKey, Aad, storeSecret } from "@openmatter-network/matter-client";
 

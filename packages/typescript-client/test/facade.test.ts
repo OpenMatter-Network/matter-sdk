@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DeploymentsFacade,
+  KeysFacade,
   OrgsFacade,
   ResourcesFacade,
   SecretsFacade,
@@ -25,6 +26,13 @@ import {
 
 const vectorsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../testvectors");
 const fixture = JSON.parse(readFileSync(resolve(vectorsDir, "facade_calls.json"), "utf8")) as {
+  runtimeApiCalls?: never;
+  runtime_api_calls: Array<{
+    facade: string;
+    method: string;
+    state_call: string;
+    args: string[];
+  }>;
   calls: Array<{
     facade: string;
     method: string;
@@ -60,6 +68,8 @@ function facadeFor(name: string, host: FacadeHost): object {
       return new StakingFacade(host);
     case "orgs":
       return new OrgsFacade(host);
+    case "keys":
+      return new KeysFacade(host);
     default:
       throw new Error(`the fixture names an unknown façade: ${name}`);
   }
@@ -141,11 +151,36 @@ describe("façade parity", () => {
     expect([pallet, call]).toEqual([row.pallet, row.call]);
   });
 
+  it("routes every pinned read through the named state_call", async () => {
+    // Reads cannot go in the `calls` table — they have no (pallet, call) — but
+    // dropping one would still be drift, so they are pinned separately.
+    for (const row of fixture.runtime_api_calls) {
+      const seen: Uint8Array[] = [];
+      const host: FacadeHost = {
+        async tx() {
+          throw new Error("a read must not submit an extrinsic");
+        },
+        async agentKey(key: Uint8Array) {
+          seen.push(key);
+          return undefined;
+        },
+      };
+      const facade = facadeFor(row.facade, host) as Record<string, unknown>;
+      const method = facade[toCamel(row.method)];
+      expect(typeof method, `${row.facade}.${row.method} is missing`).toBe("function");
+      await (method as (...args: unknown[]) => Promise<unknown>).apply(facade, [
+        new Uint8Array(32),
+      ]);
+      expect(seen).toHaveLength(1);
+    }
+  });
+
   it("exposes no façade method the fixture does not pin", () => {
     // The other direction: an extra method here would be a surface Rust does not
-    // have, which is drift even though every fixture row passes.
+    // have, which is drift even though every fixture row passes. Both tables
+    // count — a façade's surface is their union.
     const expected = new Map<string, Set<string>>();
-    for (const row of fixture.calls) {
+    for (const row of [...fixture.calls, ...fixture.runtime_api_calls]) {
       const methods = expected.get(row.facade) ?? new Set<string>();
       methods.add(toCamel(row.method));
       expected.set(row.facade, methods);

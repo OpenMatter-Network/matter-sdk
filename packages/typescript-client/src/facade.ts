@@ -17,10 +17,13 @@ import type { Aad, EncryptedSecret, GrantTarget, StoreSecret } from "@openmatter
 import { aadBytes } from "@openmatter-network/matter-vault";
 
 import type { TxReceipt } from "./backend.js";
+import type { ScopeSet } from "./scopes.js";
 
-/** What a façade needs from the client: the ability to submit a named call. */
+/** What a façade needs from the client: the ability to submit a named call, and
+ * — for the one façade that reads — to resolve a key's grant. */
 export interface FacadeHost {
   tx(pallet: string, call: string, args: unknown[]): Promise<TxReceipt>;
+  agentKey?(key: Uint8Array): Promise<readonly [Uint8Array, ScopeSet] | undefined>;
 }
 
 /** The four-blob sealed envelope as the runtime's `EncryptedSecret` composite. */
@@ -261,5 +264,50 @@ export class OrgsFacade {
     who: Uint8Array,
   ): Promise<TxReceipt> {
     return this.host.tx("Budgets", "revoke_project_secrets_agent", [org, project, who]);
+  }
+}
+
+/**
+ * Minting and revoking member-tied API keys (`pallet-budgets`' roster calls).
+ *
+ * **These are member-signed.** A key can never call them on itself — the runtime
+ * puts the roster calls on its never-admitted list precisely so a key cannot
+ * widen its own authority — so reach for this façade from a client built on a
+ * human seed or an HSM signer. Calling `authorize` from a delegated client
+ * throws `ClientError` with `kind === "never-admitted"` before anything is
+ * submitted.
+ */
+export class KeysFacade {
+  constructor(private readonly host: FacadeHost) {}
+
+  /**
+   * Register `key` as an API key acting for the signer, with `scopes`.
+   *
+   * An upsert: it replaces whatever scoped definition `key` already holds on the
+   * signer, so re-scoping a live key is this same call.
+   */
+  async authorize(key: Uint8Array, scopes: ScopeSet): Promise<TxReceipt> {
+    return this.host.tx("Budgets", "authorize_agent_key", [key, scopes.bits]);
+  }
+
+  /**
+   * Revoke `key`, cutting off its authority — and its committee decrypt rights —
+   * from the next request onward.
+   */
+  async revoke(key: Uint8Array): Promise<TxReceipt> {
+    return this.host.tx("Budgets", "revoke_agent_key", [key]);
+  }
+
+  /**
+   * Who `key` acts for and what it may do, or `undefined` if it is not
+   * registered.
+   *
+   * A read, so it needs no signer and works on a read-only client.
+   */
+  async lookup(key: Uint8Array): Promise<readonly [Uint8Array, ScopeSet] | undefined> {
+    if (this.host.agentKey === undefined) {
+      throw new Error("this backend cannot resolve an api key's grant");
+    }
+    return this.host.agentKey(key);
   }
 }

@@ -209,3 +209,19 @@ func decryptErrorKind(t *testing.T, err error) string {
 	}
 	return de.Kind
 }
+
+// fakeAgentKeys answers BudgetsApi_agent_key without a chain, keeping the three
+// outcomes distinct: a grant, no grant, and a lookup that failed.
+type fakeAgentKeys struct {
+	delegation *Delegation
+	err        error
+	calls      [][]byte
+}
+
+func (f *fakeAgentKeys) AgentKey(key []byte) (*Delegation, error) {
+	f.calls = append(f.calls, key)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.delegation, nil
+}

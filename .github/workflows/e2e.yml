@@ -46,6 +46,20 @@ jobs:
       - name: Read-only client example (no key, no gas)
         working-directory: matter-sdk
         run: cargo run -p matter-client-example
+      # The delegated path, read-only: resolve the grant and print it. Skipped
+      # rather than failed when no scoped key is configured, because a fork has
+      # no access to the secret and this is not the check that guards the code —
+      # `scoped_keys_dev.rs` is, and it runs on a dev node.
+      - name: Scoped-key example (no gas)
+        working-directory: matter-sdk
+        env:
+          MATTER_DELEGATED_KEY: ${{ secrets.MATTER_DELEGATED_KEY }}
+        run: |
+          if [ -z "$MATTER_DELEGATED_KEY" ]; then
+            echo "MATTER_DELEGATED_KEY not set; skipping the delegated example"
+            exit 0
+          fi
+          MATTER_API_KEY="$MATTER_DELEGATED_KEY" cargo run -p matter-delegated-e2e
 
   rust:
     needs: read-only

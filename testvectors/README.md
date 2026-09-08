@@ -12,7 +12,9 @@ their crypto stays identical.
 | `open_secret.json` | a sealed secret + a real committee quorum; `openSecret` must recover `expected_plaintext_hex` |
 | `seed_formats.json` | one sr25519 secret in both encodings (`0x`-hex mini-secret and BIP39 mnemonic) must derive `account_id_hex` — pins key ingestion in every binding's companion signer library, and in the dashboard that mints API keys |
 | `api_keys.json` | the full API-key ingestion contract: `valid` keys must parse to `account_id_hex`, `invalid` keys must be rejected with the named error kind |
-| `facade_calls.json` | the curated façade surface: which `(façade, method)` pairs exist and which `(pallet, call)` each maps to — 30 rows across the five façades |
+| `facade_calls.json` | the curated façade surface: which `(façade, method)` pairs exist and which `(pallet, call)` each maps to — 32 rows across the six façades |
+| `scope_bits.json` | the `ScopeSet` wire contract for member-tied API keys: bit = `scope * 2 + access`, encoded as a bare `u32`, plus a truth table for `is_superset` where Read and Write are independent |
+| `required_scopes.json` | what each of the 155 calls of the ten scoped pallets requires of a delegated key — `required: null` for the 35 no key may ever make |
 
 `api_keys.json` is a deliberate **sibling** of `seed_formats.json`, not an extension of
 it. `seed_formats.json` is a positive derivation vector that the dashboard also replays;
@@ -40,6 +42,7 @@ cargo test -p matter-vault-core --test roundtrip -- --ignored
 cargo test -p matter-vault --test seed_formats -- --ignored
 cargo test -p matter-vault-key --test parse -- --ignored
 cargo test -p matter-vault --features chain --test facade_calls -- --ignored
+cargo test -p matter-vault --features chain --test scope_vectors -- --ignored
 ```
 
 `api_keys.json` is replayed by `crates/matter-vault-key/tests/parse.rs` (Rust),
@@ -50,6 +53,25 @@ and `packages/go/mattervault/facade_test.go` — each checks **both ways** (a fi
 row without a method fails, and a method without a row fails); Rust has no
 reflection, so its emitter test pins the same list instead. See
 [`../docs/parity.md`](../docs/parity.md).
+
+`scope_bits.json` and `required_scopes.json` are replayed the same way. They are
+fixtures rather than a shared implementation on purpose: a scope set is not
+cryptography, so it does not belong behind `matter-vault-ffi`, and the two
+`arg_sensitive` rows could not cross that boundary anyway without shipping the
+whole dynamic argument tree with them. Those two rows are marked in the fixture
+precisely because it can only pin their name-derived half — each binding covers
+the argument-dependent part in its own tests. `required_scopes.json` is generated
+against `testvectors/spec322_metadata.scale`, so regenerate that
+blob first when the runtime adds a call; the recipe is in
+`crates/matter-vault/src/chain/scopes_table.rs`.
+
+Two metadata blobs sit beside the JSON, for the same runtime in the two versions the
+bindings actually read. `spec322_metadata.scale` is **V15**, which is what subxt and
+@polkadot load and the only version carrying runtime-API declarations; Rust resolves
+`BudgetsApi_agent_key` from it. `spec322_metadata_v14.scale` is what `state_getMetadata`
+returns and all GSRPC and substrate-interface can decode, so it is the one Go pins its
+argument-sensitive scope rows against. Neither is a lesser copy of the other: each is
+what that binding sees in production.
 
 `open_secret.json` is large (~4 MB) because RLWE capsules and ZK proofs are large;
 that is the real wire size, which is itself worth pinning.

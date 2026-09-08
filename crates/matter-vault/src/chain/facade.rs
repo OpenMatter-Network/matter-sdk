@@ -23,7 +23,7 @@
 //! is the tripwire that catches it before a user does.
 
 use matter_vault_core::Aad;
-use matter_vault_key::AccountId;
+use matter_vault_key::{AccountId, ScopeSet};
 use subxt::dynamic::Value;
 
 use super::{MatterClient, TxReceipt};
@@ -477,6 +477,55 @@ fn option_value(value: Option<Value>) -> Value {
     match value {
         Some(v) => Value::unnamed_variant("Some", [v]),
         None => Value::unnamed_variant("None", []),
+    }
+}
+
+/// Minting and revoking member-tied API keys (`pallet-budgets`' roster calls).
+///
+/// **These are member-signed.** A key can never call them on itself — the
+/// runtime puts the roster calls on its never-admitted list precisely so a key
+/// cannot widen its own authority — so reach for this façade from a client built
+/// on a human seed or an HSM signer, which is to say a
+/// [`Mode::Direct`](super::Mode::Direct) one. Calling `authorize` from a
+/// delegated client returns [`SdkError::NeverAdmitted`](crate::SdkError::NeverAdmitted)
+/// before anything is submitted.
+pub struct Keys<'a>(pub(super) &'a MatterClient);
+
+impl Keys<'_> {
+    /// Register `key` as an API key acting for the signer, with `scopes`.
+    ///
+    /// An upsert: it replaces whatever scoped definition `key` already holds on
+    /// the signer, so re-scoping a live key is this same call.
+    pub async fn authorize(&self, key: AccountId, scopes: ScopeSet) -> Result<TxReceipt> {
+        self.0
+            .tx(
+                "Budgets",
+                "authorize_agent_key",
+                vec![
+                    Value::from_bytes(key.as_bytes()),
+                    Value::u128(u128::from(scopes.bits())),
+                ],
+            )
+            .await
+    }
+
+    /// Revoke `key`, cutting off its authority — and its committee decrypt
+    /// rights — from the next request onward.
+    pub async fn revoke(&self, key: AccountId) -> Result<TxReceipt> {
+        self.0
+            .tx(
+                "Budgets",
+                "revoke_agent_key",
+                vec![Value::from_bytes(key.as_bytes())],
+            )
+            .await
+    }
+
+    /// Who `key` acts for and what it may do, or `None` if it is not registered.
+    ///
+    /// A read, so it needs no signer and works on a read-only client.
+    pub async fn lookup(&self, key: AccountId) -> Result<Option<(AccountId, ScopeSet)>> {
+        self.0.agent_key(key).await
     }
 }
 

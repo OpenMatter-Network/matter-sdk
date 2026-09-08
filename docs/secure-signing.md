@@ -73,13 +73,19 @@ MATTER_API_KEY=0xfac7…479e   # never in argv, never in source
 
 **Stated plainly.** An `apiKey` is a private key your process holds. Anything that can
 read your process — a core dump, a debugger, a malicious transitive dependency, a heap
-snapshot from a crash reporter, `root` reading `/proc` — can read it; and anyone who
-holds it can request decryption of every secret that account is authorized for and
-submit every transaction it can pay for, until you rotate it. A KMS- or HSM-backed
-signer has no such window: the key is never in your address space, so compromising the
-process buys an attacker *use* of the key for as long as they hold the process, not
-*possession* of it forever. That difference is why bring-your-own-signer is still the
-recommendation.
+snapshot from a crash reporter, `root` reading `/proc` — can read it, and whoever holds
+it can act with it until you revoke it. A KMS- or HSM-backed signer has no such window:
+the key is never in your address space, so compromising the process buys an attacker
+*use* of the key for as long as they hold the process, not *possession* of it forever.
+That difference is why bring-your-own-signer is still the recommendation.
+
+What has changed is **how much a leaked key is worth**. A member-tied key is not an
+account with authority of its own — see [Scoped keys](#scoped-keys) below. It is a
+delegate holding a `ScopeSet` on its member's account, and a leak is bounded by that
+set: a key scoped `deployments:w` cannot move a token, touch staking, vote, read a
+secret, or mint another key, however long the attacker holds it. Revocation is one
+extrinsic and takes effect on the next request. That is a materially better trade than
+the old project-tied key, which was an account you funded and grants you attached.
 
 What `apiKey` buys in exchange is that a client can be built from one string, which is
 what makes CI jobs, agents, ephemeral workers, and single-file scripts possible at all.
@@ -110,12 +116,16 @@ compromised — see the trade above.
 
 ### Operating an apiKey safely
 
-1. **Scope it.** An `apiKey` is an account. Give it only the grants it needs
-   (`secrets.grantAccess` is per-account and per-secret) and only the balance it needs
-   for fees. A leak is then bounded by what that one account could do.
-2. **Rotate it.** Rotation is a new key plus a grant for the new account and a revoke
-   for the old — *not* a re-encryption. Ciphertext is bound to the committee's joint
-   key, not to yours, so rotating a signer costs two extrinsics and no cryptography.
+1. **Scope it, narrowly.** Mint it with the smallest `ScopeSet` that does the job, and
+   remember Read and Write are independent bits: a deployment agent wants
+   `deployments:w`, not `deployments:rw`, and a policy reader wants a Read bit and no
+   Write bit at all. Widening later is one call. A leak is bounded by the set.
+2. **Rotate it.** Rotation is `keys.authorize` for the new key and `keys.revoke` for
+   the old — *not* a re-encryption. Ciphertext is bound to the committee's joint key,
+   not to yours, so rotating a signer costs two extrinsics and no cryptography. One
+   caveat with teeth: a key holding `secrets:w` can `grantAccess` **to itself**, and
+   those grants **survive revocation**. Containment there is revoke, then sweep the
+   key's `User` grants over the member's secrets, then rotate.
 3. **Treat it as a bearer credential.** Unlike an HSM key it can leak by screenshot,
    paste, a committed `.env`, or a CI job printing its environment. Rotate on
    suspicion, not on proof.
@@ -124,6 +134,51 @@ compromised — see the trade above.
 5. **Read it from the environment or a secret manager, never argv.** The SDK's
    examples and errors only ever demonstrate the env path, so keys stay out of shell
    history and `ps` output.
+
+## Scoped keys
+
+Runtime spec 322 moved where an API key's authority lives. A key is still a raw sr25519
+keypair, but it is now registered by the **member it acts for**, as a `pallet_proxy`
+definition of type `Scoped(ScopeSet)` on that member's account. Every call it makes is
+dispatched as `proxy.proxy(member, null, call)` and runs **as the member**: ownership
+and role checks evaluate against them, gas is paid by their billing org or by them, and
+the runtime admits the call only if the key's set covers what that call requires.
+
+Three consequences worth internalising:
+
+- **The key's own account has no authority and no balance.** A directly signed call
+  from a member-tied key is refused in the pool for want of fees, not for want of
+  permission — which is why the SDK checks scopes locally and tells you which one is
+  missing, instead of letting you read a fee complaint and go looking for a funding bug.
+- **The member is accountable for the key.** `deployments:w` commits their balance to
+  compute settlement; `organization:w` is Admin-equivalent. There is no per-key spend
+  cap on chain.
+- **Read and Write are independent, and only `secrets:r` is enforced on chain.**
+  `SecretsApi_is_authorized` answers for a key exactly as it would for its member, so a
+  key with `secrets:r` no longer needs a per-secret grant to decrypt. Every other Read
+  bit is advisory until the service that serves that data enforces it.
+
+The client resolves all of this once at connect and tells you what it found:
+
+```
+INFO: acting for 5GrwvaEF… with scopes deployments:w, secrets:r
+```
+
+`client.mode()`, `client.principal()` and `client.scopes()` expose it. A key that
+resolves to `Direct` when you expected delegation is revoked, or minted against a
+different network — that log line is the first thing to check.
+
+Minting and revoking are **member-signed**; a key can never call them on itself,
+because the roster calls are on the runtime's never-admitted list precisely so a key
+cannot widen its own authority:
+
+```rust
+client.keys().authorize(agent_account, "deployments:w".parse()?).await?;
+client.keys().revoke(agent_account).await?;
+```
+
+Legacy project-tied keys (`orgs().authorize_secrets_agent`) keep working unchanged.
+Migrating one is: revoke the legacy key, mint a member-tied one.
 
 ## Dev-only local keys (and why they are still named that)
 

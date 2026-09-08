@@ -15,6 +15,7 @@ import (
 	"time"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/registry"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -32,6 +33,9 @@ const (
 type ChainClient struct {
 	api  *gsrpc.SubstrateAPI
 	meta *types.Metadata
+	// calls decodes call arguments for the argument-sensitive scope rows. Nil
+	// when the registry could not be built; see NewChainClient.
+	calls registry.CallRegistry
 }
 
 // ChainNode is one committee node as read from chain.
@@ -51,7 +55,15 @@ func NewChainClient(url string) (*ChainClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ChainClient{api: api, meta: meta}, nil
+	// The call registry lets the local scope check read a call's arguments, which
+	// two Jobs rows depend on. A runtime whose types this build cannot model
+	// leaves it nil, and the check falls back to the wider set by name — a
+	// degraded answer, never a wrong one — so this does not fail the connect.
+	calls, err := registry.NewFactory().CreateCallRegistry(meta)
+	if err != nil {
+		calls = nil
+	}
+	return &ChainClient{api: api, meta: meta, calls: calls}, nil
 }
 
 // Close releases the underlying websocket connection.
@@ -359,6 +371,23 @@ func (k KeyringSigner) SignExtrinsic(payload []byte) ([]byte, error) {
 // than assuming a fixed layout — see extrinsic.go for why. This is the single
 // submission path; every typed helper is a caller.
 func (c *ChainClient) SubmitCall(signer ExtrinsicSigner, call types.Call) (string, error) {
+	encoded, err := c.assemble(signer, call)
+	if err != nil {
+		return "", err
+	}
+	var txHash string
+	if err := c.api.Client.Call(&txHash, "author_submitExtrinsic", encoded); err != nil {
+		return "", fmt.Errorf("submit extrinsic: %w", err)
+	}
+	return txHash, nil
+}
+
+// assemble signs `call` and returns the hex-encoded extrinsic ready to submit.
+//
+// Split from SubmitCall so a submission that waits can hold on to the exact
+// bytes it sent: that string is how the extrinsic is later found in its block,
+// which avoids decoding this runtime's signed extensions a second time.
+func (c *ChainClient) assemble(signer ExtrinsicSigner, call types.Call) (string, error) {
 	ctx, err := c.signingContext(signer.AccountID())
 	if err != nil {
 		return "", err
@@ -375,12 +404,92 @@ func (c *ChainClient) SubmitCall(signer ExtrinsicSigner, call types.Call) (strin
 	if err != nil {
 		return "", err
 	}
+	return "0x" + hex.EncodeToString(full), nil
+}
+
+// TxReceipt is what a finalized extrinsic did.
+type TxReceipt struct {
+	// TxHash is the submitted extrinsic's hash.
+	TxHash string
+	// BlockHash is the finalized block it landed in.
+	BlockHash types.Hash
+	// ExtrinsicIndex is its position in that block.
+	ExtrinsicIndex uint32
+	// Events are the events it emitted, a wrapped call's included.
+	Events []Event
+}
+
+// Emitted reports whether this extrinsic emitted `pallet.name`.
+func (r TxReceipt) Emitted(pallet, name string) bool {
+	for _, e := range r.Events {
+		if e.Pallet == pallet && e.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// SubmitAndWatch signs and submits `call`, follows it to finalization, and reads
+// what it did from the block's events.
+//
+// The extrinsic is located by matching the exact bytes submitted, so this does
+// not depend on decoding a signed extrinsic whose extension list this client
+// deliberately hand-assembles.
+func (c *ChainClient) SubmitAndWatch(signer ExtrinsicSigner, call types.Call, timeout time.Duration) (TxReceipt, extrinsicOutcome, error) {
+	encoded, err := c.assemble(signer, call)
+	if err != nil {
+		return TxReceipt{}, extrinsicOutcome{}, err
+	}
+	if timeout <= 0 {
+		timeout = storeFinalityAttempts * storeFinalityInterval
+	}
 
 	var txHash string
-	if err := c.api.Client.Call(&txHash, "author_submitExtrinsic", "0x"+hex.EncodeToString(full)); err != nil {
-		return "", fmt.Errorf("submit extrinsic: %w", err)
+	if err := c.api.Client.Call(&txHash, "author_submitExtrinsic", encoded); err != nil {
+		// A key with no balance whose call the runtime will not admit is refused
+		// here, before any block: the caller needs the cause, not just the text.
+		return TxReceipt{}, extrinsicOutcome{}, wrapChainError(KindChain, "", err, "submit extrinsic: %v", err)
 	}
-	return txHash, nil
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(storeFinalityInterval)
+		head, err := c.api.RPC.Chain.GetFinalizedHead()
+		if err != nil {
+			continue
+		}
+		index, found, err := c.findExtrinsic(head, encoded)
+		if err != nil || !found {
+			continue
+		}
+		outcome, err := c.outcomeAt(head, index)
+		if err != nil {
+			return TxReceipt{}, extrinsicOutcome{}, err
+		}
+		receipt := TxReceipt{TxHash: txHash, BlockHash: head, ExtrinsicIndex: index, Events: outcome.Events}
+		return receipt, outcome, nil
+	}
+	return TxReceipt{}, extrinsicOutcome{}, chainErrorf(KindFinalityTimeout, "",
+		"not finalized within %v; the extrinsic may still land, so check the chain "+
+			"before resubmitting", timeout)
+}
+
+// findExtrinsic locates the submitted bytes among a block's extrinsics.
+func (c *ChainClient) findExtrinsic(blockHash types.Hash, encoded string) (uint32, bool, error) {
+	var block struct {
+		Block struct {
+			Extrinsics []string `json:"extrinsics"`
+		} `json:"block"`
+	}
+	if err := c.api.Client.Call(&block, "chain_getBlock", blockHash.Hex()); err != nil {
+		return 0, false, wrapChainError(KindChain, "", err, "read block %s: %v", blockHash.Hex(), err)
+	}
+	for i, xt := range block.Block.Extrinsics {
+		if strings.EqualFold(xt, encoded) {
+			return uint32(i), true, nil
+		}
+	}
+	return 0, false, nil
 }
 
 // signingContext gathers the chain and account state the signed extensions need.

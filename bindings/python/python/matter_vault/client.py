@@ -7,20 +7,120 @@ what the *endpoint* serves rather than what the caller configured.
 Needs ``substrate-interface``: ``pip install matter-vault[sdk]``.
 """
 
+import logging
 import os
 from typing import List, Optional
 
+from substrateinterface.utils.ss58 import ss58_decode, ss58_encode
+
 from .apikey import ApiKey
-from .chain import ChainClient, ChainError, TxReceipt, api_key_signer
+from .chain import (
+    ChainClient,
+    ChainError,
+    OuterDispatchError,
+    PoolRejectedError,
+    TxReceipt,
+    api_key_signer,
+)
 from .facade import (
     DeploymentsFacade,
+    KeysFacade,
     OrgsFacade,
     ResourcesFacade,
     SecretsFacade,
     StakingFacade,
 )
+from .scopes import ScopeSet, required_scopes
 
-__all__ = ["MatterClient", "ChainProperties", "Network", "TESTNET_RPC", "MAINNET_RPC"]
+__all__ = [
+    "MatterClient",
+    "ChainProperties",
+    "Network",
+    "KeyRevokedError",
+    "NeverAdmittedError",
+    "NotPermittedError",
+    "UnsponsoredError",
+    "TESTNET_RPC",
+    "MAINNET_RPC",
+]
+
+
+class KeyRevokedError(ChainError):
+    """This key's proxy is gone, or now points at a different member.
+
+    Confirmed against the chain rather than guessed: the pool rejection a
+    revoked key gets says only that nobody would pay.
+    """
+
+
+class UnsponsoredError(ChainError):
+    """The call is within this key's scopes, but nobody would pay for it."""
+
+
+class NotPermittedError(ChainError):
+    """A member-tied API key was asked for a call its scopes do not cover.
+
+    Caught before submission. The runtime would refuse it too, but a
+    balance-less delegated key is refused in the *pool*, for want of funds, so
+    the chain's own answer names neither the call nor the missing scope.
+    """
+
+
+class NeverAdmittedError(NotPermittedError):
+    """The call is admitted to no API key, whatever its scopes.
+
+    A subclass rather than a sibling: widening a key fixes a
+    :class:`NotPermittedError` and can never fix this one, so the distinction is
+    worth having — but code that already catches the general case keeps working.
+    """
+
+
+#: This client's diagnostics. A library should not decide where its output goes,
+#: so these go to a named logger and, by default, nowhere: an application that
+#: wants them calls logging.basicConfig().
+_log = logging.getLogger("matter_vault.client")
+
+#: Outcomes of re-reading the chain's grant.
+_REFRESH_UNCHANGED = "unchanged"
+_REFRESH_RESCOPED = "rescoped"
+_REFRESH_GONE = "gone"
+#: The lookup itself failed, so nothing new is known.
+_REFRESH_UNKNOWN = "unknown"
+
+#: pallet-proxy's complaint that no definition matches this (key, member) pair.
+_NOT_PROXY_ERROR = "NotProxy"
+
+
+def _after_refresh(previous, fresh) -> str:
+    """Compare a fresh grant against the one held.
+
+    Pure, so the rule worth pinning is pinned: a key whose grant is gone stays
+    delegated, and only a re-scope updates the cache.
+    """
+    if previous is None:
+        return _REFRESH_UNCHANGED
+    principal, scopes = previous
+    if fresh is None or fresh[0] != principal:
+        return _REFRESH_GONE
+    if fresh[1] != scopes.bits:
+        return _REFRESH_RESCOPED
+    return _REFRESH_UNCHANGED
+
+
+def _decode_account(text: str) -> bytes:
+    """``MATTER_PRINCIPAL`` as raw account bytes: ``0x``-hex or SS58."""
+    text = text.strip()
+    try:
+        if text.startswith("0x"):
+            raw = bytes.fromhex(text[2:])
+            if len(raw) != 32:
+                raise ValueError("expected 32 bytes")
+            return raw
+        return bytes.fromhex(ss58_decode(text))
+    except Exception as exc:
+        raise ValueError(
+            "MATTER_PRINCIPAL is neither 0x-prefixed hex nor a valid SS58 address"
+        ) from exc
 
 TESTNET_RPC = "wss://node2.testnet.openmatter.network"
 MAINNET_RPC = "wss://node1.mainnet.openmatter.network"
@@ -188,6 +288,9 @@ class MatterClient:
         self._confirm_mainnet = confirm_mainnet
         self._network = network
         self._enforce_network_guards()
+        # Guards first: refusing to touch mainnet unconfirmed should not cost a
+        # round trip, and a wrong-network client has nothing to resolve.
+        self._mode = self._resolve_mode()
 
     # --- constructors -------------------------------------------------------
 
@@ -299,6 +402,15 @@ class MatterClient:
         """The signing identity's SS58 address, or ``None`` if read-only."""
         return None if self._keypair is None else self._keypair.ss58_address
 
+    @property
+    def principal_address(self) -> Optional[str]:
+        """The member this client acts for, as SS58 — the form the dashboard
+        showed whoever minted the key. ``None`` when it acts as itself."""
+        principal = self.principal
+        if principal is None:
+            return None
+        return ss58_encode(principal, self._properties.ss58_prefix)
+
     def signer(self):
         """A committee ``Signer`` for this identity, so one key both submits
         extrinsics and authorizes ``/partial-decrypt`` requests."""
@@ -332,8 +444,187 @@ class MatterClient:
     # --- the generic surface ------------------------------------------------
 
     def tx(self, pallet: str, call: str, params: dict) -> TxReceipt:
-        """Sign and submit ``pallet.call(params)``, waiting for finalization."""
-        return self._chain.submit(self._require_keypair(), pallet, call, params)
+        """Sign and submit any call, waiting for finalization.
+
+        Under a member-tied API key the call is wrapped in ``proxy.proxy`` and
+        runs as the key's principal; under any other signer it is submitted
+        directly. Nothing about the caller's code changes either way.
+        """
+        self._refuse_if_out_of_scope(pallet, call, params)
+        try:
+            return self._chain.submit(
+                self._require_keypair(), pallet, call, params, principal=self.principal
+            )
+        except PoolRejectedError as exc:
+            raise self._explain_pool_rejection(pallet, call, params, exc) from exc
+        except OuterDispatchError as exc:
+            raise self._explain_outer_dispatch(pallet, call, exc) from exc
+
+    def _explain_pool_rejection(self, pallet, call, params, exc):
+        """Turn "nobody would pay" into the reason nobody would.
+
+        A pool rejection has two indistinguishable causes — the delegation is
+        gone, or the payer cannot cover it — so rather than guess from the text,
+        re-read the grant and let the chain's answer decide.
+        """
+        if not self.is_delegated:
+            return exc
+        outcome = self._refresh_delegation()
+        if outcome == _REFRESH_GONE:
+            return KeyRevokedError(
+                f"this key's proxy is gone or now points at a different member, so "
+                f"{pallet}.{call} was refused; mint a new key or have the member "
+                f"re-authorize this one",
+                pallet=pallet,
+                call=call,
+            )
+        if outcome == _REFRESH_RESCOPED:
+            # The scopes moved under us. If the call is now out of scope, name
+            # the missing one with the fresh set rather than blaming the payer.
+            try:
+                self._refuse_if_out_of_scope(pallet, call, params)
+            except NotPermittedError as rescoped:
+                return rescoped
+        if outcome == _REFRESH_UNKNOWN:
+            # The lookup failed too, so nothing new is known.
+            return exc
+        return UnsponsoredError(
+            f"{pallet}.{call} is within this key's scopes, but nobody would pay for it: "
+            f"{self.principal_address} and their billing org must cover the fee",
+            pallet=pallet,
+            call=call,
+        )
+
+    def _explain_outer_dispatch(self, pallet, call, exc):
+        """``Proxy.NotProxy`` means pallet-proxy found no definition for this
+        (key, member) pair — a revoked or rebound key, in practice. Confirm that
+        against the chain before saying so."""
+        if not self.is_delegated or exc.name != _NOT_PROXY_ERROR:
+            return exc
+        if self._refresh_delegation() == _REFRESH_GONE:
+            return KeyRevokedError(
+                f"this key's proxy is gone or now points at a different member, so "
+                f"{pallet}.{call} was refused; mint a new key or have the member "
+                f"re-authorize this one",
+                pallet=pallet,
+                call=call,
+            )
+        return exc
+
+    def _refresh_delegation(self) -> str:
+        """Re-read the chain's grant, updating the cached scopes if they moved.
+
+        A grant that is *gone* deliberately leaves this client delegated. A
+        revoked key that fell back to signing directly would fail the next call
+        for want of funds it was never meant to hold, and the caller would read
+        "cannot pay fees" instead of "your key was revoked".
+        """
+        account = self.account_id
+        if self._mode is None or account is None:
+            return _REFRESH_UNCHANGED
+        try:
+            fresh = self._chain.agent_key(account)
+        except ChainError:
+            return _REFRESH_UNKNOWN
+        outcome = _after_refresh(self._mode, fresh)
+        if outcome == _REFRESH_RESCOPED:
+            self._mode = (self._mode[0], ScopeSet.from_bits(fresh[1]))
+        return outcome
+
+    # --- delegation ---------------------------------------------------------
+
+    def _resolve_mode(self):
+        """Ask the chain who this client's key acts for.
+
+        ``MATTER_PRINCIPAL`` first: the escape hatch for a key whose pointer is
+        stale while its proxy still stands. The chain cannot then report the
+        scopes either, so it assumes the full set — the local pre-flight check
+        turns off and the runtime's filter decides alone. Assuming the empty set
+        would refuse every call locally and make the override useless, so the
+        override is loud rather than narrow.
+        """
+        account = self.account_id
+        if account is None:
+            return None
+
+        override = os.environ.get("MATTER_PRINCIPAL", "").strip()
+        if override:
+            _log.warning(
+                "MATTER_PRINCIPAL is set, so this client acts for %s "
+                "without asking the chain. Local scope checking is disabled; the "
+                "runtime still enforces.",
+                override,
+            )
+            return (_decode_account(override), ScopeSet.all())
+
+        resolved = self._chain.agent_key(account)
+        if resolved is None:
+            return None
+        principal, bits = resolved
+        scopes = ScopeSet.from_bits(bits)
+        # Said once, and worth saying: a key that was meant to be delegated but
+        # resolved direct is the first thing anyone debugging an unexplained fee
+        # rejection needs to see.
+        _log.info(
+            "acting for %s with scopes %s",
+            ss58_encode(principal, self._properties.ss58_prefix),
+            scopes,
+        )
+        return (principal, scopes)
+
+    @property
+    def is_delegated(self) -> bool:
+        """Whether this client's key acts for a member rather than for itself."""
+        return self._mode is not None
+
+    @property
+    def principal(self) -> Optional[bytes]:
+        """The member this client acts for, or ``None`` when it acts as itself."""
+        return None if self._mode is None else self._mode[0]
+
+    @property
+    def scopes(self):
+        """What this client's key may do, or ``None`` when the chain grants it no
+        scoped proxy."""
+        return None if self._mode is None else self._mode[1]
+
+    def _refuse_if_out_of_scope(self, pallet: str, call: str, params: dict) -> None:
+        """Refuse, before submitting, a call this client's key cannot make.
+
+        A courtesy, not a boundary: the runtime is the enforcer. It exists
+        because a delegated key holds no balance, so the chain's answer to "your
+        key may not do that" is a complaint about *fees* that names neither the
+        call nor the scope.
+        """
+        if self._mode is None:
+            return
+        target = f"{pallet}.{call}"
+
+        # The runtime never admits these inside a proxy, and nesting one would
+        # let a key launder authority through a batch.
+        if pallet in ("Proxy", "Utility", "EthSigning"):
+            raise NeverAdmittedError(
+                f"{target} is never admitted to an api key; sign it with the "
+                "member's own key",
+                pallet=pallet,
+                call=call,
+            )
+
+        required = required_scopes(pallet, call, params)
+        if required is None:
+            raise NeverAdmittedError(
+                f"{target} is never admitted to an api key; sign it with the "
+                "member's own key",
+                pallet=pallet,
+                call=call,
+            )
+        held = self._mode[1]
+        if not held.is_superset(required):
+            raise NotPermittedError(
+                f"key lacks {required} for {target}; it holds {held}",
+                pallet=pallet,
+                call=call,
+            )
 
     def query(self, pallet: str, entry: str, keys: Optional[List] = None):
         """Read any storage entry. ``None`` means absent."""
@@ -372,6 +663,16 @@ class MatterClient:
     def staking(self) -> StakingFacade:
         """Staking on MatterChain, including nomination pools."""
         return StakingFacade(self)
+
+    @property
+    def keys(self) -> KeysFacade:
+        """Minting and revoking member-tied API keys.
+
+        Member-signed: a key can never call these on itself, because the runtime
+        puts the roster calls on its never-admitted list precisely so a key
+        cannot widen its own authority.
+        """
+        return KeysFacade(self)
 
     @property
     def orgs(self) -> OrgsFacade:
@@ -433,14 +734,14 @@ class MatterClient:
 
         if properties.decimals_disagree:
             # Loud once, then trust the runtime. Quiet success, loud surprise.
-            import sys
-
-            print(
-                f"WARNING: {properties.chain_name} reports tokenDecimals="
-                f"{declared} in its chain spec but is executing a runtime whose "
-                f"ExistentialDeposit implies {effective}. Using {effective} for "
-                "all arithmetic.",
-                file=sys.stderr,
+            _log.warning(
+                "%s reports tokenDecimals=%d in its chain spec but is executing a "
+                "runtime whose ExistentialDeposit implies %d. Using %d for all "
+                "arithmetic.",
+                properties.chain_name,
+                declared,
+                effective,
+                effective,
             )
         return properties
 

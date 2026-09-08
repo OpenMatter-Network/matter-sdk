@@ -57,7 +57,17 @@ pub use matter_vault_core::{self, encrypt, Aad, CoreError, EncryptedSecret, Plai
 // Likewise the key surface: an ApiKey is a Signer, so callers should not have to
 // name a second crate to build one.
 #[doc(inline)]
-pub use matter_vault_key::{AccountId, ApiKey, KeyError, KeyScheme, KeySigner};
+pub use matter_vault_key::{
+    Access,
+    AccountId,
+    ApiKey,
+    KeyError,
+    KeyScheme,
+    KeySigner,
+    Scope,
+    ScopeParseError,
+    ScopeSet,
+};
 pub use signer::{partial_decrypt_auth, RequestAuth, Signer, SigningRequest, Sr25519Signer};
 pub use transport::{Health, ReqwestTransport, Transport};
 

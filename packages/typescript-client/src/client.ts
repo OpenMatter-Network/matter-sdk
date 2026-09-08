@@ -12,15 +12,18 @@ import {
   oneToken,
   parseAmount,
 } from "./amount.js";
-import type { ChainBackend, TxReceipt } from "./backend.js";
+import type { ChainBackend, Mode, TxReceipt } from "./backend.js";
 import { ClientError } from "./errors.js";
+import { defaultLogger, type ClientLogger } from "./logger.js";
 import {
   DeploymentsFacade,
+  KeysFacade,
   OrgsFacade,
   ResourcesFacade,
   SecretsFacade,
   StakingFacade,
 } from "./facade.js";
+import { ScopeSet, requiredScopes } from "./scopes.js";
 import {
   CONFIRM_ENV,
   CONFIRM_VALUE,
@@ -49,7 +52,15 @@ export interface MatterConfig {
    * testable without a node.
    */
   backend?: ChainBackend;
+  /**
+   * Where this client's two connect diagnostics go: which member a key acts
+   * for, and a chain whose declared decimals disagree with its runtime.
+   * Defaults to the console. Pass your own to route them, or a pair of no-ops
+   * to silence them — a library should not decide that for its host.
+   */
+  logger?: ClientLogger;
 }
+
 
 const DEFAULT_FINALITY_TIMEOUT_MS = 120_000;
 
@@ -158,13 +169,15 @@ export class MatterClient {
     signer: KeySigner | undefined,
   ): Promise<MatterClient> {
     const network = config.network ?? Network.Testnet;
-    const backend = config.backend ?? (await MatterClient.#connectBackend(config, network, signer));
+    const logger = config.logger ?? defaultLogger;
+    const backend =
+      config.backend ?? (await MatterClient.#connectBackend(config, network, signer, logger));
     const properties = await backend.properties();
 
     if (decimalsDisagree(properties)) {
       // Loud once, then trust the runtime. Quiet success, loud surprise.
-      console.warn(
-        `WARNING: ${properties.chainName} reports tokenDecimals=` +
+      logger.warn(
+        `${properties.chainName} reports tokenDecimals=` +
           `${properties.tokenDecimalsDeclared} in its chain spec but is executing a ` +
           `runtime whose ExistentialDeposit implies ${properties.tokenDecimalsEffective}. ` +
           `Using ${properties.tokenDecimalsEffective} for all arithmetic.`,
@@ -185,6 +198,7 @@ export class MatterClient {
     config: MatterConfig,
     network: Network,
     signer: KeySigner | undefined,
+    logger: ClientLogger,
   ): Promise<ChainBackend> {
     const url = config.rpcUrl ?? defaultRpcUrl(network);
     if (url === undefined) {
@@ -193,7 +207,7 @@ export class MatterClient {
     // Imported lazily so the guards and arithmetic can be unit-tested — and a
     // caller can inject a backend — without pulling in @polkadot/api.
     const { PolkadotBackend } = await import("./polkadot.js");
-    return PolkadotBackend.connect(url, signer);
+    return PolkadotBackend.connect(url, signer, logger);
   }
 
   /**
@@ -293,6 +307,7 @@ export class MatterClient {
     if (this.#signer === undefined) throw ClientError.readOnly();
 
     const target = `${pallet}.${call}`;
+    this.#refuseIfOutOfScope(pallet, call, args, target);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(
@@ -306,6 +321,74 @@ export class MatterClient {
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
+  }
+
+  /**
+   * Refuse, before submitting, a call this client's key cannot make.
+   *
+   * Lives here rather than in the backend because it needs no chain access —
+   * keeping `ChainBackend` a dumb "sign and send exactly this" seam. It is a
+   * courtesy, not a boundary: the runtime is the enforcer, and this exists so a
+   * caller reads which scope is missing instead of the fee complaint a
+   * balance-less delegated key actually gets from the pool.
+   */
+  #refuseIfOutOfScope(pallet: string, call: string, args: unknown[], target: string): void {
+    const mode = this.mode;
+    if (mode.kind !== "delegated") return;
+
+    // The runtime never admits these inside a proxy, and nesting one would let
+    // a key launder authority through a batch.
+    if (pallet === "Proxy" || pallet === "Utility" || pallet === "EthSigning") {
+      throw ClientError.neverAdmitted(target);
+    }
+
+    const required = requiredScopes(pallet, call, args);
+    if (required === null) throw ClientError.neverAdmitted(target);
+    if (!mode.scopes.isSuperset(required)) {
+      throw ClientError.notPermitted(target, required.toString(), mode.scopes.toString());
+    }
+  }
+
+  /**
+   * Who this client's signature speaks for.
+   *
+   * A member-tied API key is `delegated` and every write it makes runs as its
+   * principal; anything else is `direct`.
+   */
+  get mode(): Mode {
+    return this.#backend.mode?.() ?? { kind: "direct" };
+  }
+
+  /** The member this client acts for, or `undefined` when it acts as itself. */
+  get principal(): Uint8Array | undefined {
+    const mode = this.mode;
+    return mode.kind === "delegated" ? mode.principal : undefined;
+  }
+
+  /** The member's SS58 address, or `undefined` when this client acts as itself. */
+  get principalAddress(): string | undefined {
+    const principal = this.principal;
+    return principal === undefined ? undefined : this.#backend.encodeAddress(principal);
+  }
+
+  /**
+   * Who `key` acts for and what it may do, per the chain — `undefined` if it
+   * holds no scoped proxy.
+   *
+   * Needs no signer, so it works on a read-only client.
+   */
+  async agentKey(key: Uint8Array): Promise<readonly [Uint8Array, ScopeSet] | undefined> {
+    if (this.#backend.agentKey === undefined) {
+      throw ClientError.config("this backend cannot resolve an api key's grant");
+    }
+    return this.#backend.agentKey(key);
+  }
+
+  /** What this client's key may do, or `undefined` when the chain grants it no
+   * scoped proxy. */
+  get scopes(): ScopeSet | undefined {
+    const mode = this.mode;
+    return mode.kind === "delegated" ? mode.scopes : undefined;
   }
 
   /**
@@ -357,6 +440,18 @@ export class MatterClient {
   /** Organizations and budgets. */
   get orgs(): OrgsFacade {
     return new OrgsFacade(this);
+  }
+
+  /**
+   * Minting and revoking member-tied API keys.
+   *
+   * Member-signed: a key can never call these on itself, because the runtime
+   * puts the roster calls on its never-admitted list precisely so a key cannot
+   * widen its own authority. Reach for this from a client built on a human seed
+   * or an HSM signer.
+   */
+  get keys(): KeysFacade {
+    return new KeysFacade(this);
   }
 
   /** Release the connection. */

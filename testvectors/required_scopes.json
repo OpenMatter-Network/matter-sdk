@@ -1,0 +1,1090 @@
+{
+  "calls": [
+    {
+      "arg_sensitive": true,
+      "call": "request_deployment",
+      "pallet": "Jobs",
+      "required": 18,
+      "required_text": "deployments:w, secrets:r"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "cancel_deployment",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_deployment_status",
+      "pallet": "Jobs",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "report_tls_status",
+      "pallet": "Jobs",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "register_wg_peer",
+      "pallet": "Jobs",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_wg_peer",
+      "pallet": "Jobs",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_network",
+      "pallet": "Jobs",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_env",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": true,
+      "call": "set_deployment_secret_ref",
+      "pallet": "Jobs",
+      "required": 18,
+      "required_text": "deployments:w, secrets:r"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_image",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_launch",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_session",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "join_as_participant",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_ready",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "assign_compute_node",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "attest_input_proof",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "submit_input_commitment",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "submit_output_share_commitments",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "ack_result",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "complete_session",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "cancel_session",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "bind_overlay_network",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_overlay_for_session",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "attest_preproc",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_compute_node_image",
+      "pallet": "Collaborations",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_compute_node_sku_id",
+      "pallet": "Collaborations",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "report_compute_node_pubkeys",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "attest_compute_node_pubkeys",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "expire_attestation",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "replace_compute_node",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "join_session_overlay",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "start_session",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_schema_commitment",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "submit_schema_commitment",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_circuit",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "invite_participant",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_invite",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "expire_lobby",
+      "pallet": "Collaborations",
+      "required": 8,
+      "required_text": "collaborations:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "store_secret",
+      "pallet": "Secrets",
+      "required": 32,
+      "required_text": "secrets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "grant_access",
+      "pallet": "Secrets",
+      "required": 32,
+      "required_text": "secrets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_access",
+      "pallet": "Secrets",
+      "required": 32,
+      "required_text": "secrets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_secret",
+      "pallet": "Secrets",
+      "required": 32,
+      "required_text": "secrets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "rotate_secret",
+      "pallet": "Secrets",
+      "required": 32,
+      "required_text": "secrets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_volume",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "confirm_ready",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_volume",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "retire_volume",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_volume",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_backup_policy",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "record_backup",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "restore_backup",
+      "pallet": "Volumes",
+      "required": 128,
+      "required_text": "volumes:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "register_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "publish_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_metadata",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "transfer_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "retire_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "purge_dataset_likes",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "like_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "unlike_dataset",
+      "pallet": "Datasets",
+      "required": 512,
+      "required_text": "datasets:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_delist_dataset",
+      "pallet": "Datasets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_restore_dataset",
+      "pallet": "Datasets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_delete_dataset",
+      "pallet": "Datasets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_network",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "invite_account",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "accept_invite",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "decline_invite",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_invite",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "expire_invite",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "join_as_peer",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "join_as_client",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "publish_endpoint",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "leave_network_as_member",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "leave_network",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_member",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "close_network",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "add_deployment_peer",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_deployment_peer",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "report_consumption",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "register_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "request_consumption_report",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_sku",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_sku",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "report_capacity",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "reactivate_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_resource_privacy",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "add_to_whitelist",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_from_whitelist",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_resource_name",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "register_org_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "register_private_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_provider_min_stake",
+      "pallet": "Resources",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_org",
+      "pallet": "Organizations",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "add_member",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_member_role",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_member",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_project",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "assign_to_project",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "unassign_from_project",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "add_project_deployment_peer",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_project",
+      "pallet": "Organizations",
+      "required": 32768,
+      "required_text": "organization:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_org",
+      "pallet": "Organizations",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "fund_org_treasury",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "allot",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "defund_project",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "withdraw_org_treasury",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "authorize_project_deployer",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_project_deployer",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "claim_sponsorship",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "transfer_sponsorship",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "authorize_project_secrets_agent",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_project_secrets_agent",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_plan_allotment",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "add_purchased_allotment",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_purchased_allotment",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_member_billing",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "clear_member_billing",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "authorize_org_resource_operator",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_org_resource_operator",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "bond_org_stake",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "unbond_org_stake",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "withdraw_org_stake",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "approve_sponsor",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_member_gas_limit",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "authorize_agent_key",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_agent_key",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_community",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "update_metadata",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_visibility",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "archive_community",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "purge_community_members",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_confidential_members",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "delete_community",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "join_community",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "leave_community",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "invite_member",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "accept_invite",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "decline_invite",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "revoke_invite",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_member_role",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "remove_member",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "transfer_ownership",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "vouch_member",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "unvouch_member",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "link_dataset",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "unlink_dataset",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "prune_dead_link",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "create_proposal",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "vote_proposal",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "close_proposal",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "cancel_proposal",
+      "pallet": "Communities",
+      "required": 524288,
+      "required_text": "communities:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_delist_community",
+      "pallet": "Communities",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_restore_community",
+      "pallet": "Communities",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "force_delete_community",
+      "pallet": "Communities",
+      "required": null,
+      "required_text": null
+    }
+  ],
+  "comment": "What each call requires of a delegated key, mirroring matter-node's runtime/src/configs/budgets.rs::required_scopes. `required: null` means no scope set admits the call at all. Rows with `arg_sensitive: true` depend on the call's arguments too: the value here is the one the SDK uses when it cannot read the arguments, which is deliberately the wider set. Replay this BOTH ways — a row with no local classification and a local classification with no row are both drift."
+}

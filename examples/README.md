@@ -6,6 +6,7 @@ Three kinds, in increasing order of what they touch.
 |---|---|---|---|
 | [`rust`](rust) · [`typescript/demo.ts`](typescript) | none | no | seal and recover against an in-process committee |
 | [`client-rust`](client-rust) · [`client-typescript`](client-typescript) · [`client-python`](client-python) · [`client-go`](client-go) | testnet | **no**, unless `MATTER_SUBMIT=yes` | connect from an `apiKey`, read any pallet, and see what submission would look like |
+| [`delegated-e2e`](delegated-e2e) | testnet | **no**, unless `MATTER_SUBMIT=yes` | what a member-tied scoped key can and cannot do: the grant it resolves, a write wrapped as its member, and the two refusals that never reach the chain |
 | [`rust-e2e`](rust-e2e) · [`e2e`](e2e) (TypeScript) · [`python-e2e`](python-e2e) · [`go-e2e`](go-e2e) | testnet | **yes** | the full round trip: seal → `secrets.storeSecret` → read back → threshold-decrypt |
 
 Start with a `client-*` example. It is read-only by default, so it cannot cost
@@ -26,6 +27,7 @@ from argv** — argv lands in shell history and `ps` output.
 | `MATTER_SUBMIT` | — | must be `yes` before a `client-*` example submits anything |
 | `MATTER_SECRET` | a sample env line | plaintext to seal (e2e only) |
 | `MATTER_SECRET_ID` | — | act on an existing secret instead of storing a new one |
+| `MATTER_PRINCIPAL` | — | force the member a key acts for, when the chain's pointer is stale. An escape hatch: it turns the local scope check off and lets the runtime decide alone |
 | `MATTER_AAD` | `env` | which AAD registry tag to seal under (e2e only) |
 
 Two guards are worth knowing about because they are what stop an expensive
@@ -43,6 +45,9 @@ mistake:
 ```bash
 # Rust — read-only against testnet
 MATTER_API_KEY=$TEST_KEY cargo run -p matter-client-example
+
+# A member-tied scoped key: what it acts as, and what it is refused
+MATTER_API_KEY=$MATTER_DELEGATED_KEY cargo run -p matter-delegated-e2e
 
 # TypeScript
 cd examples/client-typescript && npm install && MATTER_API_KEY=$TEST_KEY npm start

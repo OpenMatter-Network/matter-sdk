@@ -279,3 +279,47 @@ func optionU128(value *SecretID) []byte {
 	le := value.LEBytes()
 	return append([]byte{0x01}, le[:]...) // Some(u128)
 }
+
+// --- keys ------------------------------------------------------------------
+
+// KeysFacade covers pallet-budgets' roster calls: minting and revoking
+// member-tied API keys.
+//
+// These are member-signed. A key can never call them on itself — the runtime
+// puts the roster calls on its never-admitted list precisely so a key cannot
+// widen its own authority — so reach for this façade from a client built on a
+// human seed or an HSM signer. Calling Authorize from a delegated client is
+// refused before anything is submitted.
+type KeysFacade struct{ client *MatterClient }
+
+// Keys returns the keys façade.
+func (c *MatterClient) Keys() KeysFacade { return KeysFacade{c} }
+
+// Authorize registers key as an API key acting for the signer, with scopes.
+//
+// An upsert: it replaces whatever scoped definition key already holds on the
+// signer, so re-scoping a live key is this same call.
+func (f KeysFacade) Authorize(key []byte, scopes ScopeSet) (string, error) {
+	account, err := types.NewAccountID(key)
+	if err != nil {
+		return "", fmt.Errorf("api key account id: %w", err)
+	}
+	return f.client.call("Budgets", "authorize_agent_key",
+		*account, types.NewU32(scopes.Bits()))
+}
+
+// Revoke withdraws key's authority — and its committee decrypt rights — from the
+// next request onward.
+func (f KeysFacade) Revoke(key []byte) (string, error) {
+	account, err := types.NewAccountID(key)
+	if err != nil {
+		return "", fmt.Errorf("api key account id: %w", err)
+	}
+	return f.client.call("Budgets", "revoke_agent_key", *account)
+}
+
+// Lookup reports who key acts for and what it may do, or nil if it is not
+// registered. A read, so it needs no signer and works on a read-only client.
+func (f KeysFacade) Lookup(key []byte) (*Delegation, error) {
+	return f.client.AgentKey(key)
+}

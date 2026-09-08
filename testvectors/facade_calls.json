@@ -293,7 +293,36 @@
       "facade": "orgs",
       "method": "revoke_secrets_agent",
       "pallet": "Budgets"
+    },
+    {
+      "args": [
+        "key",
+        "scopes"
+      ],
+      "call": "authorize_agent_key",
+      "facade": "keys",
+      "method": "authorize",
+      "pallet": "Budgets"
+    },
+    {
+      "args": [
+        "key"
+      ],
+      "call": "revoke_agent_key",
+      "facade": "keys",
+      "method": "revoke",
+      "pallet": "Budgets"
     }
   ],
-  "comment": "The curated typed façade surface. Every binding with a chain client must expose exactly these (facade, method) pairs, each mapping to the named (pallet, call) with these ordered args. Method names are snake_case here; bindings apply their own convention (TypeScript camelCases them)."
+  "comment": "The curated typed façade surface. Every binding with a chain client must expose exactly these (facade, method) pairs — the union of both arrays, and no more. `calls` are extrinsics, each mapping to the named (pallet, call) with these ordered args; `runtime_api_calls` are reads routed through a `state_call` instead, which is why they cannot share the same table. Method names are snake_case here; bindings apply their own convention (TypeScript camelCases them).",
+  "runtime_api_calls": [
+    {
+      "args": [
+        "key"
+      ],
+      "facade": "keys",
+      "method": "lookup",
+      "state_call": "BudgetsApi_agent_key"
+    }
+  ]
 }

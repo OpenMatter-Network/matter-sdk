@@ -28,17 +28,33 @@ type facadeRow struct {
 	Args   []string `json:"args"`
 }
 
-func loadFacadeRows(t *testing.T) []facadeRow {
+// runtimeAPIRow is a façade method that reads through a state_call rather than
+// submitting an extrinsic, so it has no (pallet, call) to pin.
+type runtimeAPIRow struct {
+	Facade    string   `json:"facade"`
+	Method    string   `json:"method"`
+	StateCall string   `json:"state_call"`
+	Args      []string `json:"args"`
+}
+
+func loadFacadeFixture(t *testing.T) ([]facadeRow, []runtimeAPIRow) {
 	t.Helper()
 	var doc struct {
-		Calls []facadeRow `json:"calls"`
+		Calls          []facadeRow     `json:"calls"`
+		RuntimeAPICall []runtimeAPIRow `json:"runtime_api_calls"`
 	}
 	load(t, "facade_calls.json", &doc)
 	if len(doc.Calls) < 20 {
 		// A silently truncated fixture would make every assertion below vacuous.
 		t.Fatalf("facade_calls.json has only %d rows; regenerate it", len(doc.Calls))
 	}
-	return doc.Calls
+	return doc.Calls, doc.RuntimeAPICall
+}
+
+func loadFacadeRows(t *testing.T) []facadeRow {
+	t.Helper()
+	calls, _ := loadFacadeFixture(t)
+	return calls
 }
 
 // facadeTypes maps a fixture façade name to the Go type implementing it.
@@ -48,6 +64,7 @@ var facadeTypes = map[string]reflect.Type{
 	"resources":   reflect.TypeOf(ResourcesFacade{}),
 	"staking":     reflect.TypeOf(StakingFacade{}),
 	"orgs":        reflect.TypeOf(OrgsFacade{}),
+	"keys":        reflect.TypeOf(KeysFacade{}),
 }
 
 // goMethodName converts the fixture's snake_case method to Go's PascalCase.
@@ -85,11 +102,40 @@ func TestEveryPinnedFacadeMethodExists(t *testing.T) {
 	}
 }
 
+func TestEveryPinnedReadExists(t *testing.T) {
+	// Reads cannot go in the calls table — they have no (pallet, call) — but
+	// dropping one would still be drift, so they are pinned separately.
+	_, reads := loadFacadeFixture(t)
+	if len(reads) == 0 {
+		t.Fatal("facade_calls.json pins no runtime-API reads; regenerate it")
+	}
+	for _, row := range reads {
+		facadeType, ok := facadeTypes[row.Facade]
+		if !ok {
+			t.Errorf("the fixture names an unknown façade: %s", row.Facade)
+			continue
+		}
+		name := goMethodName(row.Method)
+		if _, found := facadeType.MethodByName(name); !found {
+			t.Errorf("%s.%s is missing (fixture read %s.%s)",
+				facadeType.Name(), name, row.Facade, row.Method)
+		}
+	}
+}
+
 func TestNoFacadeMethodIsUnpinned(t *testing.T) {
 	// The other direction: an extra method here would be a surface Rust does not
-	// have, which is drift even though every fixture row passes.
+	// have, which is drift even though every fixture row passes. Both tables
+	// count — a façade's surface is their union.
+	calls, reads := loadFacadeFixture(t)
 	pinned := map[string]map[string]bool{}
-	for _, row := range loadFacadeRows(t) {
+	for _, row := range calls {
+		if pinned[row.Facade] == nil {
+			pinned[row.Facade] = map[string]bool{}
+		}
+		pinned[row.Facade][goMethodName(row.Method)] = true
+	}
+	for _, row := range reads {
 		if pinned[row.Facade] == nil {
 			pinned[row.Facade] = map[string]bool{}
 		}
@@ -109,11 +155,15 @@ func TestNoFacadeMethodIsUnpinned(t *testing.T) {
 	}
 }
 
-func TestTheCuratedFacadesAreTheFiveDocumentedOnes(t *testing.T) {
+func TestTheCuratedFacadesAreTheSixDocumentedOnes(t *testing.T) {
 	// The set of façades is a documented promise (README, docs/parity.md). Adding a
-	// sixth should be a deliberate act that updates those too.
+	// seventh should be a deliberate act that updates those too.
+	calls, reads := loadFacadeFixture(t)
 	seen := map[string]bool{}
-	for _, row := range loadFacadeRows(t) {
+	for _, row := range calls {
+		seen[row.Facade] = true
+	}
+	for _, row := range reads {
 		seen[row.Facade] = true
 	}
 	if len(seen) != len(facadeTypes) {
@@ -130,7 +180,9 @@ func TestClientExposesEveryFacadeAccessor(t *testing.T) {
 	// The accessors are the API; a missing one makes the façade unreachable even
 	// though its type is fine.
 	clientType := reflect.TypeOf(&MatterClient{})
-	for _, accessor := range []string{"Secrets", "Deployments", "Resources", "Staking", "Orgs"} {
+	for _, accessor := range []string{
+		"Secrets", "Deployments", "Resources", "Staking", "Orgs", "Keys",
+	} {
 		if _, ok := clientType.MethodByName(accessor); !ok {
 			t.Errorf("MatterClient.%s() is missing", accessor)
 		}

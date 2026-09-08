@@ -24,12 +24,26 @@ the same names the fixture pins.
 
 from typing import Any, Dict, List, Optional
 
+
+def _account_arg(account: Any) -> Any:
+    """An account argument in the form scalecodec accepts.
+
+    ``lookup`` takes raw bytes because that is what the runtime API returns, so
+    the mint and revoke calls beside it must take them too. Passing the bytes
+    straight through fails inside scalecodec with a message about
+    ``startswith``, which says nothing about accounts.
+    """
+    if isinstance(account, (bytes, bytearray)):
+        return "0x" + bytes(account).hex()
+    return account
+
 __all__ = [
     "SecretsFacade",
     "DeploymentsFacade",
     "ResourcesFacade",
     "StakingFacade",
     "OrgsFacade",
+    "KeysFacade",
 ]
 
 
@@ -281,3 +295,46 @@ class OrgsFacade(_Facade):
             "revoke_project_secrets_agent",
             {"org": org, "project": project, "who": who},
         )
+
+
+class KeysFacade(_Facade):
+    """Minting and revoking member-tied API keys (``pallet-budgets``' roster calls).
+
+    **These are member-signed.** A key can never call them on itself — the
+    runtime puts the roster calls on its never-admitted list precisely so a key
+    cannot widen its own authority — so reach for this façade from a client built
+    on a human seed or a keypair. Calling ``authorize`` from a delegated client
+    raises before anything is submitted.
+    """
+
+    def authorize(self, key: Any, scopes: Any):
+        """Register ``key`` as an API key acting for the signer, with ``scopes``.
+
+        An upsert: it replaces whatever scoped definition ``key`` already holds
+        on the signer, so re-scoping a live key is this same call.
+
+        ``scopes`` may be a :class:`~matter_vault.scopes.ScopeSet` or its raw
+        ``u32`` bits — the runtime takes a bare integer either way.
+        """
+        bits = scopes.bits if hasattr(scopes, "bits") else int(scopes)
+        return self._tx(
+            "Budgets", "authorize_agent_key", {"key": _account_arg(key), "scopes": bits}
+        )
+
+    def revoke(self, key: Any):
+        """Revoke ``key``, cutting off its authority — and its committee decrypt
+        rights — from the next request onward."""
+        return self._tx("Budgets", "revoke_agent_key", {"key": _account_arg(key)})
+
+    def lookup(self, key: bytes):
+        """Who ``key`` acts for and what it may do, or ``None`` if unregistered.
+
+        A read, so it needs no signer and works on a read-only client.
+        """
+        from .scopes import ScopeSet
+
+        resolved = self._client.chain.agent_key(key)
+        if resolved is None:
+            return None
+        principal, bits = resolved
+        return (principal, ScopeSet.from_bits(bits))
