@@ -28,6 +28,12 @@ pub enum Aad {
     /// `docs/agent-credential-delivery.md` — the whole connector config, with
     /// `"kind"` discriminating `"s3"`/`"postgres"`; unknown fields are ignored.
     DatasetSourceCredsV1,
+    /// The per-deployment data-encryption key a QuantumGuard policy envelope is
+    /// sealed under. Payload: the raw 32-byte AES-256-GCM key. The envelope
+    /// itself lives off chain (`matter-org-meta`, by BLAKE3 root) and names the
+    /// secret id of this DEK, so the guard recovers the key once and opens every
+    /// generation of its policy locally.
+    QuantumGuardPolicyDekV1,
 }
 
 impl Aad {
@@ -39,6 +45,7 @@ impl Aad {
             Aad::StorageCredsV1 => b"matter-volume/storage-creds/v1",
             Aad::VolumeDekV1 => b"matter-volume/dek/v1",
             Aad::DatasetSourceCredsV1 => b"matter-dataset/source-creds/v1",
+            Aad::QuantumGuardPolicyDekV1 => b"quantum-guard/policy-dek/v1",
         }
     }
 }
@@ -67,6 +74,10 @@ mod tests {
         assert_eq!(
             Aad::DatasetSourceCredsV1.as_bytes(),
             b"matter-dataset/source-creds/v1"
+        );
+        assert_eq!(
+            Aad::QuantumGuardPolicyDekV1.as_bytes(),
+            b"quantum-guard/policy-dek/v1"
         );
     }
 }

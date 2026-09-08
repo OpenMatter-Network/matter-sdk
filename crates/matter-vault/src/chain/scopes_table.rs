@@ -159,7 +159,8 @@ pub fn required_scopes(pallet: &str, call: &str, args: &[Value]) -> Option<Scope
             "cancel_deployment"
             | "set_deployment_env"
             | "set_deployment_image"
-            | "set_deployment_launch",
+            | "set_deployment_launch"
+            | "set_deployment_policy_root",
         ) => Some(write(Scope::Deployments)),
         ("Jobs", "register_wg_peer" | "remove_wg_peer") => Some(write(Scope::Networking)),
         // `update_deployment_status`, `set_deployment_network`,

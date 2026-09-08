@@ -1,0 +1,8 @@
+# What a consumer's engine build needs from this checkout is the source tree, not the
+# gigabytes of build output beside it.
+target
+bindings/wasm/target
+bindings/python/target
+**/node_modules
+**/dist
+**/.pytest_cache

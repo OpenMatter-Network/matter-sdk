@@ -16,6 +16,7 @@ class Aad(str, Enum):
     STORAGE_CREDS_V1 = "matter-volume/storage-creds/v1"
     VOLUME_DEK_V1 = "matter-volume/dek/v1"
     DATASET_SOURCE_CREDS_V1 = "matter-dataset/source-creds/v1"
+    QUANTUM_GUARD_POLICY_DEK_V1 = "quantum-guard/policy-dek/v1"
 
 
 def aad_bytes(aad: Union[Aad, str, bytes]) -> bytes:

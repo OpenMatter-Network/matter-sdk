@@ -17,6 +17,25 @@ env:
   FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
 
 jobs:
+  # QuantumGuard's policy fetcher links `matter-vault --features chain` as a static musl
+  # binary on the engine image's toolchain. A dependency or MSRV bump that only the
+  # 1.93 glibc matrix tolerates would surface as an engine build failure, one repo away.
+  consumer-musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: dtolnay/rust-toolchain@1.91.1
+        with:
+          targets: x86_64-unknown-linux-musl
+      - name: Install the musl C toolchain (ring)
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build matter-vault (chain) for musl
+        working-directory: matter-sdk
+        run: cargo build -p matter-vault --features chain --target x86_64-unknown-linux-musl --locked
   rust:
     runs-on: ubuntu-latest
     steps:

@@ -174,6 +174,13 @@ there is one derivation and nothing to diverge. `ChainClient.keypair_from_seed` 
 for callers who need a real `Keypair`, and now raises rather than silently dropping
 junctions.
 
+**`Secrets::recover` is Rust-only.** It composes the chain reads a committee decrypt
+needs — the secret's payload and its stored epoch, and `KgcApi`'s committee at that epoch —
+with `recover_secret`, returning the zeroizing plaintext. Its consumer is QuantumGuard's
+`zkfw-policyd`, a Rust binary; the other bindings keep the primitive
+(`open_secret`/`recover_secret`) and the reads, and grow the composition when a
+non-Rust caller needs it. Not in `facade_calls.json` because it submits nothing.
+
 **Remaining.** The Ethereum/EIP-712 path is the one signer gap, and it is reserved
 rather than missing: only the Substrate sr25519 path is implemented across bindings,
 but `ApiKey` carries a scheme discriminant (a `secp256k1:` key reports "unsupported

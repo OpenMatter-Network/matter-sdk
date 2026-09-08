@@ -278,6 +278,7 @@ _DEPLOYMENTS_WRITE = frozenset(
         "set_deployment_env",
         "set_deployment_image",
         "set_deployment_launch",
+        "set_deployment_policy_root",
     }
 )
 

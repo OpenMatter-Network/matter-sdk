@@ -234,6 +234,7 @@ export function requiredScopes(
         case "set_deployment_env":
         case "set_deployment_image":
         case "set_deployment_launch":
+        case "set_deployment_policy_root":
           return write(Scope.Deployments);
         case "register_wg_peer":
         case "remove_wg_peer":

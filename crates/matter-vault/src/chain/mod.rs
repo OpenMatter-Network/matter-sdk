@@ -45,6 +45,7 @@
 mod amount;
 mod facade;
 mod mode;
+mod recover;
 pub mod scopes_table;
 
 use std::sync::{Arc, RwLock};

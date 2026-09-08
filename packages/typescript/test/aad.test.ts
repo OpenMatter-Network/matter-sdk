@@ -13,6 +13,7 @@ describe("Aad registry", () => {
     expect(Aad.StorageCredsV1).toBe("matter-volume/storage-creds/v1");
     expect(Aad.VolumeDekV1).toBe("matter-volume/dek/v1");
     expect(Aad.DatasetSourceCredsV1).toBe("matter-dataset/source-creds/v1");
+    expect(Aad.QuantumGuardPolicyDekV1).toBe("quantum-guard/policy-dek/v1");
   });
 
   it("aadBytes encodes a tag as UTF-8", () => {

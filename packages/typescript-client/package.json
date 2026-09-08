@@ -1,6 +1,6 @@
 {
   "name": "@openmatter-network/matter-client",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "TypeScript client for OpenMatter: one apiKey, every pallet. Wraps @openmatter-network/matter-vault with a metadata-driven chain client (tx / query / runtimeApi) plus the MatterVault threshold-secret path.",
   "license": "Apache-2.0",
   "author": "Open Matter <admin@openmatter.network>",

@@ -11,6 +11,9 @@ export enum Aad {
   /** Dataset data-source credentials (S3/Postgres) for the matter-ml agent —
    * payload is the canonical JSON schema in `docs/agent-credential-delivery.md`. */
   DatasetSourceCredsV1 = "matter-dataset/source-creds/v1",
+  /** The per-deployment DEK a QuantumGuard policy envelope is sealed under —
+   * payload is the raw 32-byte AES-256-GCM key. */
+  QuantumGuardPolicyDekV1 = "quantum-guard/policy-dek/v1",
 }
 
 const ENCODER = new TextEncoder();

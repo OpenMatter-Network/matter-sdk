@@ -239,6 +239,55 @@ client.Secrets().Revoke(secretID, target)
 client.Deployments().SetSecretRef(deployment, &secretID)
 ```
 
+`Deployments::request` takes the runtime's `ResourceRequest` as a `Value`, so a
+QuantumGuard-guarded deployment (spec ≥ 324) is the stock image plus four request-level
+additions — the engine as a read-only image volume, the supervisor as the launcher, the
+policy commitment, and `privileged` for the two capabilities the boundary needs — with the
+guard's key travelling only inside the sealed env the `secret_ref` names:
+
+```rust
+use subxt::ext::scale_value::Value;
+
+let engine = "ghcr.io/openmatter-network/quantum-guard/engine@sha256:…";
+let request = Value::named_composite([
+    ("config", Value::unnamed_variant("ContainerRequest", [Value::named_composite([
+        ("image", Value::from_bytes("nousresearch/hermes-agent")),
+        ("tag", Value::from_bytes("latest")),
+        ("ports", Value::unnamed_variant("Some", [Value::unnamed_composite([
+            Value::named_composite([("container_port", Value::u128(8089)), ("host_port", Value::unnamed_variant("None", []))]),
+        ])])),
+        ("volumes", Value::unnamed_variant("Some", [Value::unnamed_composite([
+            Value::named_composite([
+                ("name", Value::from_bytes("zkfw-engine")),
+                ("target", Value::from_bytes("/opt/zkfw")),
+                ("source", Value::unnamed_variant("Image", [Value::named_composite([("reference", Value::from_bytes(engine))])])),
+                ("read_only", Value::bool(true)),
+            ]),
+        ])])),
+        ("command", Value::unnamed_variant("None", [])),
+        ("privileged", Value::unnamed_variant("Some", [Value::bool(true)])),
+    ])])),
+    ("requirements", Value::u128(1)),
+    ("expiration", Value::unnamed_variant("None", [])),
+    ("treasury", Value::from_bytes(treasury.as_bytes())),
+    ("secret_ref", Value::unnamed_variant("Some", [Value::u128(sealed_env)])),
+    ("launch", Value::unnamed_variant("Some", [Value::named_composite([
+        ("launcher", Value::unnamed_composite([Value::from_bytes("/opt/zkfw/zkfw-sandboxd")])),
+        ("user", Value::unnamed_variant("Some", [Value::from_bytes("0")])),
+    ])])),
+    ("policy_root", Value::unnamed_variant("Some", [Value::from_bytes(policy_root)])),
+]);
+client.deployments().request(request).await?;
+```
+
+`policy_root` is the BLAKE3 of the sealed policy envelope uploaded to matter-org-meta; the
+DEK it is sealed under is a `pallet-secrets` secret (`Aad::QuantumGuardPolicyDekV1`) with a
+`User` grant for the guard's key, which the guard recovers once with `Secrets::recover`.
+Later generations are one upload and one `client.tx("Jobs", "set_deployment_policy_root",
+…)` away — the guard polls the commitment and adopts hot fields in place; a change to a
+boot-time field is reported as pending until `set_deployment_launch` is re-sent with the
+same launch, which the provider treats as a restart.
+
 A façade method is a thin, named wrapper around `tx` — it shapes typed arguments
 and delegates. No encoding, no error handling, no chain access of its own, so a
 façade can be wrong about a *name* but never about the wire format.

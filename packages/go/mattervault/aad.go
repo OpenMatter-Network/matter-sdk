@@ -11,6 +11,7 @@ const (
 	AadStorageCredsV1       Aad = "matter-volume/storage-creds/v1"
 	AadVolumeDekV1          Aad = "matter-volume/dek/v1"
 	AadDatasetSourceCredsV1 Aad = "matter-dataset/source-creds/v1"
+	AadQuantumGuardPolicyDekV1 Aad = "quantum-guard/policy-dek/v1"
 )
 
 // AadBytes returns the canonical bytes for an AAD tag.

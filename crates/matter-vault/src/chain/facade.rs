@@ -22,13 +22,14 @@
 //! `the_curated_pallets_all_exist_in_live_metadata` test in `tests/live_chain.rs`
 //! is the tripwire that catches it before a user does.
 
-use matter_vault_core::Aad;
+use matter_vault_core::{Aad, Plaintext};
 use matter_vault_key::{AccountId, ScopeSet};
 use subxt::dynamic::Value;
 
-use super::{MatterClient, TxReceipt};
+use super::{recover, MatterClient, TxReceipt};
 use crate::calls::{GrantTarget, StoreSecret};
 use crate::error::Result;
+use crate::transport::ReqwestTransport;
 
 /// Convert a [`GrantTarget`] to the runtime's `GrantTarget<AccountId>` enum.
 ///
@@ -142,6 +143,32 @@ impl Secrets<'_> {
         self.0
             .tx("Secrets", "delete_secret", vec![Value::u128(secret_id)])
             .await
+    }
+
+    /// Recover a stored secret's plaintext in one call: read its envelope, epoch and AAD,
+    /// assemble the committee seated at that epoch, and run the threshold decrypt with
+    /// this client's key.
+    ///
+    /// The key must be authorized for the secret — its owner, a `User` grantee, or a
+    /// `Secrets:Read` delegate — or the committee refuses every partial. A secret sealed
+    /// under a different tag than `aad` is refused before any node is contacted.
+    /// Rust-only: the other bindings compose `recover_secret` themselves.
+    pub async fn recover(&self, secret_id: u128, aad: Aad) -> Result<Plaintext> {
+        let signer = self.0.require_signer()?;
+        let stored = recover::read_secret(&self.0.rpc, secret_id).await?;
+        recover::check_aad(secret_id, &stored.aad, aad)?;
+        let committee = recover::committee_info(&self.0.rpc, stored.epoch).await?;
+        let transport = ReqwestTransport::new();
+        let auth = recover::KeyAuth(signer.as_ref());
+        crate::recover_secret(
+            &committee,
+            &transport,
+            &auth,
+            secret_id,
+            &stored.envelope,
+            aad,
+        )
+        .await
     }
 }
 

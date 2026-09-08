@@ -67,6 +67,18 @@ pub enum SdkError {
         detail: String,
     },
 
+    /// A secret is sealed under a different AAD tag than the one requested, so
+    /// it belongs to a different consumer and the open would fail anyway.
+    #[error("secret {secret_id} is sealed under AAD {sealed_under:?}, not {requested:?}")]
+    AadMismatch {
+        /// The secret asked for.
+        secret_id: u128,
+        /// The AAD the chain records for it, as UTF-8 where it is text.
+        sealed_under: String,
+        /// The tag the caller presented.
+        requested: String,
+    },
+
     /// The client was built without a signer, so it cannot submit extrinsics or
     /// authorize decryption. Build it with an API key or a signer.
     #[error("this client is read-only: build it with an api key or a signer to submit")]

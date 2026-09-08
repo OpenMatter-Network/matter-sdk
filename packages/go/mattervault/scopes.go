@@ -297,6 +297,7 @@ var deploymentsWrite = map[string]bool{
 	"set_deployment_env":    true,
 	"set_deployment_image":  true,
 	"set_deployment_launch": true,
+	"set_deployment_policy_root": true,
 }
 
 // RequiredScopes reports what pallet.call requires of a delegated key, and
