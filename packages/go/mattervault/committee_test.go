@@ -14,6 +14,7 @@ package mattervault
 import (
 	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -128,13 +129,91 @@ func TestDecryptRejectsEpochRotation(t *testing.T) {
 	}
 }
 
-func TestDecryptTransportFailureIsTyped(t *testing.T) {
+// A per-node transport failure is a per-node *fault*, not the whole decrypt's
+// verdict: the node is dropped and the subset re-formed (audit MV-H2, which the
+// Rust SDK already implemented and this binding did not). When every node
+// refuses, the run ends as "quorum" — naming each node and its reason — rather
+// than as an opaque "transport" from whichever node happened to answer first.
+func TestDecryptPerNodeTransportFailureExhaustsAsQuorum(t *testing.T) {
 	fx := loadCommitteeFixture(t)
 	transport := &fakeTransport{fx: fx, t: t, partialErr: errors.New("connection reset")}
 
 	_, err := Decrypt(transport, &recordingSigner{}, fx.params(t))
-	if kind := decryptErrorKind(t, err); kind != "transport" {
-		t.Errorf("kind = %q, want %q", kind, "transport")
+	if kind := decryptErrorKind(t, err); kind != "quorum" {
+		t.Fatalf("kind = %q, want %q", kind, "quorum")
+	}
+	var de *DecryptError
+	if !errors.As(err, &de) {
+		t.Fatalf("not a *DecryptError: %v", err)
+	}
+	if len(de.Faults) == 0 {
+		t.Fatal("every dropped node must be accounted for")
+	}
+	for _, f := range de.Faults {
+		if f.Stage != FaultPartialDecrypt {
+			t.Errorf("node %d stage = %q, want %q", f.Index, f.Stage, FaultPartialDecrypt)
+		}
+		if !strings.Contains(f.Detail, "connection reset") {
+			t.Errorf("node %d detail = %q, want the node's own reason", f.Index, f.Detail)
+		}
+	}
+	// A caller that only logs err.Error() still gets the reasons.
+	if !strings.Contains(err.Error(), "connection reset") {
+		t.Errorf("reasons must survive into Error(): %v", err)
+	}
+}
+
+// The 2026-09-09 testnet shape: one node unreachable at /health while the rest
+// answer. The old code reported only a count, so working out *which* node was
+// missing meant reading the committee's own logs.
+func TestDecryptNamesTheNodeThatFailedHealth(t *testing.T) {
+	fx := loadCommitteeFixture(t)
+	params := fx.params(t)
+	down := params.Nodes[0]
+	transport := &fakeTransport{
+		fx: fx, t: t,
+		healthErrAt: map[string]error{down.Endpoint: errors.New("connection refused")},
+	}
+
+	_, err := Decrypt(transport, &recordingSigner{}, params)
+	var de *DecryptError
+	if !errors.As(err, &de) || de.Kind != "quorum" {
+		t.Fatalf("want a quorum DecryptError, got %v", err)
+	}
+	found := false
+	for _, f := range de.Faults {
+		if f.Index == down.Index {
+			found = true
+			if f.Stage != FaultHealth {
+				t.Errorf("stage = %q, want %q", f.Stage, FaultHealth)
+			}
+			if f.Endpoint != down.Endpoint {
+				t.Errorf("endpoint = %q, want %q", f.Endpoint, down.Endpoint)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("node %d must be named in the faults: %+v", down.Index, de.Faults)
+	}
+	if !strings.Contains(err.Error(), down.Endpoint) {
+		t.Errorf("the endpoint must survive into Error(): %v", err)
+	}
+}
+
+// Nothing was dropped — the caller supplied too few nodes. The bare count could
+// never distinguish that from "nodes were dropped"; empty faults now does.
+func TestDecryptTooFewNodesReportsNoFaults(t *testing.T) {
+	fx := loadCommitteeFixture(t)
+	params := fx.params(t)
+	params.Nodes = params.Nodes[:1]
+
+	_, err := Decrypt(&fakeTransport{fx: fx, t: t}, &recordingSigner{}, params)
+	var de *DecryptError
+	if !errors.As(err, &de) {
+		t.Fatalf("not a *DecryptError: %v", err)
+	}
+	if len(de.Faults) != 0 {
+		t.Errorf("no node failed, so no fault should be reported: %+v", de.Faults)
 	}
 }
 

@@ -50,7 +50,7 @@ mod transport;
 
 pub use calls::{DeleteSecret, GrantAccess, GrantTarget, RevokeAccess, RotateSecret, StoreSecret};
 pub use committee::{decrypt, CommitteeNode, DecryptRequest};
-pub use error::{Result, SdkError};
+pub use error::{FaultStage, NodeFault, Result, SdkError};
 // Re-export the core surface so consumers need only depend on `matter-vault`.
 #[doc(inline)]
 pub use matter_vault_core::{self, encrypt, Aad, CoreError, EncryptedSecret, Plaintext};

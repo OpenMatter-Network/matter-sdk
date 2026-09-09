@@ -33,12 +33,20 @@ pub enum SdkError {
 
     /// Fewer than `threshold` committee nodes were reachable and healthy, so no
     /// quorum could be formed. Retry later or widen the node set.
-    #[error("quorum unavailable: need {needed} healthy nodes, found {active}")]
+    ///
+    /// `faults` says *why* each node did not contribute. Without it this error
+    /// reports only a count, and a count cannot distinguish "the committee is
+    /// down" from "this caller cannot reach two of them" from "the partials do
+    /// not verify against the commitments we were given" — three problems with
+    /// three different fixes. Callers should surface it verbatim.
+    #[error("quorum unavailable: need {needed} healthy nodes, found {active}{}", summarize_faults(.faults))]
     QuorumUnavailable {
         /// The threshold `t` required.
         needed: usize,
         /// How many nodes were healthy.
         active: usize,
+        /// One entry per node that was dropped, in the order they were dropped.
+        faults: Vec<NodeFault>,
     },
 
     /// The committee served the secret under a *different* epoch than the one the
@@ -205,3 +213,121 @@ pub enum SdkError {
 
 /// Convenience alias for results in this crate.
 pub type Result<T> = core::result::Result<T, SdkError>;
+
+/// Where in the decrypt round trip a node stopped being usable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FaultStage {
+    /// The `/health` probe did not answer.
+    Health,
+    /// `/health` answered, but the node did not report itself active.
+    Inactive,
+    /// `/partial-decrypt` did not answer.
+    PartialDecrypt,
+    /// The node served a different epoch than the caller's state is for, and
+    /// too few nodes agreed with it to call it a rotation.
+    EpochMismatch,
+}
+
+impl FaultStage {
+    /// A short, stable tag for logs.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FaultStage::Health => "health",
+            FaultStage::Inactive => "inactive",
+            FaultStage::PartialDecrypt => "partial-decrypt",
+            FaultStage::EpochMismatch => "epoch-mismatch",
+        }
+    }
+}
+
+/// Why one committee node did not contribute to a quorum.
+///
+/// Carries the node's endpoint because "which two nodes could this caller not
+/// reach" is the first question asked, and a bare index does not answer it when
+/// the caller and the operator are looking at different machines. It never
+/// carries request material — no signature, no auth fields, no partial.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NodeFault {
+    /// The node's 1-based DKG evaluation point.
+    pub index: u64,
+    /// The node's base URL.
+    pub endpoint: String,
+    /// Where it dropped out.
+    pub stage: FaultStage,
+    /// The underlying reason, already rendered.
+    pub detail: String,
+}
+
+/// Render faults for the error's `Display`, so a caller that only logs `{e}`
+/// still gets the reasons.
+fn summarize_faults(faults: &[NodeFault]) -> String {
+    if faults.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(" — ");
+    for (i, f) in faults.iter().enumerate() {
+        if i > 0 {
+            out.push_str("; ");
+        }
+        out.push_str(&format!(
+            "node {} ({}) {}: {}",
+            f.index,
+            f.endpoint,
+            f.stage.as_str(),
+            f.detail
+        ));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The rendering is the deliverable: `zkfw-policyd` logs `{e}` and nothing
+    /// else, so anything not in this string does not reach an operator.
+    #[test]
+    fn quorum_unavailable_renders_every_fault() {
+        let err = SdkError::QuorumUnavailable {
+            needed: 3,
+            active: 2,
+            faults: vec![
+                NodeFault {
+                    index: 4,
+                    endpoint: "https://kgc4.testnet.openmatter.network:443".into(),
+                    stage: FaultStage::PartialDecrypt,
+                    detail: "503 Service Unavailable".into(),
+                },
+                NodeFault {
+                    index: 5,
+                    endpoint: "https://kgc5.testnet.openmatter.network:443".into(),
+                    stage: FaultStage::Health,
+                    detail: "connection refused".into(),
+                },
+            ],
+        };
+        assert_eq!(
+            err.to_string(),
+            "quorum unavailable: need 3 healthy nodes, found 2 — \
+             node 4 (https://kgc4.testnet.openmatter.network:443) partial-decrypt: 503 Service Unavailable; \
+             node 5 (https://kgc5.testnet.openmatter.network:443) health: connection refused"
+        );
+        println!("RENDERED: {err}");
+    }
+
+    /// No faults means the caller supplied too few nodes, not that nodes failed.
+    /// The message must not imply otherwise by dangling a separator.
+    #[test]
+    fn no_faults_renders_the_bare_count() {
+        let err = SdkError::QuorumUnavailable {
+            needed: 3,
+            active: 1,
+            faults: Vec::new(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "quorum unavailable: need 3 healthy nodes, found 1"
+        );
+    }
+}

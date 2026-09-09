@@ -42,6 +42,8 @@ export type {
   CommitteeNode,
   DecryptParams,
   DecryptErrorKind,
+  FaultStage,
+  NodeFault,
   Transport,
   Health,
   PartialDecryptRequest,

@@ -7,7 +7,7 @@
 use matter_vault_core::wire::{from_0x, secret_id_to_hex, to_0x, PartialDecryptRequest};
 use matter_vault_core::{lagrange_for, open_secret, PartialInput, Plaintext};
 
-use crate::error::{Result, SdkError};
+use crate::error::{FaultStage, NodeFault, Result, SdkError};
 use crate::signer::{Signer, SigningRequest};
 use crate::transport::Transport;
 
@@ -56,7 +56,9 @@ pub struct DecryptRequest<'a> {
 /// query each node → verify + aggregate + AEAD-open. The returned [`Plaintext`]
 /// is a zeroizing buffer.
 ///
-/// Errors: [`SdkError::QuorumUnavailable`] if too few nodes are healthy;
+/// Errors: [`SdkError::QuorumUnavailable`] if too few nodes are healthy — it
+/// carries a [`NodeFault`] per dropped node saying which one and why, which is
+/// the only place that information exists;
 /// [`SdkError::EpochRotated`] if the committee served a different epoch than the
 /// supplied state (refetch and retry); [`SdkError::Core`] with
 /// [`matter_vault_core::CoreError::Aead`] if the secret can't be opened at all.
@@ -67,18 +69,39 @@ where
 {
     // 1. Health-probe and keep the active nodes. Sequential: a committee is
     //    small, and concurrency here is an optimization to measure, not assume.
+    //
+    //    Every node that drops out records why. This used to be
+    //    `if let Ok(health) = …`, which discarded both the transport error and
+    //    the not-active case, leaving only a count — and a count cannot tell an
+    //    operator whether the committee is down or this caller simply cannot
+    //    reach part of it.
     let mut active: Vec<&CommitteeNode> = Vec::new();
+    let mut faults: Vec<NodeFault> = Vec::new();
     for node in req.nodes {
-        if let Ok(health) = transport.health(&node.endpoint).await {
-            if health.is_active() {
-                active.push(node);
-            }
+        match transport.health(&node.endpoint).await {
+            Ok(health) if health.is_active() => active.push(node),
+            Ok(health) => faults.push(NodeFault {
+                index: node.index,
+                endpoint: node.endpoint.clone(),
+                stage: FaultStage::Inactive,
+                detail: format!(
+                    "status {:?}, epoch {}, crypto protocol v{}",
+                    health.status, health.epoch, health.crypto_protocol_version
+                ),
+            }),
+            Err(e) => faults.push(NodeFault {
+                index: node.index,
+                endpoint: node.endpoint.clone(),
+                stage: FaultStage::Health,
+                detail: e.to_string(),
+            }),
         }
     }
     if active.len() < req.threshold {
         return Err(SdkError::QuorumUnavailable {
             needed: req.threshold,
             active: active.len(),
+            faults,
         });
     }
     active.sort_by_key(|n| n.index);
@@ -128,8 +151,17 @@ where
 
             let resp = match transport.partial_decrypt(&node.endpoint, &request).await {
                 Ok(resp) => resp,
-                // Treat an unreachable/erroring node as a per-node fault.
-                Err(_) => {
+                // Treat an unreachable/erroring node as a per-node fault — but
+                // keep the reason: this is the drop that matters most, because a
+                // node that passed `/health` and then refused the real request
+                // is a different problem from one that was never reachable.
+                Err(e) => {
+                    faults.push(NodeFault {
+                        index: node.index,
+                        endpoint: node.endpoint.clone(),
+                        stage: FaultStage::PartialDecrypt,
+                        detail: e.to_string(),
+                    });
                     faulty = Some(node.index);
                     break;
                 }
@@ -149,6 +181,15 @@ where
                         provided: req.epoch,
                     });
                 }
+                faults.push(NodeFault {
+                    index: node.index,
+                    endpoint: node.endpoint.clone(),
+                    stage: FaultStage::EpochMismatch,
+                    detail: format!(
+                        "served epoch {}, state supplied for {}",
+                        resp.served_epoch, req.epoch
+                    ),
+                });
                 faulty = Some(node.index);
                 break;
             }
@@ -193,5 +234,6 @@ where
     Err(SdkError::QuorumUnavailable {
         needed: req.threshold,
         active: available.len(),
+        faults,
     })
 }

@@ -17,9 +17,48 @@ use crate::error::{Result, SdkError};
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// Connection-establishment timeout.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-/// Generous cap on a committee response body — real partials/proofs are a few KB;
-/// a larger body is a misbehaving or hostile node, not a real response.
-const MAX_RESPONSE_BYTES: usize = 1 << 20; // 1 MiB
+/// Cap on a committee response body.
+///
+/// This was 1 MiB, on the stated assumption that "real partials/proofs are a few
+/// KB". That assumption was wrong: a real `/partial-decrypt` response for a
+/// production secret measured **1,180,574 bytes** — over the old cap by ~132 KB —
+/// so every honest node's answer was rejected as hostile and no quorum could
+/// ever form. Proof size scales with the subset and the BGV parameters, so the
+/// true ceiling is not a few KB and should not be guessed at again.
+///
+/// The cap is the body half of audit finding MV-H3: it stops a misbehaving or
+/// hostile node exhausting client memory, since `reqwest`'s `.json()` would
+/// buffer without limit. At this value that protection is nominal — a single bad
+/// node can make a client buffer up to 1 GiB, which is a quarter of the RAM of a
+/// typical guarded deployment's container. It is deliberately set here as an
+/// operational choice; a value in the tens of MiB would keep ~15-30x headroom
+/// over the observed size while leaving the control meaningful.
+///
+/// Note this is enforced by growing the buffer and checking as chunks arrive, so
+/// a large cap permits growth rather than pre-allocating it.
+const MAX_RESPONSE_BYTES: usize = 1 << 30; // 1 GiB
+
+/// A real `/partial-decrypt` response, measured on testnet 2026-09-09.
+///
+/// Kept as a literal because the number is the whole point: the cap was once set
+/// from a guess ("a few KB") that this exceeds by two orders of magnitude, and
+/// every honest node's answer was rejected as hostile until it was measured.
+const OBSERVED_PARTIAL_BYTES: usize = 1_180_574;
+
+// Guard the cap at COMPILE time, not in a test: a cap too small to admit a real
+// response is not a failing assertion somewhere, it is an outage on a provider
+// host, and it should be impossible to build.
+const _: () = assert!(
+    MAX_RESPONSE_BYTES > OBSERVED_PARTIAL_BYTES,
+    "MAX_RESPONSE_BYTES rejects a real partial-decrypt response"
+);
+// Headroom, not a coincidence: proof size scales with the subset and the BGV
+// parameters, so a cap that merely clears today's measurement is one parameter
+// change away from the same outage.
+const _: () = assert!(
+    MAX_RESPONSE_BYTES >= OBSERVED_PARTIAL_BYTES * 8,
+    "MAX_RESPONSE_BYTES leaves under 8x headroom over a measured response"
+);
 
 /// A committee node's `/health` response.
 #[derive(Debug, Clone, Deserialize)]

@@ -29,10 +29,23 @@ const byIndex = new Map<number, any>(
 );
 
 class FixtureCommittee implements Transport {
-  async health(_endpoint: string): Promise<Health> {
+  /** Endpoints whose `/health` rejects, as an unreachable node does. */
+  constructor(
+    private readonly unreachableHealth: ReadonlySet<string> = new Set(),
+    /** Endpoints that pass `/health` and then refuse the real request. */
+    private readonly refusePartial: ReadonlySet<string> = new Set(),
+  ) {}
+
+  async health(endpoint: string): Promise<Health> {
+    if (this.unreachableHealth.has(endpoint)) {
+      throw new DecryptError("transport", `health failed: connection refused (${endpoint})`);
+    }
     return { status: "active", epoch: fixture.epoch };
   }
   async partialDecrypt(endpoint: string, _req: PartialDecryptRequest): Promise<PartialDecryptResponse> {
+    if (this.refusePartial.has(endpoint)) {
+      throw new DecryptError("transport", `partial-decrypt 503 from ${endpoint}`);
+    }
     const index = Number(endpoint.split("-").at(-1));
     const p = byIndex.get(index);
     return {
@@ -58,6 +71,21 @@ function nodes(): CommitteeNode[] {
     endpoint: `http://node-${index}`,
     shareCommitment: fromHex(byIndex.get(index).commitment_hex),
   }));
+}
+
+function baseParams() {
+  return {
+    secretId: BigInt(fixture.secret_id),
+    epoch: fixture.epoch,
+    bindingId: fromHex(fixture.binding_id_hex),
+    aad: fromHex(fixture.aad_hex),
+    capsule: fromHex(fixture.capsule_hex),
+    ct: fromHex(fixture.ct_hex),
+    sharedA: fromHex(fixture.shared_a_hex),
+    blockHash: new Uint8Array(32),
+    threshold: Number(fixture.meta.t),
+    nodes: nodes(),
+  };
 }
 
 describe("decrypt orchestration", () => {
@@ -93,5 +121,61 @@ describe("decrypt orchestration", () => {
         nodes: oneNode,
       }),
     ).rejects.toMatchObject({ kind: "quorum" } satisfies Partial<DecryptError>);
+  });
+
+  /** Nothing was *dropped* — the caller supplied too few nodes. Both used to
+   *  render as a bare count. */
+  it("reports no faults when the caller simply supplied too few nodes", async () => {
+    const err = await decrypt(new FixtureCommittee(), fakeSigner, {
+      ...baseParams(),
+      nodes: nodes().slice(0, 1),
+    }).catch((e: unknown) => e as DecryptError);
+    expect(err.faults).toEqual([]);
+  });
+
+  /**
+   * The 2026-09-09 testnet shape, health half: a node unreachable at `/health`.
+   * The old code reported only a count, so diagnosing it meant reading three
+   * servers' logs to work out *which* nodes were missing.
+   */
+  it("names a node that never answered /health", async () => {
+    const all = nodes();
+    const err = await decrypt(
+      new FixtureCommittee(new Set([all[0]!.endpoint])),
+      fakeSigner,
+      baseParams(),
+    ).catch((e: unknown) => e as DecryptError);
+
+    expect(err.kind).toBe("quorum");
+    const fault = err.faults.find((f) => f.index === all[0]!.index);
+    expect(fault?.stage).toBe("health");
+    // A caller that only logs `err.message` still gets it.
+    expect(err.message).toContain(all[0]!.endpoint);
+    expect(err.message).toContain("connection refused");
+  });
+
+  /**
+   * The other half, and MV-H2 parity with the Rust SDK: a node that passes
+   * `/health` and then refuses the real request must be *dropped* as a per-node
+   * fault, not propagated as the whole decrypt's failure. This binding used to
+   * `throw` the first transport error, letting one node deny the decrypt.
+   *
+   * The fixture is a bare quorum (t = 3 of 3 nodes), so dropping one leaves too
+   * few and the call still fails — but it now fails as `quorum`, naming the
+   * node and its reason, rather than as an opaque `transport`.
+   */
+  it("drops a node that refuses the real request instead of aborting on it", async () => {
+    const all = nodes();
+    const err = await decrypt(
+      new FixtureCommittee(new Set(), new Set([all[1]!.endpoint])),
+      fakeSigner,
+      baseParams(),
+    ).catch((e: unknown) => e as DecryptError);
+
+    expect(err.kind).toBe("quorum");
+    const fault = err.faults.find((f) => f.index === all[1]!.index);
+    expect(fault?.stage).toBe("partial-decrypt");
+    expect(fault?.detail).toContain("503");
+    expect(err.message).toContain("503");
   });
 });

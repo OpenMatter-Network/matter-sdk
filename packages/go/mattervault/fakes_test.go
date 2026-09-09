@@ -113,12 +113,22 @@ type fakeTransport struct {
 	partialErr  error
 	badPartial  string
 
+	// Per-endpoint injection, for asserting that a fault names the right node.
+	// healthErrAt errors the /health probe; refusePartialAt passes /health and
+	// then refuses the real request — the shape that stranded a deployment while
+	// every node looked healthy from outside.
+	healthErrAt     map[string]error
+	refusePartialAt map[string]error
+
 	healthCalls  []string
 	decryptCalls []PartialDecryptRequest
 }
 
 func (f *fakeTransport) Health(endpoint string) (Health, error) {
 	f.healthCalls = append(f.healthCalls, endpoint)
+	if err, ok := f.healthErrAt[endpoint]; ok {
+		return Health{}, err
+	}
 	if f.unhealthy {
 		return Health{Status: "joining", Epoch: f.fx.Epoch}, nil
 	}
@@ -127,6 +137,9 @@ func (f *fakeTransport) Health(endpoint string) (Health, error) {
 
 func (f *fakeTransport) PartialDecrypt(endpoint string, req PartialDecryptRequest) (PartialDecryptResponse, error) {
 	f.decryptCalls = append(f.decryptCalls, req)
+	if err, ok := f.refusePartialAt[endpoint]; ok {
+		return PartialDecryptResponse{}, err
+	}
 	if f.partialErr != nil {
 		return PartialDecryptResponse{}, f.partialErr
 	}

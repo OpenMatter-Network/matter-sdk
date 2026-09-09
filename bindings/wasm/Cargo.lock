@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "matter-vault-core"
-version = "1.0.0"
+version = "1.2.0"
 dependencies = [
  "bincode",
  "getrandom",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "matter-vault-key"
-version = "1.0.0"
+version = "1.2.0"
 dependencies = [
  "getrandom",
  "hex",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "matter-vault-wasm"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
