@@ -65,9 +65,9 @@ pub use self::mode::Mode;
 use self::mode::Refresh;
 use crate::error::{Result, SdkError};
 
-/// Default RPC endpoint per network.
+/// Default RPC endpoint per network. Pinned for every binding by `testvectors/networks.json`.
 const TESTNET_RPC: &str = "wss://node2.testnet.openmatter.network";
-const MAINNET_RPC: &str = "wss://node1.mainnet.openmatter.network";
+const MAINNET_RPC: &str = "wss://node2.mainnet.openmatter.network";
 
 /// Genesis hash of the public testnet, read with `chain_getBlockHash(0)` on
 /// 2026-07-29. Used to detect which network an endpoint actually serves.
@@ -1147,20 +1147,28 @@ mod tests {
         assert_eq!(config.resolve_url().unwrap(), "ws://127.0.0.1:9944");
     }
 
+    /// Replays `testvectors/networks.json`, the one home for the default endpoints.
+    /// A default that drifted from the live network is how every QuantumGuard boot on
+    /// mainnet died on 2026-09-16: the SDK dialed a host that serves no public RPC.
     #[test]
     fn named_networks_have_default_endpoints() {
-        assert_eq!(
-            MatterConfig::for_network(Network::Testnet)
-                .resolve_url()
-                .unwrap(),
-            TESTNET_RPC
-        );
-        assert_eq!(
-            MatterConfig::for_network(Network::Mainnet)
-                .resolve_url()
-                .unwrap(),
-            MAINNET_RPC
-        );
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../../testvectors/networks.json")).unwrap();
+        let rows = fixture["default_rpc"].as_array().unwrap();
+        assert!(!rows.is_empty());
+        for row in rows {
+            let network = match row["network"].as_str().unwrap() {
+                "testnet" => Network::Testnet,
+                "mainnet" => Network::Mainnet,
+                "custom" => Network::Custom,
+                other => panic!("fixture names an unknown network `{other}`"),
+            };
+            assert_eq!(
+                network.default_rpc_url(),
+                row["url"].as_str(),
+                "default endpoint for {network:?}"
+            );
+        }
     }
 
     #[test]

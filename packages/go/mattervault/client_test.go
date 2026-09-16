@@ -206,8 +206,24 @@ func TestConfigResolvesTheRightEndpoint(t *testing.T) {
 	if url, err := (Config{}).resolveURL(); err != nil || url != TestnetRPC {
 		t.Errorf("empty config -> %q, %v; want the testnet default", url, err)
 	}
-	if url, _ := (Config{Network: NetworkMainnet}).resolveURL(); url != MainnetRPC {
-		t.Errorf("mainnet -> %q", url)
+	var fixture struct {
+		DefaultRPC []struct {
+			Network string  `json:"network"`
+			URL     *string `json:"url"`
+		} `json:"default_rpc"`
+	}
+	load(t, "networks.json", &fixture)
+	if len(fixture.DefaultRPC) == 0 {
+		t.Fatal("networks.json has no rows")
+	}
+	for _, row := range fixture.DefaultRPC {
+		url, err := (Config{Network: row.Network}).resolveURL()
+		switch {
+		case row.URL == nil && err == nil:
+			t.Errorf("%s -> %q; the fixture says it has no default", row.Network, url)
+		case row.URL != nil && url != *row.URL:
+			t.Errorf("%s -> %q, %v; want %q", row.Network, url, err, *row.URL)
+		}
 	}
 	if _, err := (Config{Network: NetworkCustom}).resolveURL(); err == nil {
 		t.Error("a custom network without an explicit URL must fail")

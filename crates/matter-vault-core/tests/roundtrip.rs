@@ -13,24 +13,15 @@ use matter_crypto::bgv::poly::crt::CrtPoly;
 use matter_crypto::bgv::poly::CrtContext;
 use matter_crypto::bgv::Ciphertext;
 use matter_crypto::dkg::{
-    commit_to_contribution,
-    derive_shared_a,
-    generate_contribution,
-    process_contributions,
+    commit_to_contribution, derive_shared_a, generate_contribution, process_contributions,
     DkgOutput,
 };
 use matter_crypto::secret::{lagrange_coefficient, produce_proven_partial};
 use matter_crypto::zkp::plaintext::PlaintextProof;
 use matter_crypto::zkp::zkp_aware_smudge_bits;
 use matter_vault_core::{
-    encrypt,
-    lagrange_for,
-    open_secret,
-    signing_payload,
-    verify_plaintext_proof,
-    Aad,
-    EncryptedSecret,
-    PartialInput,
+    encrypt, lagrange_for, open_secret, signing_payload, verify_plaintext_proof, Aad,
+    EncryptedSecret, PartialInput,
 };
 
 type Params = SecureParams;

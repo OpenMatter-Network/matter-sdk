@@ -27,13 +27,8 @@ use matter_vault_core as core;
 mod apikey;
 
 pub use apikey::{
-    mv_apikey_account_id,
-    mv_apikey_free,
-    mv_apikey_parse,
-    mv_apikey_scheme,
-    mv_apikey_sign,
-    MvApiKey,
-    MV_ERR_KEY,
+    mv_apikey_account_id, mv_apikey_free, mv_apikey_parse, mv_apikey_scheme, mv_apikey_sign,
+    MvApiKey, MV_ERR_KEY,
 };
 
 /// Success.

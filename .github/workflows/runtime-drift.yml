@@ -34,7 +34,7 @@ jobs:
           - network: testnet
             rpc: wss://node2.testnet.openmatter.network
           - network: mainnet
-            rpc: wss://node1.mainnet.openmatter.network
+            rpc: wss://node2.mainnet.openmatter.network
     steps:
       - uses: actions/checkout@v4
         with: { path: matter-sdk }

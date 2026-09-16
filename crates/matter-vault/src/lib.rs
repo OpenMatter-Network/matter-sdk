@@ -58,15 +58,7 @@ pub use matter_vault_core::{self, encrypt, Aad, CoreError, EncryptedSecret, Plai
 // name a second crate to build one.
 #[doc(inline)]
 pub use matter_vault_key::{
-    Access,
-    AccountId,
-    ApiKey,
-    KeyError,
-    KeyScheme,
-    KeySigner,
-    Scope,
-    ScopeParseError,
-    ScopeSet,
+    Access, AccountId, ApiKey, KeyError, KeyScheme, KeySigner, Scope, ScopeParseError, ScopeSet,
 };
 pub use signer::{partial_decrypt_auth, RequestAuth, Signer, SigningRequest, Sr25519Signer};
 pub use transport::{Health, ReqwestTransport, Transport};

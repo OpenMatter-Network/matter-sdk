@@ -1,0 +1,16 @@
+{
+  "default_rpc": [
+    {
+      "network": "testnet",
+      "url": "wss://node2.testnet.openmatter.network"
+    },
+    {
+      "network": "mainnet",
+      "url": "wss://node2.mainnet.openmatter.network"
+    },
+    {
+      "network": "custom",
+      "url": null
+    }
+  ]
+}

@@ -14,6 +14,7 @@ their crypto stays identical.
 | `api_keys.json` | the full API-key ingestion contract: `valid` keys must parse to `account_id_hex`, `invalid` keys must be rejected with the named error kind |
 | `facade_calls.json` | the curated façade surface: which `(façade, method)` pairs exist and which `(pallet, call)` each maps to — 32 rows across the six façades |
 | `scope_bits.json` | the `ScopeSet` wire contract for member-tied API keys: bit = `scope * 2 + access`, encoded as a bare `u32`, plus a truth table for `is_superset` where Read and Write are independent |
+| `networks.json` | the default RPC endpoint each network name resolves to (`null` = no default). **Hand-maintained**, not emitted: it mirrors the public RPC column of matter-node's `CLAUDE.md` network table. A default that drifted to a host serving no public RPC broke every QuantumGuard boot on mainnet on 2026-09-16. Replayed by the default-endpoint test in each binding |
 | `required_scopes.json` | what each of the 155 calls of the ten scoped pallets requires of a delegated key — `required: null` for the 35 no key may ever make |
 
 `api_keys.json` is a deliberate **sibling** of `seed_formats.json`, not an extension of

@@ -202,7 +202,7 @@ async fn pointing_testnet_config_at_mainnet_is_caught() {
     // A typo'd RPC URL must fail before it costs anything. Skips cleanly if the
     // mainnet endpoint is unreachable, since that is not what is under test.
     let mut config = MatterConfig::for_network(Network::Testnet);
-    config.rpc_url = Some("wss://node1.mainnet.openmatter.network".to_string());
+    config.rpc_url = Some("wss://node2.mainnet.openmatter.network".to_string());
 
     match MatterClient::connect(config).await {
         Err(matter_vault::SdkError::WrongNetwork { expected, actual }) => {

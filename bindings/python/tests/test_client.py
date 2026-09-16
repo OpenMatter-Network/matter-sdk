@@ -239,6 +239,20 @@ def test_the_client_is_a_context_manager():
     assert client.chain.closed
 
 
+def test_default_endpoints_replay_the_fixture():
+    # One home for where each network is: testvectors/networks.json. A drifted default
+    # dialed a mainnet host with no public RPC on 2026-09-16.
+    import json
+    from pathlib import Path
+
+    fixture = json.loads(
+        (Path(__file__).resolve().parents[3] / "testvectors" / "networks.json").read_text()
+    )
+    assert fixture["default_rpc"]
+    for row in fixture["default_rpc"]:
+        assert Network.default_rpc_url(row["network"]) == row["url"], row["network"]
+
+
 def test_custom_network_requires_an_explicit_url():
     with pytest.raises(ValueError, match="requires an explicit rpc_url"):
         MatterClient._resolve_url(Network.CUSTOM, None)

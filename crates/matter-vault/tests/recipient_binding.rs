@@ -10,14 +10,7 @@ use std::cell::RefCell;
 use std::future::Future;
 
 use matter_vault::{
-    decrypt,
-    CommitteeNode,
-    DecryptRequest,
-    Health,
-    RequestAuth,
-    Result,
-    Signer,
-    SigningRequest,
+    decrypt, CommitteeNode, DecryptRequest, Health, RequestAuth, Result, Signer, SigningRequest,
     Transport,
 };
 use matter_vault_core::wire::{to_0x, AuthScheme, PartialDecryptRequest, PartialDecryptResponse};

@@ -30,10 +30,10 @@ const (
 	NetworkCustom  = "custom"
 )
 
-// Default RPC endpoint per network.
+// Default RPC endpoint per network. Pinned for every binding by testvectors/networks.json.
 const (
 	TestnetRPC = "wss://node2.testnet.openmatter.network"
-	MainnetRPC = "wss://node1.mainnet.openmatter.network"
+	MainnetRPC = "wss://node2.mainnet.openmatter.network"
 )
 
 // TestnetGenesis is the public testnet's genesis hash, read with

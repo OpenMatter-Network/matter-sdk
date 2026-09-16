@@ -122,8 +122,9 @@ def _decode_account(text: str) -> bytes:
             "MATTER_PRINCIPAL is neither 0x-prefixed hex nor a valid SS58 address"
         ) from exc
 
+#: Default RPC endpoint per network. Pinned for every binding by ``testvectors/networks.json``.
 TESTNET_RPC = "wss://node2.testnet.openmatter.network"
-MAINNET_RPC = "wss://node1.mainnet.openmatter.network"
+MAINNET_RPC = "wss://node2.mainnet.openmatter.network"
 
 #: Genesis hash of the public testnet, read with ``chain_getBlockHash(0)`` on
 #: 2026-07-29. The only spoof-resistant network signal we have pinned.

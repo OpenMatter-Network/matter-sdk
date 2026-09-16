@@ -8,10 +8,7 @@
 
 #[doc(inline)]
 pub use matter_kgc_proto::{
-    partial_decrypt_signing_payload,
-    AuthScheme,
-    PartialDecryptRequest,
-    PartialDecryptResponse,
+    partial_decrypt_signing_payload, AuthScheme, PartialDecryptRequest, PartialDecryptResponse,
     PARTIAL_DECRYPT_SIGNING_DOMAIN,
 };
 

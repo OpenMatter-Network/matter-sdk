@@ -12,9 +12,9 @@ export const Network = {
 
 export type Network = (typeof Network)[keyof typeof Network];
 
-/** Default RPC endpoint per network. */
+/** Default RPC endpoint per network. Pinned for every binding by `testvectors/networks.json`. */
 export const TESTNET_RPC = "wss://node2.testnet.openmatter.network";
-export const MAINNET_RPC = "wss://node1.mainnet.openmatter.network";
+export const MAINNET_RPC = "wss://node2.mainnet.openmatter.network";
 
 /**
  * Genesis hash of the public testnet, read with `chain_getBlockHash(0)` on
