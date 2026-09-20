@@ -21,8 +21,8 @@ pytest.importorskip("substrateinterface")
 
 from scalecodec.base import ScaleBytes  # noqa: E402
 
-from matter_vault import ApiKey  # noqa: E402
-from matter_vault.chain import ApiKeySigner, api_key_signer, ChainClient  # noqa: E402
+from matter_sdk import ApiKey  # noqa: E402
+from matter_sdk.chain import ApiKeySigner, api_key_signer, ChainClient  # noqa: E402
 
 VECTORS = Path(__file__).resolve().parents[3] / "testvectors" / "api_keys.json"
 

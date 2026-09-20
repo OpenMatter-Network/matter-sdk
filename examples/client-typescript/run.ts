@@ -19,7 +19,7 @@ import {
   Network,
   decimalsDisagree,
   type MatterConfig,
-} from "@openmatter-network/matter-client";
+} from "@openmatter-network/matter-sdk";
 
 /** Opt-in gate for anything that costs gas. */
 const SUBMIT_ENV = "MATTER_SUBMIT";

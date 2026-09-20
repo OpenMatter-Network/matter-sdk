@@ -15,7 +15,7 @@ their crypto stays identical.
 | `facade_calls.json` | the curated façade surface: which `(façade, method)` pairs exist and which `(pallet, call)` each maps to — 32 rows across the six façades |
 | `scope_bits.json` | the `ScopeSet` wire contract for member-tied API keys: bit = `scope * 2 + access`, encoded as a bare `u32`, plus a truth table for `is_superset` where Read and Write are independent |
 | `networks.json` | the default RPC endpoint each network name resolves to (`null` = no default). **Hand-maintained**, not emitted: it mirrors the public RPC column of matter-node's `CLAUDE.md` network table. A default that drifted to a host serving no public RPC broke every QuantumGuard boot on mainnet on 2026-09-16. Replayed by the default-endpoint test in each binding |
-| `required_scopes.json` | what each of the 155 calls of the ten scoped pallets requires of a delegated key — `required: null` for the 35 no key may ever make |
+| `required_scopes.json` | what every call of the ten scoped pallets requires of a delegated key — `required: null` for the ones no key may ever make |
 
 `api_keys.json` is a deliberate **sibling** of `seed_formats.json`, not an extension of
 it. `seed_formats.json` is a positive derivation vector that the dashboard also replays;
@@ -39,37 +39,43 @@ After any change to the cryptographic core, regenerate and re-run every binding'
 conformance suite:
 
 ```bash
-cargo test -p matter-vault-core --test roundtrip -- --ignored
-cargo test -p matter-vault --test seed_formats -- --ignored
-cargo test -p matter-vault-key --test parse -- --ignored
-cargo test -p matter-vault --features chain --test facade_calls -- --ignored
-cargo test -p matter-vault --features chain --test scope_vectors -- --ignored
+cargo test -p matter-sdk-core --test roundtrip -- --ignored
+cargo test -p matter-sdk --test seed_formats -- --ignored
+cargo test -p matter-sdk-key --test parse -- --ignored
+cargo test -p matter-sdk --features chain --test facade_calls -- --ignored
+cargo test -p matter-sdk --features chain --test scope_vectors -- --ignored
 ```
 
-`api_keys.json` is replayed by `crates/matter-vault-key/tests/parse.rs` (Rust),
-`packages/typescript/test/api-key.test.ts`, `bindings/python/tests/test_api_key.py`,
-and `packages/go/mattervault/apikey_test.go`. `facade_calls.json` is replayed by
-`packages/typescript-client/test/facade.test.ts`, `bindings/python/tests/test_facade.py`,
-and `packages/go/mattervault/facade_test.go` — each checks **both ways** (a fixture
+`api_keys.json` is replayed by `crates/matter-sdk-key/tests/parse.rs` (Rust),
+`packages/typescript-core/test/api-key.test.ts`, `bindings/python/tests/test_api_key.py`,
+and `packages/go/mattersdk/apikey_test.go`. `facade_calls.json` is replayed by
+`packages/typescript/test/facade.test.ts`, `bindings/python/tests/test_facade.py`,
+and `packages/go/mattersdk/facade_test.go` — each checks **both ways** (a fixture
 row without a method fails, and a method without a row fails); Rust has no
-reflection, so its emitter test pins the same list instead. See
+reflection, so its emitter test pins the same list instead, and
+`fixture_args_match_the_runtime_fields` checks every row's argument names and
+arity against the metadata blob.
+
+`required_scopes.json` is replayed in **one** direction only — each binding
+classifies every row it carries, and a call missing from the fixture fails
+nothing. Its completeness comes from being generated: CI re-runs the emitter and
+fails on any diff, and `runtime-drift` asks the live chains nightly. See
 [`../docs/parity.md`](../docs/parity.md).
 
-`scope_bits.json` and `required_scopes.json` are replayed the same way. They are
-fixtures rather than a shared implementation on purpose: a scope set is not
-cryptography, so it does not belong behind `matter-vault-ffi`, and the two
+Both are fixtures rather than a shared implementation on purpose: a scope set is not
+cryptography, so it does not belong behind `matter-sdk-ffi`, and the two
 `arg_sensitive` rows could not cross that boundary anyway without shipping the
 whole dynamic argument tree with them. Those two rows are marked in the fixture
 precisely because it can only pin their name-derived half — each binding covers
 the argument-dependent part in its own tests. `required_scopes.json` is generated
-against `testvectors/spec322_metadata.scale`, so regenerate that
+against `testvectors/spec329_metadata.scale`, so regenerate that
 blob first when the runtime adds a call; the recipe is in
-`crates/matter-vault/src/chain/scopes_table.rs`.
+`crates/matter-sdk/src/chain/scopes_table.rs`.
 
 Two metadata blobs sit beside the JSON, for the same runtime in the two versions the
-bindings actually read. `spec322_metadata.scale` is **V15**, which is what subxt and
+bindings actually read. `spec329_metadata.scale` is **V15**, which is what subxt and
 @polkadot load and the only version carrying runtime-API declarations; Rust resolves
-`BudgetsApi_agent_key` from it. `spec322_metadata_v14.scale` is what `state_getMetadata`
+`BudgetsApi_agent_key` from it. `spec329_metadata_v14.scale` is what `state_getMetadata`
 returns and all GSRPC and substrate-interface can decode, so it is the one Go pins its
 argument-sensitive scope rows against. Neither is a lesser copy of the other: each is
 what that binding sees in production.

@@ -10,7 +10,7 @@ import pathlib
 
 import pytest
 
-from matter_vault import (
+from matter_sdk import (
     CommitteeNode,
     DecryptError,
     DecryptParams,

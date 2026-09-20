@@ -7,7 +7,7 @@ drift, and so is a classification the fixture does not know about.
 import json
 from pathlib import Path
 
-from matter_vault.scopes import Access, Scope, ScopeSet, required_scopes
+from matter_sdk.scopes import Access, Scope, ScopeSet, required_scopes
 
 VECTORS = Path(__file__).resolve().parents[3] / "testvectors"
 BITS = json.loads((VECTORS / "scope_bits.json").read_text())

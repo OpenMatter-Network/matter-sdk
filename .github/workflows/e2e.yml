@@ -45,7 +45,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.0
       - name: Read-only client example (no key, no gas)
         working-directory: matter-sdk
-        run: cargo run -p matter-client-example
+        run: cargo run -p matter-sdk-client-example
       # The delegated path, read-only: resolve the grant and print it. Skipped
       # rather than failed when no scoped key is configured, because a fork has
       # no access to the secret and this is not the check that guards the code —
@@ -76,7 +76,7 @@ jobs:
         working-directory: matter-sdk
         env:
           TEST_KEY: ${{ secrets.TEST_KEY }}
-        run: cargo run -p matter-vault-e2e
+        run: cargo run -p matter-sdk-e2e
 
   typescript:
     needs: read-only
@@ -99,8 +99,8 @@ jobs:
         env:
           TEST_KEY: ${{ secrets.TEST_KEY }}
         run: |
-          npm --prefix ../../packages/typescript ci
-          npm --prefix ../../packages/typescript run build
+          npm --prefix ../../packages/typescript-core ci
+          npm --prefix ../../packages/typescript-core run build
           npm install
           npm start
 
@@ -124,7 +124,7 @@ jobs:
         run: |
           pip install maturin 'substrate-interface>=1.7'
           maturin build --release
-          pip install --force-reinstall --no-deps target/wheels/matter_vault-*.whl
+          pip install --force-reinstall --no-deps target/wheels/matter_sdk-*.whl
           python ../../examples/python-e2e/run.py
 
   go:
@@ -145,6 +145,6 @@ jobs:
         env:
           TEST_KEY: ${{ secrets.TEST_KEY }}
         run: |
-          cargo build -p matter-vault-ffi --release
+          cargo build -p matter-sdk-ffi --release
           cd examples/go-e2e
           LD_LIBRARY_PATH=../../target/release go run .

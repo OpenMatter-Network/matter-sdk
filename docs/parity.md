@@ -1,7 +1,7 @@
 # Language parity
 
-MatterSDK ships two pure Rust cores — `crates/matter-vault-core` (cryptography, wrapping
-`matter-crypto`) and `crates/matter-vault-key` (API-key ingestion and signing) — behind
+MatterSDK ships two pure Rust cores — `crates/matter-sdk-core` (cryptography, wrapping
+`matter-crypto`) and `crates/matter-sdk-key` (API-key ingestion and signing) — behind
 per-language shells. This table tracks how far each binding has progressed.
 
 - **Crypto surface** — the pure core functions (encrypt, signing payload, Lagrange,
@@ -59,20 +59,27 @@ and replayed by every binding:
   which is also why its two typed grant conveniences (`grant_to_user`,
   `grant_to_deployment`, thin wrappers over `grant`) sit outside the fixture.
 - `scope_bits.json` and `required_scopes.json` — the `ScopeSet` bit layout and what
-  each of the 155 calls of the ten scoped pallets requires. Replayed both ways, like
-  the façade fixture. They are fixtures rather than shared code on purpose: a scope set
-  is not cryptography, so it does not belong behind `matter-vault-ffi`, and the two
+  every call of the ten scoped pallets requires. Unlike the façade fixture, these are
+  replayed in one direction only: each binding checks that it classifies every row the
+  fixture carries, and nothing fails if the fixture itself is missing a call. The
+  fixture's *completeness* is guaranteed differently, because it is generated from the
+  checked-in metadata rather than hand-written: CI re-runs the emitter and fails if the
+  result differs, and the nightly `runtime-drift` job asks the live chains whether the
+  table still classifies every call they expose. (The fixture sat at spec 322 while the
+  runtime reached 329, which is the drift this arrangement closes.) They are fixtures
+  rather than shared code on purpose: a scope set
+  is not cryptography, so it does not belong behind `matter-sdk-ffi`, and the two
   `arg_sensitive` rows must read call arguments *before* anything is encoded, which
   could not cross that boundary without shipping the whole argument tree. Porting the
   table found a real divergence the moment TypeScript replayed it — TS had conflated
   "argument absent" with "argument is `None`", which quietly inverted the fail-safe
   direction for one row.
 - the live-metadata test — every curated `(pallet, call)` must exist on chain
-  (`cargo test -p matter-vault --features chain --test live_chain -- --ignored`).
+  (`cargo test -p matter-sdk --features chain --test live_chain -- --ignored`).
 
 **Where the languages still differ, deliberately.** Rust's chain client is behind a
 default-off `chain` cargo feature and TypeScript's is a separate package
-(`@openmatter-network/matter-client`) — the same opt-out expressed two ways, because a
+(`@openmatter-network/matter-sdk`) — the same opt-out expressed two ways, because a
 cargo feature that is off is genuinely not compiled while npm installs any declared
 dependency. Python's is the optional `[sdk]` extra. Go's is always present, since cgo
 already binds the core.
@@ -137,10 +144,10 @@ mechanism that lets the bindings diverge in *ergonomics* while never diverging i
 *cryptography*. Regenerate after any core change:
 
 ```bash
-cargo test -p matter-vault-core --test roundtrip -- --ignored
-cargo test -p matter-vault --test seed_formats -- --ignored
-cargo test -p matter-vault-key --test parse -- --ignored
-cargo test -p matter-vault --features chain --test facade_calls -- --ignored
+cargo test -p matter-sdk-core --test roundtrip -- --ignored
+cargo test -p matter-sdk --test seed_formats -- --ignored
+cargo test -p matter-sdk-key --test parse -- --ignored
+cargo test -p matter-sdk --features chain --test facade_calls -- --ignored
 ```
 
 The same mechanism now covers two non-cryptographic contracts:

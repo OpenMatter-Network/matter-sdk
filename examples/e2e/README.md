@@ -1,6 +1,6 @@
 # End-to-end test (live chain + committee)
 
-Exercises the **full** MatterVault path against a real OpenMatter chain and the live
+Exercises the **full** MatterSDK path against a real OpenMatter chain and the live
 matter-kgc committee: fetch context → encrypt → `secrets.storeSecret` → read back →
 threshold-decrypt → verify. This is the integration point that can't be tested
 offline.

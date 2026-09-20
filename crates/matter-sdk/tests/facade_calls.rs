@@ -1,0 +1,447 @@
+//! The curated façade surface, pinned as a fixture every language replays.
+//!
+//! The façades are hand-written per language (all four have a client), so the
+//! risk is that they drift: TypeScript grows a `secrets.purge` that Rust does not
+//! have, or two languages disagree about which pallet call a method maps to. Code
+//! generation was considered and rejected for now — a generated four-line wrapper
+//! is less reviewable than the wrapper itself. So instead of generating, **pin**:
+//! one fixture, emitted from Rust, replayed by every binding, exactly the
+//! mechanism `testvectors/` already uses for crypto.
+//!
+//! TypeScript, Python, and Go check the fixture both ways by reflection: a row
+//! without an implementation fails, and an implementation without a row fails —
+//! otherwise it would only catch half the drift. Rust has no reflection, so this
+//! file pins the same list by hand instead.
+//!
+//! Regenerate with:
+//!
+//! ```bash
+//! cargo test -p matter-sdk --features chain --test facade_calls -- --ignored
+//! ```
+
+#![cfg(feature = "chain")]
+
+use std::collections::BTreeSet;
+
+use serde_json::json;
+
+/// The curated surface: `(façade, method, pallet, call, ordered arg names)`.
+///
+/// This list is the contract. Adding a façade method means adding a row here and
+/// regenerating; the live-metadata test in `tests/live_chain.rs` separately
+/// proves each `(pallet, call)` actually exists on chain.
+const FACADE_CALLS: &[(&str, &str, &str, &str, &[&str])] = &[
+    // --- secrets ---
+    (
+        "secrets",
+        "store",
+        "Secrets",
+        "store_secret",
+        &["payload", "epoch", "label", "aad"],
+    ),
+    (
+        "secrets",
+        "rotate",
+        "Secrets",
+        "rotate_secret",
+        &["secret_id", "payload", "epoch", "aad"],
+    ),
+    (
+        "secrets",
+        "grant",
+        "Secrets",
+        "grant_access",
+        &["secret_id", "target"],
+    ),
+    (
+        "secrets",
+        "revoke",
+        "Secrets",
+        "revoke_access",
+        &["secret_id", "target"],
+    ),
+    (
+        "secrets",
+        "delete",
+        "Secrets",
+        "delete_secret",
+        &["secret_id"],
+    ),
+    // --- deployments (pallet-jobs) ---
+    (
+        "deployments",
+        "request",
+        "Jobs",
+        "request_deployment",
+        &["request"],
+    ),
+    (
+        "deployments",
+        "cancel",
+        "Jobs",
+        "cancel_deployment",
+        &["deployment"],
+    ),
+    (
+        "deployments",
+        "set_secret_ref",
+        "Jobs",
+        "set_deployment_secret_ref",
+        &["deployment", "secret_ref"],
+    ),
+    (
+        "deployments",
+        "set_env",
+        "Jobs",
+        "set_deployment_env",
+        &["deployment", "env_vars"],
+    ),
+    (
+        "deployments",
+        "register_wg_peer",
+        "Jobs",
+        "register_wg_peer",
+        &["deployment", "user_wg_pubkey"],
+    ),
+    // --- resources ---
+    (
+        "resources",
+        "register",
+        "Resources",
+        "register_resource",
+        &["resource_id", "ownership_proof", "name"],
+    ),
+    (
+        "resources",
+        "update_sku",
+        "Resources",
+        "update_sku",
+        &["uuid", "sku"],
+    ),
+    (
+        "resources",
+        "report_capacity",
+        "Resources",
+        "report_capacity",
+        &["capacity"],
+    ),
+    (
+        "resources",
+        "set_privacy",
+        "Resources",
+        "set_resource_privacy",
+        &["resource_id", "is_private"],
+    ),
+    (
+        "resources",
+        "allow",
+        "Resources",
+        "add_to_whitelist",
+        &["resource_id", "user"],
+    ),
+    (
+        "resources",
+        "disallow",
+        "Resources",
+        "remove_from_whitelist",
+        &["resource_id", "user"],
+    ),
+    // --- staking ---
+    ("staking", "bond", "Staking", "bond", &["value", "payee"]),
+    // The runtime spells this field `max_additional`; `additional` was wrong here
+    // and in Python, which passes arguments by name and so failed at encode time.
+    (
+        "staking",
+        "bond_extra",
+        "Staking",
+        "bond_extra",
+        &["max_additional"],
+    ),
+    ("staking", "unbond", "Staking", "unbond", &["value"]),
+    (
+        "staking",
+        "withdraw_unbonded",
+        "Staking",
+        "withdraw_unbonded",
+        &["num_slashing_spans"],
+    ),
+    ("staking", "nominate", "Staking", "nominate", &["targets"]),
+    ("staking", "chill", "Staking", "chill", &[]),
+    (
+        "staking",
+        "join_pool",
+        "NominationPools",
+        "join",
+        &["amount", "pool_id"],
+    ),
+    (
+        "staking",
+        "claim_pool_payout",
+        "NominationPools",
+        "claim_payout",
+        &[],
+    ),
+    // --- organizations & budgets ---
+    // `create_org(origin)` takes no extrinsic arguments: the org id is derived
+    // from the signer and a sequence number. The `metadata` argument this row
+    // used to claim never existed on chain.
+    ("orgs", "create", "Organizations", "create_org", &[]),
+    (
+        "orgs",
+        "add_member",
+        "Organizations",
+        "add_member",
+        &["org", "who", "role"],
+    ),
+    (
+        "orgs",
+        "remove_member",
+        "Organizations",
+        "remove_member",
+        &["org", "who"],
+    ),
+    (
+        "orgs",
+        "allot",
+        "Budgets",
+        "allot",
+        &["org", "project", "amount"],
+    ),
+    (
+        "orgs",
+        "authorize_secrets_agent",
+        "Budgets",
+        "authorize_project_secrets_agent",
+        &["org", "project", "who"],
+    ),
+    (
+        "orgs",
+        "revoke_secrets_agent",
+        "Budgets",
+        "revoke_project_secrets_agent",
+        &["org", "project", "who"],
+    ),
+    // --- keys ---
+    // Member-signed, never key-signed: the runtime puts the roster calls on its
+    // never-admitted list so a key cannot widen itself. `keys.lookup` is a
+    // runtime-API read, not an extrinsic, so it has no row here.
+    (
+        "keys",
+        "authorize",
+        "Budgets",
+        "authorize_agent_key",
+        &["key", "scopes"],
+    ),
+    ("keys", "revoke", "Budgets", "revoke_agent_key", &["key"]),
+];
+
+/// Façade methods that are **reads**, not extrinsics: `(façade, method,
+/// state_call, ordered arg names)`.
+///
+/// They need pinning for the same reason the extrinsics do — a binding that
+/// grows or drops one has drifted — but they route through a runtime API rather
+/// than a `(pallet, call)` pair, so they cannot share the table above without
+/// giving every row two meanings.
+const FACADE_RUNTIME_API_CALLS: &[(&str, &str, &str, &[&str])] =
+    &[("keys", "lookup", "BudgetsApi_agent_key", &["key"])];
+
+#[test]
+fn every_row_is_unique() {
+    // A duplicated (façade, method) row would let two rows disagree about the
+    // same method and still pass — and a method may not appear in both tables,
+    // since it cannot be an extrinsic and a read at once.
+    let mut seen = BTreeSet::new();
+    for (facade, method, ..) in FACADE_CALLS {
+        assert!(
+            seen.insert((*facade, *method)),
+            "duplicate row for {facade}.{method}"
+        );
+    }
+    for (facade, method, ..) in FACADE_RUNTIME_API_CALLS {
+        assert!(
+            seen.insert((*facade, *method)),
+            "{facade}.{method} is pinned as both an extrinsic and a read"
+        );
+    }
+}
+
+/// Every row's argument names and arity match the runtime's own fields.
+///
+/// The fixture replays in the other bindings against fakes, so a wrong argument
+/// name survives every offline test and fails only when a real node decodes the
+/// extrinsic — or, for a binding that passes arguments by name, at encode time in
+/// the user's process. Two rows were wrong this way: `orgs.create` claimed a
+/// `metadata` argument `create_org` never had, and `staking.bond_extra` said
+/// `additional` where the runtime says `max_additional`.
+#[test]
+fn fixture_args_match_the_runtime_fields() {
+    use parity_scale_codec::Decode;
+    let bytes: &[u8] = include_bytes!("../../../testvectors/spec329_metadata.scale");
+    let metadata = subxt::Metadata::decode(&mut &bytes[..]).expect("fixture decodes");
+
+    let mut problems: Vec<String> = Vec::new();
+    for (facade, method, pallet, call, args) in FACADE_CALLS {
+        let Some(variant) = metadata
+            .pallet_by_name(pallet)
+            .and_then(|p| p.call_variants())
+            .and_then(|v| v.iter().find(|v| v.name == *call))
+        else {
+            problems.push(format!(
+                "{facade}.{method}: {pallet}.{call} is not on chain"
+            ));
+            continue;
+        };
+        let actual: Vec<&str> = variant
+            .fields
+            .iter()
+            .filter_map(|f| f.name.as_deref())
+            .collect();
+        if actual != *args {
+            problems.push(format!(
+                "{facade}.{method} ({pallet}.{call}): fixture says {args:?}, runtime says {actual:?}"
+            ));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "{} façade row(s) disagree with the runtime:\n  {}",
+        problems.len(),
+        problems.join("\n  ")
+    );
+}
+
+#[test]
+fn pallet_and_call_names_are_runtime_shaped() {
+    // Pallets are PascalCase and calls are snake_case in metadata. A camelCase
+    // call here would resolve in @polkadot but not in subxt, which is exactly the
+    // cross-language drift this fixture exists to prevent.
+    for (facade, method, pallet, call, _) in FACADE_CALLS {
+        let first = pallet.chars().next().expect("pallet name is not empty");
+        assert!(
+            first.is_ascii_uppercase(),
+            "{facade}.{method}: pallet {pallet:?} should be PascalCase as metadata spells it"
+        );
+        assert!(
+            call.chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
+            "{facade}.{method}: call {call:?} should be snake_case as metadata spells it"
+        );
+    }
+}
+
+#[test]
+fn runtime_api_rows_name_a_state_call() {
+    // `Trait_method`, which is what `state_call` takes — not a `pallet.call`.
+    for (facade, method, state_call, _) in FACADE_RUNTIME_API_CALLS {
+        let (trait_name, method_name) = state_call
+            .split_once('_')
+            .unwrap_or_else(|| panic!("{facade}.{method}: {state_call:?} is not Trait_method"));
+        assert!(
+            trait_name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_uppercase()),
+            "{facade}.{method}: {trait_name:?} should be the PascalCase runtime-API trait"
+        );
+        assert!(
+            method_name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
+            "{facade}.{method}: {method_name:?} should be snake_case"
+        );
+    }
+}
+
+#[test]
+fn the_curated_facades_are_the_six_documented_ones() {
+    // The set of façades is a documented promise (README, docs/parity.md). Adding
+    // a seventh should be a deliberate act that updates those too, not a silent
+    // consequence of adding a row.
+    let facades: BTreeSet<&str> = FACADE_CALLS
+        .iter()
+        .map(|(f, ..)| *f)
+        .chain(FACADE_RUNTIME_API_CALLS.iter().map(|(f, ..)| *f))
+        .collect();
+    assert_eq!(
+        facades,
+        BTreeSet::from([
+            "secrets",
+            "deployments",
+            "orgs",
+            "resources",
+            "staking",
+            "keys",
+        ]),
+    );
+}
+
+#[test]
+fn secrets_covers_every_pallet_secrets_call() {
+    // pallet-secrets has exactly five extrinsics and the SDK previously built
+    // three of them, leaving `revoke_access` — the call that contains a leaked
+    // signer — with no builder at all. All five must stay covered.
+    let covered: BTreeSet<&str> = FACADE_CALLS
+        .iter()
+        .filter(|(_, _, pallet, ..)| *pallet == "Secrets")
+        .map(|(_, _, _, call, _)| *call)
+        .collect();
+    assert_eq!(
+        covered,
+        BTreeSet::from([
+            "store_secret",
+            "rotate_secret",
+            "grant_access",
+            "revoke_access",
+            "delete_secret",
+        ]),
+    );
+}
+
+#[test]
+#[ignore = "writes testvectors/facade_calls.json; run explicitly to regenerate"]
+fn emit_facade_call_vectors() {
+    let calls: Vec<_> = FACADE_CALLS
+        .iter()
+        .map(|(facade, method, pallet, call, args)| {
+            json!({
+                "facade": facade,
+                "method": method,
+                "pallet": pallet,
+                "call": call,
+                "args": args,
+            })
+        })
+        .collect();
+
+    let runtime_api_calls: Vec<_> = FACADE_RUNTIME_API_CALLS
+        .iter()
+        .map(|(facade, method, state_call, args)| {
+            json!({
+                "facade": facade,
+                "method": method,
+                "state_call": state_call,
+                "args": args,
+            })
+        })
+        .collect();
+
+    let vectors = json!({
+        "comment": "The curated typed façade surface. Every binding with a chain \
+                    client must expose exactly these (facade, method) pairs — the \
+                    union of both arrays, and no more. `calls` are extrinsics, each \
+                    mapping to the named (pallet, call) with these ordered args; \
+                    `runtime_api_calls` are reads routed through a `state_call` \
+                    instead, which is why they cannot share the same table. Method \
+                    names are snake_case here; bindings apply their own convention \
+                    (TypeScript camelCases them).",
+        "calls": calls,
+        "runtime_api_calls": runtime_api_calls,
+    });
+
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../testvectors/facade_calls.json"
+    );
+    std::fs::write(path, serde_json::to_string_pretty(&vectors).unwrap()).unwrap();
+    println!("wrote {path}");
+}

@@ -21,13 +21,13 @@
 //! | `MATTER_CONFIRM` | must be `yes` for a signing client on mainnet |
 //! | `MATTER_SUBMIT` | must be `yes` to submit anything |
 //!
-//! This is the reference for the scoped-key path; `crates/matter-vault/tests/
+//! This is the reference for the scoped-key path; `crates/matter-sdk/tests/
 //! scoped_keys_dev.rs` covers the same ground against a dev node, including the
 //! mint and revoke a key cannot perform for itself.
 
 use anyhow::{bail, Context, Result};
-use matter_vault::chain::{MatterClient, MatterConfig, Mode, Network, Value};
-use matter_vault::{Access, ApiKey, Scope, SdkError};
+use matter_sdk::chain::{MatterClient, MatterConfig, Mode, Network, Value};
+use matter_sdk::{Access, ApiKey, Scope, SdkError};
 
 /// Opt-in gate for anything that costs gas.
 const SUBMIT_ENV: &str = "MATTER_SUBMIT";
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "matter_vault=info".into()),
+                .unwrap_or_else(|_| "matter_sdk=info".into()),
         )
         .with_target(false)
         .init();
@@ -119,7 +119,7 @@ fn describe_grant(client: &MatterClient) -> Result<Grant> {
 }
 
 struct Grant {
-    _principal: matter_vault::AccountId,
+    _principal: matter_sdk::AccountId,
     can_write_deployments: bool,
 }
 

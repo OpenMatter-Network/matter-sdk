@@ -2,11 +2,11 @@ module github.com/openmatter-network/matter-sdk/examples/go-e2e
 
 go 1.22
 
-replace github.com/openmatter-network/matter-sdk/packages/go/mattervault => ../../packages/go/mattervault
+replace github.com/openmatter-network/matter-sdk-go/v2 => ../../packages/go/mattersdk
 
 require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
-	github.com/openmatter-network/matter-sdk/packages/go/mattervault v0.0.0-00010101000000-000000000000
+	github.com/openmatter-network/matter-sdk-go/v2 v2.0.0
 )
 
 require (

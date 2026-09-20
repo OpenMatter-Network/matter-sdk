@@ -16,7 +16,7 @@ from scalecodec.base import RuntimeConfigurationObject  # noqa: E402
 from scalecodec.type_registry import load_type_registry_preset  # noqa: E402
 from substrateinterface.exceptions import SubstrateRequestException  # noqa: E402
 
-from matter_vault.chain import ChainClient, ChainError  # noqa: E402
+from matter_sdk.chain import ChainClient, ChainError  # noqa: E402
 
 AGENT_KEY_PALLET = "Budgets"
 AGENT_KEY_CALL = "authorize_agent_key"

@@ -10,9 +10,9 @@ import pytest
 
 pytest.importorskip("substrateinterface")
 
-from matter_vault import ApiKey  # noqa: E402
-from matter_vault.chain import ChainError  # noqa: E402
-from matter_vault.client import (  # noqa: E402
+from matter_sdk import ApiKey  # noqa: E402
+from matter_sdk.chain import ChainError  # noqa: E402
+from matter_sdk.client import (  # noqa: E402
     MAINNET_TOKEN_SYMBOL,
     TESTNET_GENESIS,
     ChainProperties,
@@ -88,7 +88,7 @@ def _properties(symbol="MTR-Test", genesis=TESTNET_GENESIS, declared=18, effecti
 
 
 def _client(properties=None, key=SEED_HEX, chain=None, **kwargs):
-    from matter_vault.chain import api_key_signer
+    from matter_sdk.chain import api_key_signer
 
     api_key = ApiKey(key) if key else None
     return MatterClient(
@@ -267,7 +267,7 @@ PRINCIPAL = bytes(32 * [9])
 
 def _delegated(scopes=None):
     """A client whose key the chain says acts for PRINCIPAL."""
-    from matter_vault.scopes import Access, Scope, ScopeSet
+    from matter_sdk.scopes import Access, Scope, ScopeSet
 
     scopes = scopes if scopes is not None else ScopeSet.single(Scope.DEPLOYMENTS, Access.WRITE)
     chain = _FakeChain(agent_key=(PRINCIPAL, scopes.bits))
@@ -293,7 +293,7 @@ def test_a_delegated_client_wraps_its_writes():
 
 
 def test_a_delegated_client_refuses_an_out_of_scope_call_before_submitting():
-    from matter_vault import NotPermittedError
+    from matter_sdk import NotPermittedError
 
     client, chain, _scopes = _delegated()
     # Naming the missing scope is the whole point: the chain's own answer to a
@@ -304,8 +304,8 @@ def test_a_delegated_client_refuses_an_out_of_scope_call_before_submitting():
 
 
 def test_a_delegated_client_refuses_calls_no_key_may_make():
-    from matter_vault import NotPermittedError
-    from matter_vault.scopes import ScopeSet
+    from matter_sdk import NotPermittedError
+    from matter_sdk.scopes import ScopeSet
 
     client, chain, _scopes = _delegated(ScopeSet.all())
     for pallet, call in [
@@ -322,7 +322,7 @@ def test_a_delegated_client_refuses_calls_no_key_may_make():
 
 
 def test_a_delegated_client_reads_the_secret_ref_argument():
-    from matter_vault import NotPermittedError
+    from matter_sdk import NotPermittedError
 
     client, chain, _scopes = _delegated()
     # Clearing a reference needs only deployments:w.
@@ -355,7 +355,7 @@ def test_a_failing_agent_key_lookup_fails_the_connect_rather_than_going_direct()
     # client to Direct, after which every write is signed as the key's own
     # balance-less account and dies in the pool as "cannot pay fees" — a message
     # that says nothing about the real cause. Unknown is not the same as absent.
-    from matter_vault.chain import ChainError
+    from matter_sdk.chain import ChainError
 
     chain = _FakeChain(agent_key_error=ChainError("ws closed", pallet="Budgets", call="agent_key"))
     with pytest.raises(ChainError):
@@ -376,7 +376,7 @@ def test_connect_diagnostics_go_to_a_logger_not_to_stderr(caplog):
     import logging
 
     chain = _FakeChain(agent_key=(bytes(range(32)), 0b0100))
-    with caplog.at_level(logging.INFO, logger="matter_vault.client"):
+    with caplog.at_level(logging.INFO, logger="matter_sdk.client"):
         client = _client(chain=chain)
 
     assert client.is_delegated
@@ -390,7 +390,7 @@ def test_a_revoked_key_is_named_as_revoked_and_stays_delegated():
     # The failure this guards: a revoked key that fell back to signing directly
     # would fail the next call for want of funds it never had, and the caller
     # would read "cannot pay fees" instead of "your key was revoked".
-    from matter_vault.chain import PoolRejectedError
+    from matter_sdk.chain import PoolRejectedError
 
     principal = bytes(range(32))
     # Secrets:Write, so the call clears the local check and reaches the chain.
@@ -407,7 +407,7 @@ def test_a_revoked_key_is_named_as_revoked_and_stays_delegated():
 
 
 def test_a_rescoped_key_reports_the_missing_scope_with_the_fresh_set():
-    from matter_vault.chain import PoolRejectedError
+    from matter_sdk.chain import PoolRejectedError
 
     principal = bytes(range(32))
     # Secrets:Write initially, so the call passes the local check.
@@ -425,7 +425,7 @@ def test_a_rescoped_key_reports_the_missing_scope_with_the_fresh_set():
 def test_a_call_no_key_may_make_is_told_apart_from_a_missing_scope():
     # Widening a key fixes one and can never fix the other, so a caller that
     # retries on a permissions error needs to know which it got.
-    from matter_vault.client import NeverAdmittedError
+    from matter_sdk.client import NeverAdmittedError
 
     client = _client(chain=_FakeChain(agent_key=(bytes(range(32)), 0b100000)))
 

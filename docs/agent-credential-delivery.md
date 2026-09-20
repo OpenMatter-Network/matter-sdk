@@ -1,4 +1,4 @@
-# Data Marketplace: data-source credential delivery via MatterVault
+# Data Marketplace: data-source credential delivery via MatterSDK
 
 Status: **Implemented** (designed 2026-07-18; the SDK-side pieces — `Aad::DatasetSourceCredsV1`
 and `recover_secret` — shipped with the v1.0.0 chain-client expansion)
@@ -28,9 +28,9 @@ are small and additive.
 
 | Piece | Where |
 |---|---|
-| `Aad::DatasetSourceCredsV1 = "matter-dataset/source-creds/v1"` | `crates/matter-vault-core/src/aad.rs` (enum is `#[non_exhaustive]`/append-only — non-breaking), mirrored in all four bindings |
+| `Aad::DatasetSourceCredsV1 = "matter-dataset/source-creds/v1"` | `crates/matter-sdk-core/src/aad.rs` (enum is `#[non_exhaustive]`/append-only — non-breaking), mirrored in all four bindings |
 | Documented canonical payload schema for the new AAD (below) | this doc + rustdoc on the variant |
-| `recover_secret` one-call helper for embedded Rust consumers | `crates/matter-vault/src/lib.rs`, thin composition over the existing `committee`/`transport`/`open_secret` orchestration |
+| `recover_secret` one-call helper for embedded Rust consumers | `crates/matter-sdk/src/lib.rs`, thin composition over the existing `committee`/`transport`/`open_secret` orchestration |
 | Consumer guidance for the matter-ml agent | this doc |
 
 Explicit non-goals: no SDK→agent HTTP client; no new crypto (seal/decrypt paths are
@@ -42,7 +42,7 @@ SDK rather than its own Substrate client. The sealed-secret flow is unchanged.)
 ## Why this shape
 
 - **Reuses the SDK's entire purpose.** Sealing, on-chain storage call-builders
-  (`StoreSecret`/`RotateSecret`/`GrantAccess` in `crates/matter-vault/src/calls.rs`), the
+  (`StoreSecret`/`RotateSecret`/`GrantAccess` in `crates/matter-sdk/src/calls.rs`), the
   `Signer` abstraction, committee quorum transport, and zeroizing `open_secret` all exist. The
   only genuinely new thing anywhere is *the agent linking the Rust crate* (tracked in the
   matter-ml doc).
@@ -107,7 +107,7 @@ Unknown fields must be ignored by consumers (forward compatibility); breaking ch
 - **In transit**: ciphertext on-chain; partial decryptions over HTTPS to committee nodes;
   the only plaintext existence is inside the agent process during ingest, in `Zeroizing`
   buffers (`Plaintext` is already a zeroizing, non-printing type in
-  `crates/matter-vault-core/src/types.rs`).
+  `crates/matter-sdk-core/src/types.rs`).
 - **Authorization**: on-chain grant, auditable; per-request recipient-binding + block-hash
   freshness in `PartialDecryptRequest` (existing MV-C1 anti-replay).
 - **What the SDK may persist**: nothing (unchanged — the SDK is stateless).
@@ -126,14 +126,14 @@ pub async fn recover_secret(
 ```
 
 (pure composition of existing pieces; no new crypto — see
-`crates/matter-vault/src/lib.rs`).
+`crates/matter-sdk/src/lib.rs`).
 
 ## Interacts with
 
 | Component | Contract |
 |---|---|
-| datavisor_v2 | already depends on `@openmatter-network/matter-vault` (seam: `src/lib/kgc/vault.ts`); adds the new `Aad` tag usage + store/grant/revoke calls in the register wizard |
-| matter-ml agent | new consumer of the Rust `matter-vault` crate (its side is specced in `matter-ml/docs/data-source-connectors.md`) |
+| datavisor_v2 | already depends on `@openmatter-network/matter-sdk-core` (seam: `src/lib/kgc/vault.ts`); adds the new `Aad` tag usage + store/grant/revoke calls in the register wizard |
+| matter-ml agent | new consumer of the Rust `matter-sdk` crate (its side is specced in `matter-ml/docs/data-source-connectors.md`) |
 | matter-node | `pallet-secrets` (store/grant/revoke/rotate extrinsics; `SecretsApi::is_authorized` gates KGC partial-decrypts). No `pallet-datasets` coupling in the SDK |
 | KGC committee | unchanged transport (`/health`, `/partial-decrypt`) |
 

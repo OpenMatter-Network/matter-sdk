@@ -9,7 +9,7 @@ Build the extension first, then run:
 import json
 import pathlib
 
-import matter_vault
+import matter_sdk
 
 VECTORS = pathlib.Path(__file__).resolve().parents[3] / "testvectors"
 
@@ -20,7 +20,7 @@ def _load(name):
 
 def test_signing_payload_conformance():
     for case in _load("signing_payload.json")["cases"]:
-        got = matter_vault.signing_payload(
+        got = matter_sdk.signing_payload(
             int(case["secret_id"]),
             case["subset"],
             bytes.fromhex(case["block_hash_hex"]),
@@ -31,7 +31,7 @@ def test_signing_payload_conformance():
 
 def test_lagrange_conformance():
     for case in _load("lagrange.json")["cases"]:
-        got = matter_vault.lagrange_for(case["point"], case["subset"])
+        got = matter_sdk.lagrange_for(case["point"], case["subset"])
         assert got.hex() == case["lambda_hex"]
 
 
@@ -46,7 +46,7 @@ def test_open_secret_conformance():
         )
         for p in v["partials"]
     ]
-    plaintext = matter_vault.open_secret(
+    plaintext = matter_sdk.open_secret(
         bytes.fromhex(v["shared_a_hex"]),
         bytes.fromhex(v["capsule_hex"]),
         int(v["secret_id"]),

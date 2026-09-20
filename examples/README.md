@@ -44,7 +44,7 @@ mistake:
 
 ```bash
 # Rust — read-only against testnet
-MATTER_API_KEY=$TEST_KEY cargo run -p matter-client-example
+MATTER_API_KEY=$TEST_KEY cargo run -p matter-sdk-client-example
 
 # A member-tied scoped key: what it acts as, and what it is refused
 MATTER_API_KEY=$MATTER_DELEGATED_KEY cargo run -p matter-delegated-e2e
@@ -56,7 +56,7 @@ cd examples/client-typescript && npm install && MATTER_API_KEY=$TEST_KEY npm sta
 MATTER_API_KEY=$TEST_KEY ./bindings/python/.venv/bin/python examples/client-python/run.py
 
 # Go — links the FFI cdylib, so it needs the library on its search path
-cargo build -p matter-vault-ffi --release
+cargo build -p matter-sdk-ffi --release
 cd examples/client-go && LD_LIBRARY_PATH=../../target/release MATTER_API_KEY=$TEST_KEY go run .
 ```
 

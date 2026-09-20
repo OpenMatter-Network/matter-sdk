@@ -22,7 +22,7 @@ def _cases():
 
 
 def test_keypair_from_seed_accepts_both_encodings():
-    from matter_vault.chain import ChainClient
+    from matter_sdk.chain import ChainClient
 
     for case in _cases():
         from_hex = ChainClient.keypair_from_seed("0x" + case["mini_secret_hex"])

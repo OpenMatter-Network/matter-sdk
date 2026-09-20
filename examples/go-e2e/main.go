@@ -1,4 +1,4 @@
-// MatterVault end-to-end test against a LIVE chain + committee (Go) — the Go
+// MatterSDK end-to-end test against a LIVE chain + committee (Go) — the Go
 // analogue of examples/e2e/run.ts: connect -> fetch context -> encrypt ->
 // secrets.storeSecret (pays a fee) -> read back -> threshold-decrypt -> assert.
 //
@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-	mv "github.com/openmatter-network/matter-sdk/packages/go/mattervault"
+	mv "github.com/openmatter-network/matter-sdk-go/v2"
 )
 
 const (

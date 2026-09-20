@@ -1,9 +1,9 @@
-//! wasm-bindgen binding over [`matter_vault_core`].
+//! wasm-bindgen binding over [`matter_sdk_core`].
 //!
 //! Exposes the pure cryptographic steps to JS/TS: seal a secret, the canonical
 //! request signing payload, the per-node Lagrange coefficient, the up-front proof
 //! check, and verify-aggregate-open. Networking and the quorum loop stay in
-//! TypeScript (see `packages/typescript`) — exactly the split the core enforces.
+//! TypeScript (see `packages/typescript-core`) — exactly the split the core enforces.
 //!
 //! It also exposes [`ApiKeyJs`], because key *derivation* is a cryptographic
 //! step: doing it here rather than in `@polkadot/util-crypto` is what keeps
@@ -14,8 +14,8 @@
 //! as a `"0x"`+hex string (JS has no native u128).
 
 use js_sys::Uint8Array;
-use matter_vault_core as core;
-use matter_vault_key::{ApiKey, KeyError};
+use matter_sdk_core as core;
+use matter_sdk_key::{ApiKey, KeyError};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
@@ -143,7 +143,7 @@ impl EncryptedSecretJs {
 /// Seal `secrets` under the committee joint public key.
 ///
 /// `joint_pk` is the bincode `PublicKey`; `aad` is the associated data (use a
-/// MatterVault AAD tag — see the TS `Aad` enum); `binding_id` defaults to 32
+/// AAD tag — see the TS `Aad` enum); `binding_id` defaults to 32
 /// random bytes when omitted.
 #[wasm_bindgen(js_name = encryptSecret)]
 pub fn encrypt_secret(

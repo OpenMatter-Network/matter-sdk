@@ -6,10 +6,10 @@
 //!
 //! ```bash
 //! # Read-only: connects, reads state, and dry-describes what it would submit.
-//! MATTER_API_KEY=$TEST_KEY cargo run -p matter-client-example
+//! MATTER_API_KEY=$TEST_KEY cargo run -p matter-sdk-client-example
 //!
 //! # Actually submit the (cheap, self-targeted) demo extrinsic.
-//! MATTER_API_KEY=$TEST_KEY MATTER_SUBMIT=yes cargo run -p matter-client-example
+//! MATTER_API_KEY=$TEST_KEY MATTER_SUBMIT=yes cargo run -p matter-sdk-client-example
 //! ```
 //!
 //! | Variable | Meaning |
@@ -21,8 +21,8 @@
 //! | `MATTER_SUBMIT` | must be `yes` to submit anything |
 
 use anyhow::{Context, Result};
-use matter_vault::chain::{MatterClient, MatterConfig, Network, Value};
-use matter_vault::ApiKey;
+use matter_sdk::chain::{MatterClient, MatterConfig, Network, Value};
+use matter_sdk::ApiKey;
 
 /// Opt-in gate for anything that costs gas.
 const SUBMIT_ENV: &str = "MATTER_SUBMIT";

@@ -15,7 +15,7 @@ name = "delegated-e2e"
 path = "src/main.rs"
 
 [dependencies]
-matter-vault = { path = "../../crates/matter-vault", features = ["chain"] }
+matter-sdk = { path = "../../crates/matter-sdk", features = ["chain"] }
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
 anyhow = "1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }

@@ -57,5 +57,5 @@ jobs:
           MATTER_RPC_URL: ${{ matrix.rpc }}
           MATTER_NETWORK: ${{ matrix.network }}
         run: |
-          cargo test -p matter-vault --features chain --test live_chain \
+          cargo test -p matter-sdk --features chain --test live_chain \
             -- --ignored --nocapture

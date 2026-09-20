@@ -1,4 +1,4 @@
-// MatterVault end-to-end test against a LIVE chain + committee.
+// MatterSDK end-to-end test against a LIVE chain + committee.
 //
 // Flow: connect → fetch committee context → encrypt → secrets.storeSecret →
 // read the secret back from chain → threshold-decrypt → assert round trip.
@@ -34,7 +34,7 @@ import {
   substrateSigner,
   type CommitteeNode,
   type EncryptedSecret,
-} from "../../packages/typescript/src/index.js";
+} from "../../packages/typescript-core/src/index.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -88,7 +88,7 @@ function readConfig(): Config | null {
 function usage(): void {
   console.error(
     [
-      "MatterVault e2e test — set these env vars and re-run:",
+      "Secrets e2e test — set these env vars and re-run:",
       "  MATTER_SIGNER_SEED=<sr25519 SURI>  (required; a FUNDED account. TEST_KEY also accepted)",
       "  MATTER_RPC_URL=wss://<node>        (default: testnet)",
       "  MATTER_NETWORK=testnet|mainnet     (default testnet)",

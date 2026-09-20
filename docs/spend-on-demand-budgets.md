@@ -26,13 +26,13 @@ fallback).
 
 ## Work items
 
-- [ ] `crates/matter-vault/src/chain/facade.rs:410-420`: remove `allot`; add
+- [ ] `crates/matter-sdk/src/chain/facade.rs:410-420`: remove `allot`; add
       `set_project_spend_cap` and a `project_spend` read (runtime API).
-- [ ] Mirror in every binding: `bindings/python/python/matter_vault/facade.py`,
-      `packages/typescript-client/src/facade.ts`,
-      `packages/go/mattervault/facade.go`.
-- [ ] `testvectors/facade_calls.json`, `crates/matter-vault/tests/facade_calls.rs`,
-      `crates/matter-vault/tests/live_chain.rs`: drop the `allot` vectors, add
+- [ ] Mirror in every binding: `bindings/python/python/matter_sdk/facade.py`,
+      `packages/typescript/src/facade.ts`,
+      `packages/go/mattersdk/facade.go`.
+- [ ] `testvectors/facade_calls.json`, `crates/matter-sdk/tests/facade_calls.rs`,
+      `crates/matter-sdk/tests/live_chain.rs`: drop the `allot` vectors, add
       the cap call; keep `docs/parity.md` in step.
 - [ ] Regenerate the vault's subxt metadata from a spec-323 node
       (`transaction_version` 10: stale metadata is rejected at submission).

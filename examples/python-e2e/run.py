@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MatterVault end-to-end test against a LIVE chain + committee (Python).
+"""MatterSDK end-to-end test against a LIVE chain + committee (Python).
 
 The Python analogue of examples/e2e/run.ts and examples/rust-e2e: connect -> fetch
 committee context -> encrypt -> secrets.storeSecret (pays a fee) -> read back ->
@@ -18,7 +18,7 @@ Run:  ./bindings/python/.venv/bin/python examples/python-e2e/run.py
 import os
 import sys
 
-from matter_vault import (
+from matter_sdk import (
     Aad,
     ChainClient,
     CommitteeNode,
@@ -62,7 +62,7 @@ def main() -> int:
         print("set MATTER_SIGNER_SEED or TEST_KEY (sr25519 SURI / 0x-seed)", file=sys.stderr)
         return 2
     if ChainClient is None:
-        print("install the chain client: pip install matter-vault[sdk]", file=sys.stderr)
+        print("install the chain client: pip install matter-sdk[sdk]", file=sys.stderr)
         return 2
     secret_text = os.environ.get("MATTER_SECRET", DEFAULT_SECRET)
     existing = os.environ.get("MATTER_SECRET_ID")

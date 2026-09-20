@@ -7,7 +7,7 @@ entitled to on MatterChain: request deployments, manage resources, stake, run or
 budgets, govern — every pallet the runtime exposes, resolved from live metadata rather
 than vendored types.
 
-It also gives you **MatterVault**: seal a secret (API keys, database URLs, env vars)
+It also gives you **MatterSDK**: seal a secret (API keys, database URLs, env vars)
 under a distributed committee's joint public key, store the ciphertext on-chain, and
 later **recover it** only with the cooperation of a `t`-of-`n` quorum. No single party —
 not even the committee operators — can decrypt your secret alone.
@@ -24,7 +24,7 @@ not even the committee operators — can decrypt your secret alone.
 ## Why a committee?
 
 A normal secrets manager has a master key — steal it and you have every secret.
-MatterVault has **no master key**. The decryption key exists only as Shamir shares
+MatterSDK has **no master key**. The decryption key exists only as Shamir shares
 split across `n` independent committee nodes; recovering a secret needs `t` of them
 to each compute a *partial decryption* that your client aggregates locally. The
 cryptography is RLWE/BGV threshold decryption with zero-knowledge proofs at every
@@ -43,14 +43,14 @@ be four chances to get lattice crypto subtly wrong).
 
 | Layer | What it is | Where |
 |---|---|---|
-| **Crypto core** | Pure, non-networked crypto + wire contract: `encrypt`, `open_secret`, signing payload, Lagrange, proof verify. | `crates/matter-vault-core` |
-| **Key core** | API-key ingestion + signing (`ApiKey`, `KeySigner`) — wasm-clean, so every language shares one derivation. | `crates/matter-vault-key` |
-| **Rust SDK** | Committee HTTP client, quorum + retry, `Signer`, call builders; the chain client + façades behind the `chain` feature. | `crates/matter-vault` |
-| **C ABI** | FFI over the cores; drives the Go binding. | `crates/matter-vault-ffi` |
+| **Crypto core** | Pure, non-networked crypto + wire contract: `encrypt`, `open_secret`, signing payload, Lagrange, proof verify. | `crates/matter-sdk-core` |
+| **Key core** | API-key ingestion + signing (`ApiKey`, `KeySigner`) — wasm-clean, so every language shares one derivation. | `crates/matter-sdk-key` |
+| **Rust SDK** | Committee HTTP client, quorum + retry, `Signer`, call builders; the chain client + façades behind the `chain` feature. | `crates/matter-sdk` |
+| **C ABI** | FFI over the cores; drives the Go binding. | `crates/matter-sdk-ffi` |
 | **wasm binding** | `wasm-bindgen` over the cores; drives the TS packages. | `bindings/wasm` |
-| **TypeScript** | `matter-vault` (seal/recover, zero runtime deps) + `matter-client` (chain client + façades). | `packages/typescript`, `packages/typescript-client` |
+| **TypeScript** | `matter-sdk` (seal/recover, zero runtime deps) + `matter-client` (chain client + façades). | `packages/typescript-core`, `packages/typescript` |
 | **Python** | PyO3 binding + pure-Python online layer; chain client via the `[sdk]` extra. | `bindings/python` |
-| **Go** | cgo over the C ABI + native online layer and chain client. | `packages/go/mattervault` |
+| **Go** | cgo over the C ABI + native online layer and chain client. | `packages/go/mattersdk` |
 
 Networking, the quorum loop, and **signing** are idiomatic per language; only the
 cryptography is shared. A [conformance vector suite](testvectors/) generated from
@@ -68,7 +68,7 @@ wraps every write accordingly, so nothing about the code below changes either wa
 [Keys and scopes](docs/client-guide.md#keys-and-scopes).
 
 ```ts
-import { MatterClient, ApiKey, Aad, storeSecret } from "@openmatter-network/matter-client";
+import { MatterClient, ApiKey, Aad, storeSecret } from "@openmatter-network/matter-sdk";
 
 const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
 
@@ -80,7 +80,7 @@ await client.tx("Staking", "bond", [client.parseAmount("10"), { Staked: null }])
 const account = await client.query("System", "Account", [client.accountId]);
 const epoch = await client.runtimeApi("KgcApi_dkg_epoch");
 
-// And the MatterVault path, on the same key: seal client-side with `encrypt()`,
+// And the MatterSDK path, on the same key: seal client-side with `encrypt()`,
 // store on-chain. The chain assigns the id in the `Secrets.SecretStored` event;
 // recovery is the threshold `decrypt()` — see docs/client-guide.md for the full path.
 const receipt = await client.secrets.store(storeSecret(sealed, epoch, "prod", Aad.EnvV1));
@@ -97,7 +97,7 @@ for the full surface.
   exposes** — `tx` / `query` / `runtimeApi` / `constant`. Nothing is vendored, so a
   pallet added by a forkless upgrade is reachable without an SDK release. It signs,
   submits, and tracks an extrinsic to finalization.
-- **Does:** the whole MatterVault path — seal, orchestrate threshold decryption
+- **Does:** the whole MatterSDK path — seal, orchestrate threshold decryption
   (health-probe → quorum → signed `/partial-decrypt` → verify + aggregate + open) — and
   still builds the `store` / `rotate` / `grant` *call data* if you'd rather submit with
   your own Substrate client.
@@ -118,7 +118,7 @@ recovered only when a `t`-of-`n` quorum cooperates:
 
 ## Language support
 
-All four are at **full parity**: same generic surface, same five façades, same
+All four share the same generic surface, the same six façades, the same
 guards, and matching constructors — with one honest asymmetry: Python's
 bring-your-own-key path is `connect_with_keypair` (an in-process
 `substrate-interface` keypair), not yet a remote-signer seam like
@@ -126,10 +126,10 @@ bring-your-own-key path is `connect_with_keypair` (an in-process
 
 | Language | Seal & recover | `apiKey` | Chain client | Façades | Chain client enabled by |
 |---|:--:|:--:|:--:|:--:|---|
-| Rust (`matter-vault`) | ✅ | ✅ | ✅ | ✅ | `chain` cargo feature (default off) |
-| TypeScript (`@openmatter-network/matter-vault`) | ✅ | ✅ | ✅ | ✅ | `@openmatter-network/matter-client` |
-| Python (`matter-vault`) | ✅ | ✅ | ✅ | ✅ | `pip install matter-vault[sdk]` |
-| Go (`mattervault`) | ✅ | ✅ | ✅ | ✅ | always (cgo already binds the core) |
+| Rust (`matter-sdk`) | ✅ | ✅ | ✅ | ✅ | `chain` cargo feature (default off) |
+| TypeScript (`@openmatter-network/matter-sdk-core`) | ✅ | ✅ | ✅ | ✅ | `@openmatter-network/matter-sdk` |
+| Python (`matter-sdk`) | ✅ | ✅ | ✅ | ✅ | `pip install matter-sdk[sdk]` |
+| Go (`mattersdk`) | ✅ | ✅ | ✅ | ✅ | always (cgo already binds the core) |
 
 The chain client is opt-in in three of the four because it is heavy and not everyone
 needs it — a dashboard that only seals secrets in the browser should not pay for
@@ -138,8 +138,8 @@ one façade surface, both pinned by fixtures every binding replays. See
 [`docs/parity.md`](docs/parity.md).
 
 Per-language guides: [Rust](examples/rust/README.md) ·
-[TypeScript](packages/typescript-client/README.md) · [Python](bindings/python/README.md) ·
-[Go](packages/go/mattervault/README.md) · [all examples](examples/README.md).
+[TypeScript](packages/typescript/README.md) · [Python](bindings/python/README.md) ·
+[Go](packages/go/mattersdk/README.md) · [all examples](examples/README.md).
 
 ## Secure signing
 
@@ -164,7 +164,7 @@ tests — they are named to shame (`..._insecure_dev_only`) and must never ship.
 
 ## Security FAQ
 
-Short, practical answers for engineers integrating MatterVault. Each has a **Read
+Short, practical answers for engineers integrating MatterSDK. Each has a **Read
 deeper** you can expand.
 
 **Q: Who can actually decrypt my secret?**
@@ -215,7 +215,7 @@ architecture doc.
 
 **Q: Is this quantum-safe? How does it line up with NIST's post-quantum standards?**
 
-MatterVault's encryption is **lattice-based** — the same hard-problem family NIST chose
+MatterSDK's encryption is **lattice-based** — the same hard-problem family NIST chose
 for the post-quantum era (NIST's ML-KEM / FIPS 203 is a close relative). It is designed
 to target the **~128-bit, post-quantum security range** NIST aligns to, which means it
 resists **"Harvest-Now-Decrypt-Later"**: data an adversary records today cannot be
@@ -223,16 +223,16 @@ unsealed by a future quantum computer.
 
 <details><summary>Read deeper</summary>
 
-Unlike a key-exchange primitive such as ML-KEM, MatterVault uses a lattice scheme that
+Unlike a key-exchange primitive such as ML-KEM, MatterSDK uses a lattice scheme that
 *also* supports threshold decryption — so the post-quantum guarantee and the "no single
-key" guarantee come from the same construction. MatterVault is early-access; see
+key" guarantee come from the same construction. MatterSDK is early-access; see
 [`SECURITY.md`](SECURITY.md) for the current security posture and assumptions before
 relying on it for production secrets.
 </details>
 
 **Q: How is this different from a KMS, an HSM, or just encrypting with a key?**
 
-| | Key in your app | KMS / HSM | MatterVault |
+| | Key in your app | KMS / HSM | MatterSDK |
 |---|---|---|---|
 | Where the decryption key lives | one place | one box / one provider | split across `n` nodes; never assembled |
 | Single point of compromise | yes | yes | **no** — need `t` nodes at once |
@@ -240,7 +240,7 @@ relying on it for production secrets.
 | Survives key-holder rotation without re-encrypting | n/a | usually re-key | **yes** — the public key is stable across membership changes |
 | Quantum-safe | depends on cipher | usually classical (RSA / ECC) | **yes** — lattice / post-quantum |
 
-The short version: a KMS still has *a key in a place*. MatterVault has no such place —
+The short version: a KMS still has *a key in a place*. MatterSDK has no such place —
 and even during decryption, no node ever sees your secret.
 
 ## Building from source
@@ -252,8 +252,8 @@ sets `net.git-fetch-with-cli`, so cargo honors your git credentials; CI swaps in
 HTTPS token instead — see `.github/actions/fetch-core-crates`.)
 
 ```bash
-cargo test -p matter-vault-core   # crypto core + roundtrip
-cargo test -p matter-vault        # Rust SDK
+cargo test -p matter-sdk-core   # crypto core + roundtrip
+cargo test -p matter-sdk        # Rust SDK
 ```
 
 ### Live end-to-end test

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from matter_vault import ApiKey, api_key_from_env
+from matter_sdk import ApiKey, api_key_from_env
 
 VECTORS = Path(__file__).resolve().parents[3] / "testvectors" / "api_keys.json"
 
@@ -127,7 +127,7 @@ def test_signs_a_distinct_payload_per_recipient():
     # MV-C1: the same request addressed to two nodes must not be interchangeable.
     # sr25519 is non-deterministic, so assert on the bytes handed to the key rather
     # than on the signatures.
-    from matter_vault import substrate_signer
+    from matter_sdk import substrate_signer
 
     seen = []
 

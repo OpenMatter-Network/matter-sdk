@@ -79,6 +79,27 @@
     },
     {
       "arg_sensitive": false,
+      "call": "set_deployment_policy_root",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_volumes",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_deployment_restart_policy",
+      "pallet": "Jobs",
+      "required": 2,
+      "required_text": "deployments:w"
+    },
+    {
+      "arg_sensitive": false,
       "call": "create_session",
       "pallet": "Collaborations",
       "required": 8,
@@ -597,6 +618,13 @@
     },
     {
       "arg_sensitive": false,
+      "call": "suspend_resource",
+      "pallet": "Resources",
+      "required": 8192,
+      "required_text": "resources:w"
+    },
+    {
+      "arg_sensitive": false,
       "call": "set_resource_privacy",
       "pallet": "Resources",
       "required": 8192,
@@ -885,6 +913,27 @@
     {
       "arg_sensitive": false,
       "call": "revoke_agent_key",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_project_spend_cap",
+      "pallet": "Budgets",
+      "required": 131072,
+      "required_text": "billing:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "fund_non_revolving_treasury",
+      "pallet": "Budgets",
+      "required": null,
+      "required_text": null
+    },
+    {
+      "arg_sensitive": false,
+      "call": "withdraw_non_revolving_treasury",
       "pallet": "Budgets",
       "required": null,
       "required_text": null

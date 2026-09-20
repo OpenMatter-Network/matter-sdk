@@ -1,5 +1,5 @@
 [package]
-name = "matter-client-example"
+name = "matter-sdk-client-example"
 description = "Connect to OpenMatter from an apiKey and exercise the generic surface plus a curated façade. Read-only unless MATTER_SUBMIT=yes."
 version.workspace = true
 license.workspace = true
@@ -15,7 +15,7 @@ name = "client"
 path = "src/main.rs"
 
 [dependencies]
-matter-vault = { path = "../../crates/matter-vault", features = ["chain"] }
+matter-sdk = { path = "../../crates/matter-sdk", features = ["chain"] }
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
 anyhow = "1"
 

@@ -1,17 +1,18 @@
-# Workspace root for MatterSDK — the polyglot client SDK for the matter-kgc
-# committee, published under the product name "MatterVault".
+# Workspace root for MatterSDK — the polyglot client SDK for MatterChain and
+# the OpenMatter platform. Threshold Secrets (the matter-kgc committee) is one
+# of the features it covers, not the whole of it.
 #
 # Layout (see README.md for the full picture):
-#   crates/matter-vault-core/ — PURE, non-networked crypto + wire contract.
+#   crates/matter-sdk-core/ — PURE, non-networked crypto + wire contract.
 #                               The single source of cryptographic truth; the
 #                               source for every language binding.
-#   crates/matter-vault-key/  — API-key ingestion + the KeySigner capability.
+#   crates/matter-sdk-key/  — API-key ingestion + the KeySigner capability.
 #                               Also non-networked and wasm32-clean, so the TS
 #                               binding shares this derivation instead of
 #                               re-implementing it in @polkadot/util-crypto.
-#   crates/matter-vault/      — the Rust SDK: committee HTTP client, quorum
+#   crates/matter-sdk/      — the Rust SDK: committee HTTP client, quorum
 #                               orchestration, Signer abstraction, call builders.
-#   crates/matter-vault-ffi/  — C ABI (cdylib) over the core, for the Go binding.
+#   crates/matter-sdk-ffi/  — C ABI (cdylib) over the core, for the Go binding.
 #   bindings/wasm/            — wasm-bindgen binding over the core (drives the TS SDK).
 #   bindings/python/          — PyO3/maturin binding over the cores + a pure-Python
 #                               online layer (chain client via the [sdk] extra).
@@ -30,7 +31,7 @@
 # here and in Cargo.lock together.
 
 [workspace]
-members = ["crates/matter-vault-core", "crates/matter-vault-key", "crates/matter-vault", "crates/matter-vault-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust", "examples/delegated-e2e"]
+members = ["crates/matter-sdk-core", "crates/matter-sdk-key", "crates/matter-sdk", "crates/matter-sdk-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust", "examples/delegated-e2e"]
 # The wasm and python bindings build through their own toolchains (wasm-pack,
 # maturin), so they are excluded from the native workspace to keep `cargo build
 # --workspace` native-only.
@@ -40,12 +41,12 @@ resolver = "2"
 [workspace.package]
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
-version = "1.3.1"
+version = "2.0.0"
 homepage = "https://openmatter.network"
 repository = "https://github.com/openmatter-network/matter-sdk"
 edition = "2021"
 # Floor lowered from 1.93 so the matter-ml agent (workspace pinned to
-# nightly-2025-07-15 = 1.90 for matter-ml-offline) can consume matter-vault
+# nightly-2025-07-15 = 1.90 for matter-ml-offline) can consume matter-sdk
 # as a git-tag dependency. Nothing in the workspace needs post-1.90 rustc;
 # restore a higher floor only alongside a matter-ml toolchain bump.
 rust-version = "1.90"
@@ -60,8 +61,8 @@ matter-kgc-proto = { git = "ssh://git@github.com/openmatter-network/matter-kgc.g
 matter-kgc-config = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
 
 # --- Local crates. ---
-matter-vault-core = { path = "crates/matter-vault-core", default-features = false }
-matter-vault-key = { path = "crates/matter-vault-key", default-features = false }
+matter-sdk-core = { path = "crates/matter-sdk-core", default-features = false }
+matter-sdk-key = { path = "crates/matter-sdk-key", default-features = false }
 
 # --- Shared third-party deps (versions aligned with the matter-kgc workspace). ---
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

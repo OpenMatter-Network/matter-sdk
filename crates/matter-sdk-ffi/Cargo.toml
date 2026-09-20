@@ -1,0 +1,27 @@
+[package]
+name = "matter-sdk-ffi"
+description = "C ABI over matter-sdk-core, the foundation for the Go (cgo) binding and any other C-compatible consumer of MatterSDK."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+# `staticlib` + `cdylib` so consumers can link statically (cgo) or dynamically.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+matter-sdk-core = { workspace = true }
+# API-key ingestion, so the Go binding shares the derivation every other binding
+# uses rather than re-deriving with go-subkey.
+matter-sdk-key = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }
+
+[lints]
+workspace = true

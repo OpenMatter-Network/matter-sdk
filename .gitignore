@@ -10,8 +10,8 @@ pkg/
 *.tsbuildinfo
 .npm/
 # generated wasm output (built by `npm run build:wasm[-web]`); not the bindings/wasm source
-/packages/typescript/wasm/
-/packages/typescript/wasm-web/
+/packages/typescript-core/wasm/
+/packages/typescript-core/wasm-web/
 
 # Python
 __pycache__/

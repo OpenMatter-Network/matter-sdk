@@ -17,7 +17,7 @@ state by accident.
 import os
 import sys
 
-from matter_vault import ApiKey, MatterClient, Network
+from matter_sdk import ApiKey, MatterClient, Network
 
 # Opt-in gate for anything that costs gas.
 SUBMIT_ENV = "MATTER_SUBMIT"

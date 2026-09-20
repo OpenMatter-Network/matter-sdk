@@ -1,7 +1,7 @@
 {
-  "name": "@openmatter-network/matter-vault",
-  "version": "1.2.0",
-  "description": "TypeScript SDK for MatterVault: seal secrets under the matter-kgc committee and recover them via a signed, threshold partial-decrypt quorum.",
+  "name": "@openmatter-network/matter-sdk",
+  "version": "2.0.0",
+  "description": "TypeScript SDK for MatterChain and the OpenMatter platform: one apiKey, every pallet. A metadata-driven chain client (tx / query / runtimeApi) plus threshold Secrets, re-exporting @openmatter-network/matter-sdk-core.",
   "license": "Apache-2.0",
   "author": "Open Matter <admin@openmatter.network>",
   "homepage": "https://openmatter.network",
@@ -12,28 +12,20 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "imports": {
-    "#wasm": {
-      "browser": "./wasm-web/matter_vault_wasm.js",
-      "default": "./wasm/matter_vault_wasm.js"
-    }
-  },
   "files": [
-    "dist",
-    "wasm",
-    "wasm-web"
+    "dist"
   ],
   "scripts": {
-    "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript/wasm --out-name matter_vault_wasm && rm -f ../../packages/typescript/wasm/.gitignore",
-    "build:wasm-web": "cd ../../bindings/wasm && wasm-pack build --target bundler --out-dir ../../packages/typescript/wasm-web --out-name matter_vault_wasm && rm -f ../../packages/typescript/wasm-web/.gitignore",
-    "build": "npm run build:wasm && npm run build:wasm-web && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build:wasm && vitest run"
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openmatter-network/matter-sdk-core": "^2.0.0",
+    "@polkadot/api": "^16.5.4"
   },
   "devDependencies": {
-    "@polkadot/keyring": "^14.0.3",
-    "@polkadot/util": "^14.0.3",
-    "@polkadot/util-crypto": "^14.0.3",
+    "@openmatter-network/matter-sdk-core": "file:../typescript-core",
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

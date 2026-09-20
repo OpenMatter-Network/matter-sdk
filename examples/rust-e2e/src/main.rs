@@ -1,14 +1,14 @@
-// MatterVault end-to-end test against a LIVE chain + committee — the Rust analogue
+// MatterSDK end-to-end test against a LIVE chain + committee — the Rust analogue
 // of examples/e2e/run.ts, and the "golden sample" the other languages reproduce.
 //
 // Flow: connect -> derive signer -> fetch committee context -> encrypt ->
 // secrets.storeSecret (pays a fee) -> read the secret back from chain ->
 // threshold-decrypt via the live committee -> assert the round trip. The seal +
-// quorum live in `matter-vault`; the chain half (state-call reads + the extrinsic)
+// quorum live in `matter-sdk`; the chain half (state-call reads + the extrinsic)
 // is subxt, exactly as @polkadot/api drives the TypeScript example.
 //
 // You provide a FUNDED account. The key never leaves this process: subxt holds it
-// for the extrinsic, and `matter_vault::Sr25519Signer` holds it for the signed
+// for the extrinsic, and `matter_sdk::Sr25519Signer` holds it for the signed
 // /partial-decrypt requests.
 //
 // Env:
@@ -18,7 +18,7 @@
 
 use std::str::FromStr;
 
-use matter_vault::{decrypt, Aad, CommitteeNode, DecryptRequest, ReqwestTransport, Sr25519Signer};
+use matter_sdk::{decrypt, Aad, CommitteeNode, DecryptRequest, ReqwestTransport, Sr25519Signer};
 use parity_scale_codec::{Decode, Encode};
 use subxt::backend::legacy::LegacyRpcMethods;
 use subxt::backend::rpc::RpcClient;
@@ -136,7 +136,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("Committee epoch={epoch}, joint_pk={}B", joint_pk.len());
 
     // 2. Seal locally, then publish with secrets.storeSecret (the gas-paying step).
-    let env = matter_vault::encrypt(
+    let env = matter_sdk::encrypt(
         &joint_pk,
         epoch,
         secret.as_bytes(),

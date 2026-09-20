@@ -1,6 +1,6 @@
 [package]
-name = "matter-vault-example"
-description = "Runnable end-to-end MatterVault demo: seal a secret and recover it from a local in-process committee."
+name = "matter-sdk-example"
+description = "Runnable end-to-end MatterSDK demo: seal a secret and recover it from a local in-process committee."
 version.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -11,10 +11,10 @@ name = "demo"
 path = "src/main.rs"
 
 [dependencies]
-matter-vault = { path = "../../crates/matter-vault" }
+matter-sdk = { path = "../../crates/matter-sdk" }
 # The demo stands up a throwaway committee in-process to mimic the real flow.
 # A real integration never depends on matter-crypto directly — the committee
-# nodes run it for you, and your app only calls matter-vault.
+# nodes run it for you, and your app only calls matter-sdk.
 matter-crypto = { workspace = true }
 # Decodes the version-tagged on-chain plaintext proof, mirroring what a real
 # committee node does before it partial-decrypts.

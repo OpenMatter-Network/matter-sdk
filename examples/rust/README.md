@@ -1,9 +1,9 @@
 # Rust example
 
-A runnable, self-contained demo of the MatterVault Rust SDK.
+A runnable, self-contained demo of the MatterSDK Rust SDK.
 
 ```bash
-cargo run -p matter-vault-example
+cargo run -p matter-sdk-example
 ```
 
 It seals a secret, prints the `secrets.storeSecret` call you would submit, then

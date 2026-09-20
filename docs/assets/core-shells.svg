@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 700" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
   <title>One core, many shells</title>
-  <desc>A single pure crypto core, crates/matter-vault-core, is shared through four bindings: native Rust, wasm-bindgen to TypeScript, a C ABI to Go, and PyO3 to Python. Every shell adds the same idiomatic committee client, quorum, Signer and call builders.</desc>
+  <desc>A single pure crypto core, crates/matter-sdk-core, is shared through four bindings: native Rust, wasm-bindgen to TypeScript, a C ABI to Go, and PyO3 to Python. Every shell adds the same idiomatic committee client, quorum, Signer and call builders.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#6d4aff"/>
@@ -32,7 +32,7 @@
   <!-- core -->
   <rect x="350" y="92" width="900" height="108" rx="18" fill="#ffffff" fill-opacity="0.10" stroke="#cbb8ff" stroke-opacity="0.7" stroke-width="2"/>
   <rect x="350" y="92" width="900" height="7" rx="3.5" fill="url(#accent)"/>
-  <text class="title mono" x="800" y="148" text-anchor="middle" font-size="28">crates/matter-vault-core</text>
+  <text class="title mono" x="800" y="148" text-anchor="middle" font-size="28">crates/matter-sdk-core</text>
   <text class="muted" x="800" y="182" text-anchor="middle" font-size="17">pure crypto + wire contract · wraps matter-crypto (RLWE/BGV) — never re-implements it</text>
 
   <!-- fan to shells -->
@@ -43,7 +43,7 @@
 
   <!-- column 1: native -->
   <rect class="card" x="64" y="300" width="320" height="92" rx="14"/>
-  <text class="title mono" x="224" y="338" text-anchor="middle" font-size="19">crates/matter-vault</text>
+  <text class="title mono" x="224" y="338" text-anchor="middle" font-size="19">crates/matter-sdk</text>
   <text class="teal" x="224" y="368" text-anchor="middle" font-size="16">Rust SDK · native</text>
 
   <!-- column 2: wasm -->
@@ -52,12 +52,12 @@
   <text class="teal" x="608" y="368" text-anchor="middle" font-size="16">wasm-bindgen</text>
   <path class="lead" d="M608,392 L608,414" marker-end="url(#arrow)"/>
   <rect class="card" x="448" y="416" width="320" height="92" rx="14"/>
-  <text class="title mono" x="608" y="454" text-anchor="middle" font-size="19">packages/typescript</text>
+  <text class="title mono" x="608" y="454" text-anchor="middle" font-size="19">packages/typescript-core</text>
   <text class="muted" x="608" y="484" text-anchor="middle" font-size="16">TS SDK</text>
 
   <!-- column 3: C ABI -->
   <rect class="card" x="832" y="300" width="320" height="92" rx="14"/>
-  <text class="title mono" x="992" y="338" text-anchor="middle" font-size="19">crates/matter-vault-ffi</text>
+  <text class="title mono" x="992" y="338" text-anchor="middle" font-size="19">crates/matter-sdk-ffi</text>
   <text class="teal" x="992" y="368" text-anchor="middle" font-size="16">C ABI</text>
   <path class="lead" d="M992,392 L992,414" marker-end="url(#arrow)"/>
   <rect class="card" x="832" y="416" width="320" height="92" rx="14"/>

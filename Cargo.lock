@@ -1786,15 +1786,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-client-example"
-version = "1.3.1"
-dependencies = [
- "anyhow",
- "matter-vault",
- "tokio",
-]
-
-[[package]]
 name = "matter-crypto"
 version = "0.8.0"
 source = "git+ssh://git@github.com/openmatter-network/matter-crypto.git?tag=v0.8.1#0f7ae62260c687b15211be39ba1d213803358ba7"
@@ -1814,10 +1805,10 @@ dependencies = [
 
 [[package]]
 name = "matter-delegated-e2e"
-version = "1.3.1"
+version = "2.0.0"
 dependencies = [
  "anyhow",
- "matter-vault",
+ "matter-sdk",
  "tokio",
  "tracing-subscriber",
 ]
@@ -1841,15 +1832,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault"
-version = "1.3.1"
+name = "matter-sdk"
+version = "2.0.0"
 dependencies = [
  "bincode",
  "hex",
  "matter-crypto",
  "matter-kgc-config",
- "matter-vault-core",
- "matter-vault-key",
+ "matter-sdk-core",
+ "matter-sdk-key",
  "parity-scale-codec",
  "reqwest",
  "serde",
@@ -1862,8 +1853,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-core"
-version = "1.3.1"
+name = "matter-sdk-client-example"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "matter-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "matter-sdk-core"
+version = "2.0.0"
 dependencies = [
  "bincode",
  "getrandom 0.2.17",
@@ -1880,10 +1880,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-e2e"
-version = "1.3.1"
+name = "matter-sdk-e2e"
+version = "2.0.0"
 dependencies = [
- "matter-vault",
+ "matter-sdk",
  "parity-scale-codec",
  "serde_json",
  "subxt",
@@ -1892,28 +1892,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-example"
-version = "1.3.1"
+name = "matter-sdk-example"
+version = "2.0.0"
 dependencies = [
  "bincode",
  "matter-crypto",
  "matter-kgc-config",
- "matter-vault",
+ "matter-sdk",
  "tokio",
 ]
 
 [[package]]
-name = "matter-vault-ffi"
-version = "1.3.1"
+name = "matter-sdk-ffi"
+version = "2.0.0"
 dependencies = [
  "hex",
- "matter-vault-core",
- "matter-vault-key",
+ "matter-sdk-core",
+ "matter-sdk-key",
 ]
 
 [[package]]
-name = "matter-vault-key"
-version = "1.3.1"
+name = "matter-sdk-key"
+version = "2.0.0"
 dependencies = [
  "getrandom 0.2.17",
  "hex",

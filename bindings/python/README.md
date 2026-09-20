@@ -1,11 +1,11 @@
-# matter-vault (Python)
+# matter-sdk (Python)
 
-The Python client for MatterVault and the OpenMatter chain. See
+The Python client for MatterSDK and the OpenMatter chain. See
 [`docs/parity.md`](../../docs/parity.md) for what has landed here versus the other
 bindings.
 
-PyO3 binding over the shared Rust cores — cryptography (`matter-vault-core`) **and**
-API-key derivation (`matter-vault-key`) — plus a pure-Python online layer: the
+PyO3 binding over the shared Rust cores — cryptography (`matter-sdk-core`) **and**
+API-key derivation (`matter-sdk-key`) — plus a pure-Python online layer: the
 committee HTTP transport, the threshold-decrypt quorum loop, the signer abstraction,
 call builders, and a chain client that reaches every pallet the runtime exposes.
 
@@ -18,7 +18,7 @@ The cryptography and `ApiKey` need no extra dependencies. The chain client needs
 `substrate-interface`:
 
 ```bash
-pip install matter-vault[sdk]
+pip install matter-sdk[sdk]
 ```
 
 ## Build & test
@@ -27,7 +27,7 @@ pip install matter-vault[sdk]
 pip install maturin
 cd bindings/python
 maturin build -i .venv/bin/python --release
-pip install --force-reinstall --no-deps target/wheels/matter_vault-*.whl
+pip install --force-reinstall --no-deps target/wheels/matter_sdk-*.whl
 pytest -q
 ```
 
@@ -39,7 +39,7 @@ needs a rebuild.
 ## Quick start
 
 ```python
-from matter_vault import MatterClient
+from matter_sdk import MatterClient
 
 # MATTER_API_KEY / MATTER_NETWORK / MATTER_RPC_URL / MATTER_CONFIRM.
 # No key set connects read-only, which is a legitimate outcome rather than an error.

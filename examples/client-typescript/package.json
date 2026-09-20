@@ -1,5 +1,5 @@
 {
-  "name": "matter-client-example",
+  "name": "matter-sdk-client-example",
   "private": true,
   "type": "module",
   "description": "Connect to OpenMatter from an apiKey and exercise the generic surface plus a curated façade. Read-only unless MATTER_SUBMIT=yes.",
@@ -7,8 +7,8 @@
     "start": "tsx run.ts"
   },
   "dependencies": {
-    "@openmatter-network/matter-client": "file:../../packages/typescript-client",
-    "@openmatter-network/matter-vault": "file:../../packages/typescript"
+    "@openmatter-network/matter-sdk": "file:../../packages/typescript",
+    "@openmatter-network/matter-sdk-core": "file:../../packages/typescript-core"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

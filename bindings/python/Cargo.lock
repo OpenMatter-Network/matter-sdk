@@ -529,8 +529,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-core"
-version = "1.3.1"
+name = "matter-sdk-core"
+version = "2.0.0"
 dependencies = [
  "bincode",
  "getrandom",
@@ -547,8 +547,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-key"
-version = "1.3.1"
+name = "matter-sdk-key"
+version = "2.0.0"
 dependencies = [
  "getrandom",
  "hex",
@@ -558,11 +558,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "matter-vault-python"
-version = "1.2.0"
+name = "matter-sdk-python"
+version = "2.0.0"
 dependencies = [
- "matter-vault-core",
- "matter-vault-key",
+ "matter-sdk-core",
+ "matter-sdk-key",
  "pyo3",
 ]
 

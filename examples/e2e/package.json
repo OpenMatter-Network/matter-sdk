@@ -1,8 +1,8 @@
 {
-  "name": "matter-vault-e2e",
+  "name": "matter-sdk-e2e",
   "private": true,
   "type": "module",
-  "description": "End-to-end MatterVault test against a live chain + committee.",
+  "description": "End-to-end Secrets test against a live chain + committee.",
   "scripts": {
     "start": "tsx run.ts"
   },

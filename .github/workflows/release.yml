@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   # Rust / native: the FFI staticlib + cdylib + C header. The consumable artifact
-  # for Rust-native and any C-ABI consumer of MatterVault.
+  # for Rust-native and any C-ABI consumer of MatterSDK.
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -37,17 +37,17 @@ jobs:
       - name: Bundle native FFI artifact
         working-directory: matter-sdk
         run: |
-          BUNDLE="matter-vault-ffi-${GITHUB_REF_NAME}-linux-x64"
+          BUNDLE="matter-sdk-ffi-${GITHUB_REF_NAME}-linux-x64"
           mkdir -p "$BUNDLE/lib" "$BUNDLE/include"
-          cp target/release/libmatter_vault_ffi.a  "$BUNDLE/lib/"
-          cp target/release/libmatter_vault_ffi.so "$BUNDLE/lib/"
-          cp crates/matter-vault-ffi/include/matter_vault.h "$BUNDLE/include/"
+          cp target/release/libmatter_sdk_ffi.a  "$BUNDLE/lib/"
+          cp target/release/libmatter_sdk_ffi.so "$BUNDLE/lib/"
+          cp crates/matter-sdk-ffi/include/matter_sdk.h "$BUNDLE/include/"
           tar -czf "${BUNDLE}.tar.gz" "$BUNDLE"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: matter-sdk/matter-vault-ffi-*.tar.gz
+          files: matter-sdk/matter-sdk-ffi-*.tar.gz
 
   # TypeScript: publish the npm package (wasm core + compiled TS) to GitHub
   # Packages (npm.pkg.github.com) so downstream consumers install it as a normal
@@ -72,13 +72,13 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@openmatter-network"
       - name: Build the TS package
-        working-directory: matter-sdk/packages/typescript
+        working-directory: matter-sdk/packages/typescript-core
         run: |
           npm ci
           npm run build
       - name: Publish to GitHub Packages
         if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: matter-sdk/packages/typescript
+        working-directory: matter-sdk/packages/typescript-core
         run: |
           npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
           npm publish
@@ -127,19 +127,19 @@ jobs:
       - name: Build FFI staticlib and verify the binding links
         working-directory: matter-sdk
         run: |
-          cargo build -p matter-vault-ffi --release
-          cd packages/go/mattervault && go build ./...
+          cargo build -p matter-sdk-ffi --release
+          cd packages/go/mattersdk && go build ./...
       - name: Bundle Go artifact
         working-directory: matter-sdk
         run: |
-          BUNDLE="matter-vault-go-${GITHUB_REF_NAME}-linux-x64"
+          BUNDLE="matter-sdk-go-${GITHUB_REF_NAME}-linux-x64"
           mkdir -p "$BUNDLE/lib" "$BUNDLE/include"
-          cp target/release/libmatter_vault_ffi.a "$BUNDLE/lib/"
-          cp crates/matter-vault-ffi/include/matter_vault.h "$BUNDLE/include/"
-          cp -r packages/go/mattervault "$BUNDLE/mattervault"
+          cp target/release/libmatter_sdk_ffi.a "$BUNDLE/lib/"
+          cp crates/matter-sdk-ffi/include/matter_sdk.h "$BUNDLE/include/"
+          cp -r packages/go/mattersdk "$BUNDLE/mattersdk"
           tar -czf "${BUNDLE}.tar.gz" "$BUNDLE"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: matter-sdk/matter-vault-go-*.tar.gz
+          files: matter-sdk/matter-sdk-go-*.tar.gz

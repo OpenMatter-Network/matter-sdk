@@ -78,7 +78,7 @@ trip and needs a real budget, so keep it as a diagnostic, not the gate.
 
 ## Work items
 
-- [ ] **`Deployments` façade** (`crates/matter-vault/src/chain/facade.rs:175-190`).
+- [ ] **`Deployments` façade** (`crates/matter-sdk/src/chain/facade.rs:175-190`).
   Add a project target to `request`, `cancel` and the `set_*` calls
   (`Deployments::in_project(project)` or a `project: Option<ProjectId>`
   argument; follow whichever idiom the façade already uses):
@@ -88,7 +88,7 @@ trip and needs a real budget, so keep it as a diagnostic, not the gate.
     `Proxy.proxy(budget, Some(Deploy), call)`, the dashboard's own shape
   - without a project, behaviour is unchanged (the deployment is the
     principal's)
-- [ ] **Wrapping** in `MatterClient::tx` (`crates/matter-vault/src/chain/mod.rs:508`).
+- [ ] **Wrapping** in `MatterClient::tx` (`crates/matter-sdk/src/chain/mod.rs:508`).
   Make the wrap target explicit (`Principal` | `Budget { budget }`) instead
   of the fixed principal wrap. The hop's inner call as a dynamic `Value`:
 
@@ -103,10 +103,10 @@ trip and needs a real budget, so keep it as a diagnostic, not the gate.
   The outer call stays `Proxy.proxy(Id(principal), None, <that>)`, signed by
   the key.
 - [ ] **Local scope mirror**:
-  - Files: `crates/matter-vault/src/chain/scopes_table.rs`, the TS
-    (`packages/typescript-client/src/scopes.ts`), Python
-    (`bindings/python/python/matter_vault/scopes.py`) and Go
-    (`packages/go/mattervault/scopes.go`) ports, and
+  - Files: `crates/matter-sdk/src/chain/scopes_table.rs`, the TS
+    (`packages/typescript/src/scopes.ts`), Python
+    (`bindings/python/python/matter_sdk/scopes.py`) and Go
+    (`packages/go/mattersdk/scopes.go`) ports, and
     `testvectors/required_scopes.json`.
   - Add `hop_requirement(pallet, call, args) = required_scopes(..) ∪ deployments:w`,
     returning `None` for a pallet outside the `Deploy` list above.
@@ -121,11 +121,11 @@ trip and needs a real budget, so keep it as a diagnostic, not the gate.
 - [ ] **Receipts.** The first `ProxyExecuted` decides the outcome (see the
   table).
   - Rust `inner_dispatch_error` (`mod.rs:749`, `.find`), TS `wrappedFailure`
-    (`packages/typescript-client/src/polkadot.ts:434`, returns on the first)
-    and Python (`bindings/python/python/matter_vault/chain.py:447-452`,
+    (`packages/typescript/src/polkadot.ts:434`, returns on the first)
+    and Python (`bindings/python/python/matter_sdk/chain.py:447-452`,
     returns on the first) are all correct today, but only because of
     emission order.
-  - Go `parseOutcome` (`packages/go/mattervault/receipt.go:171-179`) keeps
+  - Go `parseOutcome` (`packages/go/mattersdk/receipt.go:171-179`) keeps
     any `Err`, which is also correct.
   - Pin it in each binding with a two-event fixture,
     `[Err(Jobs.InvalidSkuRequested), Ok]`, which must surface as a dispatch
@@ -154,7 +154,7 @@ trip and needs a real budget, so keep it as a diagnostic, not the gate.
 - [ ] **Tests.**
   - Unit: the exact hop encoding; the version gate below 325; the new
     vectors in every binding.
-  - Dev node (`crates/matter-vault/tests/scoped_keys_dev.rs`, matter-node
+  - Dev node (`crates/matter-sdk/tests/scoped_keys_dev.rs`, matter-node
     at spec ≥ 325), mirroring the runtime smoke test:
     1. Alice creates an org and a project.
     2. Bob is added as a `Member`, assigned to the project, and authorized

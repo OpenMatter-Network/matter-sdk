@@ -17,7 +17,17 @@ env:
   FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
 
 jobs:
-  # QuantumGuard's policy fetcher links `matter-vault --features chain` as a static musl
+  # Cheap, toolchain-free checks that catch the two things a rename and a release
+  # quietly get wrong: the old name creeping back, and manifests drifting apart.
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No pre-2.0 names outside the historical record
+        run: ./scripts/check-old-names.sh
+      - name: Manifest versions agree
+        run: ./scripts/check-versions.sh
+  # QuantumGuard's policy fetcher links `matter-sdk --features chain` as a static musl
   # binary on the engine image's toolchain. A dependency or MSRV bump that only the
   # 1.93 glibc matrix tolerates would surface as an engine build failure, one repo away.
   consumer-musl:
@@ -33,9 +43,9 @@ jobs:
           targets: x86_64-unknown-linux-musl
       - name: Install the musl C toolchain (ring)
         run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - name: Build matter-vault (chain) for musl
+      - name: Build matter-sdk (chain) for musl
         working-directory: matter-sdk
-        run: cargo build -p matter-vault --features chain --target x86_64-unknown-linux-musl --locked
+        run: cargo build -p matter-sdk --features chain --target x86_64-unknown-linux-musl --locked
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -51,14 +61,14 @@ jobs:
       - name: Check fmt
         working-directory: matter-sdk
         run: cargo fmt --all --check -- --config ${{ env.FMT_CONFIG }}
-      # `matter-vault`'s chain client is behind a default-off `chain` feature, so a
+      # `matter-sdk`'s chain client is behind a default-off `chain` feature, so a
       # single default-feature run would never compile it. Both matrices are gated.
       - name: Clippy (default features)
         working-directory: matter-sdk
         run: cargo clippy --workspace --all-targets -- -Dwarnings
       - name: Clippy (chain feature)
         working-directory: matter-sdk
-        run: cargo clippy -p matter-vault --features chain --all-targets -- -Dwarnings
+        run: cargo clippy -p matter-sdk --features chain --all-targets -- -Dwarnings
       - name: Build
         working-directory: matter-sdk
         run: cargo build --workspace
@@ -67,16 +77,16 @@ jobs:
         run: cargo test --workspace
       - name: Test (chain feature)
         working-directory: matter-sdk
-        run: cargo test -p matter-vault --features chain
+        run: cargo test -p matter-sdk --features chain
       # The `chain` feature must stay opt-out: `matter-ml` consumes this crate by git
       # tag and needs neither subxt nor a tokio runtime. If the heavy subxt client
       # appears in the default graph, the feature gate has leaked.
       - name: Assert subxt stays out of the default dependency graph
         working-directory: matter-sdk
         run: |
-          if cargo tree -p matter-vault --edges normal | grep -qE '^[^a-zA-Z]*subxt v[0-9]'; then
-            echo "::error::the subxt client leaked into matter-vault's default features"
-            cargo tree -p matter-vault --edges normal | grep -E 'subxt'
+          if cargo tree -p matter-sdk --edges normal | grep -qE '^[^a-zA-Z]*subxt v[0-9]'; then
+            echo "::error::the subxt client leaked into matter-sdk's default features"
+            cargo tree -p matter-sdk --edges normal | grep -E 'subxt'
             exit 1
           fi
       # SECURITY.md promises the `*_insecure_dev_only` helpers never ship in a
@@ -86,17 +96,32 @@ jobs:
         working-directory: matter-sdk
         run: |
           hits=$(grep -rln "insecure_dev_only" --include='*.rs' crates/*/src bindings/*/src \
-            | grep -v '^crates/matter-vault/src/signer.rs$' || true)
+            | grep -v '^crates/matter-sdk/src/signer.rs$' || true)
           if [ -n "$hits" ]; then
             echo "::error::insecure_dev_only referenced outside its definition site (see SECURITY.md):"
             echo "$hits"
             exit 1
           fi
+      # `required_scopes.json` is generated from the checked-in metadata, and every
+      # other binding replays it fixture->implementation only. So a call that the
+      # tables classify but the fixture omits fails nothing anywhere — which is how
+      # the fixture sat at spec 322 while the runtime reached 329. Regenerate it
+      # here and diff: a stale fixture cannot be committed, rather than waiting for
+      # someone to read the nightly drift job.
+      - name: Scope fixture is in sync with the checked-in metadata
+        working-directory: matter-sdk
+        run: |
+          cargo test -p matter-sdk --features chain --test scope_vectors -- --ignored
+          if ! git diff --exit-code -- testvectors/required_scopes.json testvectors/scope_bits.json; then
+            echo "::error::testvectors/required_scopes.json is stale; the emitter above rewrote it."
+            echo "::error::Commit the regenerated fixture (and port any new row to the TS/Python/Go tables)."
+            exit 1
+          fi
       - name: Build cores for wasm32
         working-directory: matter-sdk
         run: |
-          cargo build -p matter-vault-core --target wasm32-unknown-unknown
-          cargo build -p matter-vault-key --target wasm32-unknown-unknown
+          cargo build -p matter-sdk-core --target wasm32-unknown-unknown
+          cargo build -p matter-sdk-key --target wasm32-unknown-unknown
 
   typescript:
     runs-on: ubuntu-latest
@@ -113,24 +138,24 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Build wasm + TS package and run vector conformance
-        working-directory: matter-sdk/packages/typescript
+        working-directory: matter-sdk/packages/typescript-core
         run: |
           npm ci
           npm run build
           npm test
-      # matter-vault advertises zero runtime dependencies, and the chain client
+      # matter-sdk advertises zero runtime dependencies, and the chain client
       # lives in a separate package precisely to keep that true. Assert it.
-      - name: Assert matter-vault has no runtime dependencies
-        working-directory: matter-sdk/packages/typescript
+      - name: Assert matter-sdk-core has no runtime dependencies
+        working-directory: matter-sdk/packages/typescript-core
         run: |
           deps=$(npm ls --omit=dev --depth=0 --parseable 2>/dev/null | tail -n +2)
           if [ -n "$deps" ]; then
-            echo "::error::matter-vault gained a runtime dependency:"
+            echo "::error::matter-sdk-core gained a runtime dependency:"
             echo "$deps"
             exit 1
           fi
       - name: Build and test the chain client
-        working-directory: matter-sdk/packages/typescript-client
+        working-directory: matter-sdk/packages/typescript
         run: |
           npm install
           npm run typecheck
@@ -159,7 +184,7 @@ jobs:
         run: |
           pip install maturin pytest 'substrate-interface>=1.7'
           maturin build --release
-          pip install --force-reinstall --no-deps target/wheels/matter_vault-*.whl
+          pip install --force-reinstall --no-deps target/wheels/matter_sdk-*.whl
           pytest -q
       # The chain, client, and façade tests guard on `pytest.importorskip`, so a
       # missing substrate-interface would make this job pass with them all skipped.
@@ -185,8 +210,8 @@ jobs:
       - name: Build the FFI library and run the full Go suite
         working-directory: matter-sdk
         run: |
-          cargo build -p matter-vault-ffi --release
-          cd packages/go/mattervault
+          cargo build -p matter-sdk-ffi --release
+          cd packages/go/mattersdk
           gofmt -l . | tee /tmp/unformatted
           test ! -s /tmp/unformatted || { echo "::error::gofmt would reformat these"; exit 1; }
           go vet ./...

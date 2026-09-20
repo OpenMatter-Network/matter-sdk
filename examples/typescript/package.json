@@ -1,8 +1,8 @@
 {
-  "name": "matter-vault-ts-example",
+  "name": "matter-sdk-ts-example",
   "private": true,
   "type": "module",
-  "description": "Runnable MatterVault TypeScript demo.",
+  "description": "Runnable MatterSDK TypeScript demo.",
   "scripts": {
     "demo": "tsx demo.ts"
   },

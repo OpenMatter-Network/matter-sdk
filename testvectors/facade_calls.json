@@ -173,7 +173,7 @@
     },
     {
       "args": [
-        "additional"
+        "max_additional"
       ],
       "call": "bond_extra",
       "facade": "staking",
@@ -232,9 +232,7 @@
       "pallet": "NominationPools"
     },
     {
-      "args": [
-        "metadata"
-      ],
+      "args": [],
       "call": "create_org",
       "facade": "orgs",
       "method": "create",

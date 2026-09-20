@@ -1,68 +1,65 @@
-# @openmatter-network/matter-vault
+# @openmatter-network/matter-sdk
 
-TypeScript SDK for **MatterVault** — seal secrets under the matter-kgc committee
-and recover them through a signed, threshold `/partial-decrypt` quorum.
-
-The cryptography — and API-key derivation — run in a shared wasm core (the same core
-the Rust SDK uses, built from `bindings/wasm`); this package adds the committee
-client, the quorum orchestration, the signer seam, and the on-chain call builders.
-
-This package has **zero runtime dependencies**, which CI asserts, so it stays small
-enough for a browser bundle. To connect to the chain, install
-[`@openmatter-network/matter-client`](../typescript-client) — it re-exports everything
-here, so you import one package name.
-
-## Install
-
-```bash
-npm install @openmatter-network/matter-vault
-```
-
-## Quick start
+**One `apiKey`, every pallet.** The TypeScript client for OpenMatter: connect,
+read state, and sign and submit any call the runtime exposes — plus the whole
+threshold Secrets path.
 
 ```ts
-import {
-  encrypt, decrypt, FetchTransport, substrateSigner, Aad, storeSecret,
-} from "@openmatter-network/matter-vault";
+import { MatterClient, ApiKey, Aad } from "@openmatter-network/matter-sdk";
 
-// 1. Seal (pure, no network).
-const env = encrypt(jointPk, epoch, new TextEncoder().encode("API_KEY=swordfish"), Aad.EnvV1);
+const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
 
-// 2. Store: submit these args with your own @polkadot/api client.
-const call = storeSecret(env, epoch, "prod-env", Aad.EnvV1);
-// api.tx.secrets.storeSecret(call.payload, call.epoch, call.label, call.aad) ...
+// Any pallet, resolved from live metadata — no vendored types, so a pallet added
+// by a forkless upgrade is reachable without an SDK release.
+await client.tx("Jobs", "request_deployment", [request]);
+await client.tx("Staking", "bond", [client.parseAmount("10"), { Staked: null }]);
 
-// 3. Recover. Your key stays in the signing callback — never in the SDK.
-const signer = substrateSigner(accountId, (payload) => pair.sign(payload));
-const plaintext = await decrypt(new FetchTransport(), signer, {
-  secretId, epoch, bindingId: env.bindingId, aad: Aad.EnvV1,
-  capsule: env.capsule, ct: env.ct, sharedA, blockHash, threshold, nodes,
-});
+// Reads and runtime APIs go through the same surface.
+const account = await client.query("System", "Account", [client.accountId]);
+const epoch = await client.runtimeApi("KgcApi_dkg_epoch");
 ```
 
-## Secure signing
+Defaults are testnet, and a *signing* client refuses to touch mainnet without
+`MATTER_CONFIRM=yes` or `confirmMainnet: true`. The check is on what the endpoint
+actually serves, so pointing a testnet config at a mainnet URL still trips.
 
-`decrypt` takes a `Signer`. You choose where the key lives:
+## Why this is a separate package
 
-- `keySigner({ accountId, sign })` or `substrateSigner(accountId, sign)` wrap a
-  callback you control — a `@polkadot/keyring` pair, a browser wallet, an HSM/KMS
-  adapter — so the key behind that signer never enters the SDK. Recommended for
-  production.
-- `new ApiKey(process.env.MATTER_API_KEY!)` holds the key in-process, inside a
-  container that is redacted through `toString`/`toJSON`/`inspect` and exposes no
-  accessor for the material. An `ApiKey` is itself a `KeySigner`.
+`@openmatter-network/matter-sdk-core` advertises **zero runtime dependencies**, and
+CI asserts it (`npm ls --omit=dev`). A chain client needs `@polkadot/api`, which is
+several megabytes — so it lives here rather than being forced on a dashboard that
+only seals and recovers secrets in the browser.
 
-See [`docs/secure-signing.md`](../../docs/secure-signing.md) for what that trade
-actually costs. Recovered plaintext is returned as raw bytes; keep it short-lived and
-never log it.
+npm has no real opt-out for a declared dependency: `optionalDependencies` are
+installed by default, so the package boundary is the only honest way to keep that
+promise. (Rust gets a cargo feature instead, because a feature that is off is
+genuinely not fetched or compiled.)
 
-## Build & test
+This package re-exports the entire `matter-sdk` surface, so a chain consumer
+still imports one package name.
+
+## Layout
+
+| File | Role |
+|---|---|
+| `src/client.ts` | `MatterClient` — four named constructors, the generic surface, the network guards |
+| `src/backend.ts` | `ChainBackend`, the seam that keeps `@polkadot/api` swappable and the client testable without a node |
+| `src/polkadot.ts` | the `@polkadot/api` backend, imported lazily |
+| `src/amount.ts` | plancks-only arithmetic (`bigint`, never `number`) |
+| `src/network.ts` | network selection and `ChainProperties` |
+| `src/errors.ts` | `ClientError` with a `kind` discriminant |
+
+## Development
+
+`matter-sdk` is a **peer** dependency (so consumers resolve the published
+version) and is **linked from the sibling directory** as a dev dependency, since
+it is published to a private registry:
 
 ```bash
-npm run build       # builds the wasm core, then tsc
-npm test            # builds wasm, runs the conformance + orchestration tests
+npm --prefix ../typescript run build   # build the wasm core + dist first
+npm install
+npm test
+npm run typecheck
 ```
 
-`npm test` runs the cross-language conformance suite: the fixtures generated by the
-Rust core (`testvectors/`) are replayed through this package and must match
-byte-for-byte. That is how we guarantee the TS binding and the Rust core never drift.
+`npm publish` refuses a `file:` specifier, so the dev link cannot silently ship.

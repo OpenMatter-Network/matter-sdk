@@ -1,4 +1,4 @@
-// MatterVault TypeScript SDK — runnable end-to-end demo.
+// MatterSDK — TypeScript — runnable end-to-end demo.
 //
 //   cd examples/typescript && npm install && npm run demo
 //
@@ -22,8 +22,8 @@ import {
   type PartialDecryptResponse,
   type Signer,
   type Transport,
-} from "../../packages/typescript/src/index.js";
-import { fromHex } from "../../packages/typescript/src/util.js";
+} from "../../packages/typescript-core/src/index.js";
+import { fromHex } from "../../packages/typescript-core/src/util.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fx = JSON.parse(readFileSync(resolve(here, "../../testvectors/open_secret.json"), "utf8"));

@@ -12,7 +12,7 @@
 //	MATTER_CONFIRM   must be "yes" for a signing client on mainnet
 //	MATTER_SUBMIT    must be "yes" to submit anything
 //
-// Build prerequisite: cargo build -p matter-vault-ffi --release
+// Build prerequisite: cargo build -p matter-sdk-ffi --release
 package main
 
 import (
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	mv "github.com/openmatter-network/matter-sdk/packages/go/mattervault"
+	mv "github.com/openmatter-network/matter-sdk-go/v2"
 )
 
 // Opt-in gate for anything that costs gas.

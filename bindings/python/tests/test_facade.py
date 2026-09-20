@@ -16,7 +16,7 @@ import pytest
 
 pytest.importorskip("substrateinterface")
 
-from matter_vault.facade import (  # noqa: E402
+from matter_sdk.facade import (  # noqa: E402
     DeploymentsFacade,
     KeysFacade,
     OrgsFacade,
@@ -192,7 +192,7 @@ def test_grant_passes_a_named_variant_not_a_bare_account():
 def test_client_exposes_every_facade_as_a_property():
     # The accessors are the API; a missing one makes the façade unreachable even
     # though its class is fine.
-    from matter_vault.client import MatterClient
+    from matter_sdk.client import MatterClient
 
     for name in FACADES:
         prop = getattr(MatterClient, name, None)

@@ -4,6 +4,13 @@ Status: **Shipped in SDK v1.1.0** (designed 2026-09-07; implemented and verified
 against the live testnet 2026-09-08).
 Companion (source of truth for the wire contract): `matter-node/docs/api-keys.md`.
 
+> This page is the spec-322 design record and is kept as written. The scope table
+> itself tracks the runtime: as of 2026-09-20 it is pinned to **spec 329**
+> (`testvectors/spec329_metadata.scale`), which added `Jobs.set_deployment_volumes`
+> and `Jobs.set_deployment_restart_policy` to `deployments:w`,
+> `Resources.suspend_resource` to `resources:w`, `Budgets.set_project_spend_cap` to
+> `billing:w`, and the two non-revolving treasury movers to the never-admitted list.
+
 Runtime spec 322 is live on testnet, and the dashboard mints member-tied keys
 against it. Nothing here is gated on a version number: the client detects support
 from metadata — the `BudgetsApi_agent_key` runtime API in Rust and TypeScript,
@@ -36,7 +43,7 @@ Option<(principal, ScopeSet)>`.
 
 ## Why the SDK must change
 
-Today `MatterClient::tx` (`crates/matter-vault/src/chain/mod.rs`) builds
+Today `MatterClient::tx` (`crates/matter-sdk/src/chain/mod.rs`) builds
 `subxt::dynamic::tx(pallet, call, args)` and signs it **as the key's own
 account**. It never uses `proxy.proxy`. Under the new model a key's own account
 has no authority and no balance: a direct-signed `secrets.store_secret` from a
@@ -146,7 +153,7 @@ failure is the `Proxy.ProxyExecuted { result: Err(..) }` event. Today's
     connect; re-resolve the mode once and retry, then surface
     `SdkError::KeyRevoked`.
 
-### 5. `ScopeSet` type (shared, `matter-vault-key`)
+### 5. `ScopeSet` type (shared, `matter-sdk-key`)
 
 ```
 pub enum Scope { Deployments=0, Collaborations=1, Secrets=2, Volumes=3, Datasets=4,
@@ -169,7 +176,7 @@ parser for the same form so CLI flags and env vars can carry it.
   - `revoke(key: AccountId)` → `Budgets.revoke_agent_key`
   - `lookup(key: AccountId) -> Option<(AccountId, ScopeSet)>` → runtime API
 - `Orgs::authorize_secrets_agent` / `revoke_secrets_agent`
-  (`crates/matter-vault/src/chain/facade.rs`) stay, documented as the legacy
+  (`crates/matter-sdk/src/chain/facade.rs`) stay, documented as the legacy
   project-tied path.
 - `Staking` façade: unreachable from a delegated key (staking is never
   admitted). Make those methods return `NotPermitted` in delegated mode rather
@@ -189,12 +196,12 @@ parser for the same form so CLI flags and env vars can carry it.
 |---|---|---|---|---|---|
 | Mode resolution at connect | yes | yes (`#connectBackend`) | yes | yes | n/a (encryptor only) |
 | `proxy.proxy` wrapping in `tx` | yes | yes (`#backend.submit`) | yes | yes | n/a |
-| `ScopeSet` + local table | `matter-vault-key` | port (small) | native port | native port | n/a |
+| `ScopeSet` + local table | `matter-sdk-key` | port (small) | native port | native port | n/a |
 | `Keys` façade | yes | yes | yes | yes | n/a |
 | `ProxyExecuted` unwrap | yes | yes | yes | yes (`TxAndWait`) | n/a |
 | `MATTER_PRINCIPAL` | yes | yes | yes | yes | n/a |
 
-TypeScript's `runtimeApi(method, argsHex)` (`packages/typescript-client/src/client.ts`)
+TypeScript's `runtimeApi(method, argsHex)` (`packages/typescript/src/client.ts`)
 already takes a `state_call` name; `BudgetsApi_agent_key` takes the 32-byte
 account as its SCALE argument and returns `Option<(AccountId32, u32)>`.
 
@@ -223,7 +230,7 @@ account as its SCALE argument and returns `Option<(AccountId32, u32)>`.
   dispatch error and Alice paying; `balances.transfer_all` refused locally as
   `NotPermitted`; re-scope to `Secrets:Read` and confirm a `/partial-decrypt`
   style authorization via `SecretsApi_is_authorized`; revoke and confirm
-  `KeyRevoked`. That lives in `crates/matter-vault/tests/scoped_keys_dev.rs`,
+  `KeyRevoked`. That lives in `crates/matter-sdk/tests/scoped_keys_dev.rs`,
   driven against `./target/release/matter-node --dev`.
   `examples/delegated-e2e` walks the same path against a real network, with a
   key you cannot mint for yourself.
@@ -251,11 +258,11 @@ account as its SCALE argument and returns `Option<(AccountId32, u32)>`.
 
 Four things landed differently from the plan above. Each was a deliberate call.
 
-- **`ScopeSet` lives in `matter-vault-key`, not `matter-vault-core`.** It is not
+- **`ScopeSet` lives in `matter-sdk-key`, not `matter-sdk-core`.** It is not
   cryptography, and the key crate is where the account and signer types it sits
   beside already are.
 - **Python and Go port the table rather than reaching it through FFI.** A scope
-  set is not cryptography, so it does not belong behind `matter-vault-ffi` — and
+  set is not cryptography, so it does not belong behind `matter-sdk-ffi` — and
   the two argument-sensitive rows could not cross that boundary anyway without
   shipping the whole dynamic argument tree with them. `scope_bits.json` and
   `required_scopes.json` keep the four honest instead.

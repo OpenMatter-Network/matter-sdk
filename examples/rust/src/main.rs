@@ -1,11 +1,11 @@
-//! MatterVault Rust SDK — runnable end-to-end demo.
+//! MatterSDK Rust SDK — runnable end-to-end demo.
 //!
-//! Run with: `cargo run -p matter-vault-example`
+//! Run with: `cargo run -p matter-sdk-example`
 //!
 //! It seals a secret, shows the on-chain call you would submit, then recovers the
 //! secret from a committee — all against a throwaway committee built in-process so
 //! the demo needs no live network. In a real integration the committee runs
-//! elsewhere; your app only ever calls `matter-vault`, and you submit the
+//! elsewhere; your app only ever calls `matter-sdk`, and you submit the
 //! `StoreSecret` call with your own Substrate client.
 
 use std::collections::BTreeMap;
@@ -16,15 +16,25 @@ use matter_crypto::bgv::poly::crt::CrtPoly;
 use matter_crypto::bgv::poly::CrtContext;
 use matter_crypto::bgv::Ciphertext;
 use matter_crypto::dkg::{
-    commit_to_contribution, derive_shared_a, generate_contribution, process_contributions,
+    commit_to_contribution,
+    derive_shared_a,
+    generate_contribution,
+    process_contributions,
     DkgOutput,
 };
 use matter_crypto::secret::{lagrange_coefficient, produce_proven_partial};
 use matter_crypto::zkp::plaintext::PlaintextProof;
 use matter_crypto::zkp::zkp_aware_smudge_bits;
-use matter_vault::matter_vault_core::wire::{to_0x, PartialDecryptRequest, PartialDecryptResponse};
-use matter_vault::{
-    decrypt, encrypt, Aad, CommitteeNode, DecryptRequest, Health, Sr25519Signer, StoreSecret,
+use matter_sdk::matter_sdk_core::wire::{to_0x, PartialDecryptRequest, PartialDecryptResponse};
+use matter_sdk::{
+    decrypt,
+    encrypt,
+    Aad,
+    CommitteeNode,
+    DecryptRequest,
+    Health,
+    Sr25519Signer,
+    StoreSecret,
     Transport,
 };
 
@@ -34,11 +44,11 @@ type Cipher = SecureCipher;
 const N: u64 = 5;
 const T: usize = 3;
 const EPOCH: u32 = 0;
-const SEED: &[u8] = b"matter-vault-example-committee";
+const SEED: &[u8] = b"matter-sdk-example-committee";
 
 #[tokio::main]
 async fn main() {
-    println!("MatterVault demo: seal a secret, then recover it from a {T}-of-{N} committee.\n");
+    println!("MatterSDK demo: seal a secret, then recover it from a {T}-of-{N} committee.\n");
 
     // --- A throwaway committee (stands in for nodes you'd reach over HTTP). ---
     let ctx = CrtContext::gen();
@@ -162,7 +172,7 @@ impl LocalCommittee {
 
 #[allow(clippy::manual_async_fn)] // eager build keeps the future Send without Sync state
 impl Transport for LocalCommittee {
-    fn health(&self, _endpoint: &str) -> impl Future<Output = matter_vault::Result<Health>> + Send {
+    fn health(&self, _endpoint: &str) -> impl Future<Output = matter_sdk::Result<Health>> + Send {
         async move {
             Ok(Health {
                 status: "active".to_string(),
@@ -176,7 +186,7 @@ impl Transport for LocalCommittee {
         &self,
         endpoint: &str,
         req: &PartialDecryptRequest,
-    ) -> impl Future<Output = matter_vault::Result<PartialDecryptResponse>> + Send {
+    ) -> impl Future<Output = matter_sdk::Result<PartialDecryptResponse>> + Send {
         let point = self.by_endpoint[endpoint];
         let idx = (point - 1) as usize;
         let lambda = lagrange_coefficient::<Params>(point, &req.subset);

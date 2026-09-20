@@ -1,6 +1,6 @@
 # Security Policy
 
-MatterVault is a tool for protecting secrets. We hold its own security to a high bar.
+MatterSDK is a tool for protecting secrets. We hold its own security to a high bar.
 
 ## Reporting a vulnerability
 
@@ -10,7 +10,7 @@ acknowledge within 3 business days. Coordinated disclosure is appreciated.
 
 ## Threat model
 
-What MatterVault protects, and against whom:
+What MatterSDK protects, and against whom:
 
 - **A stolen ciphertext is useless.** The on-chain `EncryptedSecret` envelope reveals
   nothing without a `t`-of-`n` committee quorum. Anyone can read the chain.

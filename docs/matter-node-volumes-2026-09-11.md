@@ -26,9 +26,9 @@ Add `set_deployment_volumes` beside `set_deployment_launch` /
 `set_deployment_policy_root` in all three scopes tables — it needs
 `Deployments:Write`, the same as the other `set_deployment_*` calls:
 
-- `packages/typescript-client/src/scopes.ts`
-- `crates/matter-vault/src/chain/scopes_table.rs`
-- `bindings/python/python/matter_vault/scopes.py`
+- `packages/typescript/src/scopes.ts`
+- `crates/matter-sdk/src/chain/scopes_table.rs`
+- `bindings/python/python/matter_sdk/scopes.py`
 
 The runtime's own table (`runtime/src/configs/budgets.rs::required_scopes`) is
 already updated, and a runtime test pins the admitted set, so a drift here is

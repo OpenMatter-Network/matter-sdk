@@ -1,18 +1,18 @@
 //! PyO3 binding over the shared Rust cores.
 //!
-//! Exposes the pure cryptography ([`matter_vault_core`]) and API-key ingestion
-//! ([`matter_vault_key`]) to Python, so this binding matches the cross-language
+//! Exposes the pure cryptography ([`matter_sdk_core`]) and API-key ingestion
+//! ([`matter_sdk_key`]) to Python, so this binding matches the cross-language
 //! fixtures in `testvectors/` byte-for-byte. The committee client, quorum
 //! orchestration, and chain client are the pure-Python layer in
-//! `python/matter_vault/`.
+//! `python/matter_sdk/`.
 //!
 //! Key *derivation* lives here rather than in `substrate-interface` on purpose.
 //! Deriving natively is where this binding drifted: branching on the `0x` prefix
 //! routed hex SURIs to `create_from_seed`, which ignores derivation junctions and
 //! silently returns the **root** account.
 
-use matter_vault_core as core;
-use matter_vault_key::{ApiKey, KeySigner};
+use matter_sdk_core as core;
+use matter_sdk_key::{ApiKey, KeySigner};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -27,7 +27,7 @@ fn err(e: core::CoreError) -> PyErr {
 ///
 /// Note the name collision: Python's builtin `KeyError` is unrelated, so these
 /// surface as `ValueError` to avoid reading like a failed dict lookup.
-fn key_err(e: matter_vault_key::KeyError) -> PyErr {
+fn key_err(e: matter_sdk_key::KeyError) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 
@@ -141,7 +141,7 @@ fn open_secret<'py>(
 /// other binding on `testvectors/api_keys.json`. The secret never crosses into
 /// Python: there is no accessor for it, `repr` is redacted, and pickling and
 /// copying are refused.
-#[pyclass(name = "ApiKey", module = "matter_vault", frozen)]
+#[pyclass(name = "ApiKey", module = "matter_sdk", frozen)]
 struct ApiKeyPy {
     inner: ApiKey,
 }
@@ -219,7 +219,7 @@ impl ApiKeyPy {
     }
 }
 
-/// The compiled core, imported by the `matter_vault` package as `._native`.
+/// The compiled core, imported by the `matter_sdk` package as `._native`.
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(encrypt, m)?)?;

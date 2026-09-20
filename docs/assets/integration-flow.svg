@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-  <title>Integrating MatterVault</title>
+  <title>Integrating MatterSDK</title>
   <desc>Your app calls the MatterSDK to encrypt a secret and store the ciphertext on the matter chain, then to decrypt by requesting partial decryptions from a t-of-n matter-kgc committee and aggregating them locally.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -30,7 +30,7 @@
   <rect width="1600" height="900" fill="url(#bg)"/>
   <ellipse cx="1430" cy="80" rx="560" ry="380" fill="#ffffff" fill-opacity="0.045"/>
 
-  <text class="title" x="800" y="92" text-anchor="middle" font-size="46">Integrating MatterVault</text>
+  <text class="title" x="800" y="92" text-anchor="middle" font-size="46">Integrating MatterSDK</text>
   <text class="muted" x="800" y="140" text-anchor="middle" font-size="22">Encrypt locally · store the ciphertext on-chain · recover only with a t-of-n committee quorum</text>
 
   <!-- Your App -->

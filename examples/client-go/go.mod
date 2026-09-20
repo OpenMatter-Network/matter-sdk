@@ -2,7 +2,7 @@ module github.com/openmatter-network/matter-sdk/examples/client-go
 
 go 1.22
 
-require github.com/openmatter-network/matter-sdk/packages/go/mattervault v0.0.0
+require github.com/openmatter-network/matter-sdk-go/v2 v2.0.0
 
 require (
 	github.com/ChainSafe/go-schnorrkel v1.0.0 // indirect
@@ -30,4 +30,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/openmatter-network/matter-sdk/packages/go/mattervault => ../../packages/go/mattervault
+replace github.com/openmatter-network/matter-sdk-go/v2 => ../../packages/go/mattersdk

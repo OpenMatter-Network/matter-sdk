@@ -1,6 +1,6 @@
 # Secure signing & secret handling
 
-MatterVault does not decide where your signing key lives — **you do**. Recovered
+MatterSDK does not decide where your signing key lives — **you do**. Recovered
 **secrets never leak into logs**. This page is the integration guide for both.
 
 There are two supported postures, and the difference between them is real:

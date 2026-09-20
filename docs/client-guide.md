@@ -29,8 +29,8 @@ key-never-in-process posture is not yet reachable from Python. A `connect_with_s
 seam there is tracked in [`parity.md`](parity.md#notes--remaining-work).
 
 ```rust
-use matter_vault::chain::{MatterClient, MatterConfig, Network};
-use matter_vault::ApiKey;
+use matter_sdk::chain::{MatterClient, MatterConfig, Network};
+use matter_sdk::ApiKey;
 
 let key = ApiKey::parse(&std::env::var("MATTER_API_KEY")?)?;
 let client = MatterClient::connect_with_api_key(
@@ -40,13 +40,13 @@ let client = MatterClient::connect_with_api_key(
 ```
 
 ```ts
-import { ApiKey, MatterClient } from "@openmatter-network/matter-client";
+import { ApiKey, MatterClient } from "@openmatter-network/matter-sdk";
 
 const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
 ```
 
 ```python
-from matter_vault import MatterClient
+from matter_sdk import MatterClient
 
 client = MatterClient.from_env()          # MATTER_API_KEY / MATTER_NETWORK / …
 ```
@@ -111,7 +111,7 @@ A rename in a runtime upgrade surfaces as a typed chain error naming the
 that catches it before a user does:
 
 ```bash
-cargo test -p matter-vault --features chain --test live_chain -- --ignored
+cargo test -p matter-sdk --features chain --test live_chain -- --ignored
 ```
 
 ## Keys and scopes
@@ -139,7 +139,7 @@ INFO acting for a member principal=5GrwvaEF… scopes="deployments:w, secrets:r"
 The principal is SS58 in every binding, so it can be compared directly against what the
 dashboard showed whoever minted the key. Where the line goes is the host's decision, not
 this library's: Rust emits it through `tracing` and says nothing until a subscriber is
-installed, Python through the `matter_vault.client` logger, Go through
+installed, Python through the `matter_sdk.client` logger, Go through
 `Config.Logger` (default `slog.Default()`), and TypeScript through `MatterConfig.logger`
 (default the console).
 
@@ -410,13 +410,13 @@ The surface is the same; the idioms are not.
 
 | | Rust | TypeScript | Python | Go |
 |---|---|---|---|---|
-| Enabled by | `chain` cargo feature (default **off**) | `@openmatter-network/matter-client` package | `[sdk]` extra | always |
+| Enabled by | `chain` cargo feature (default **off**) | `@openmatter-network/matter-sdk` package | `[sdk]` extra | always |
 | Amounts | `u128` | `bigint` | `int` | `*big.Int` |
 | `tx` args | `Vec<Value>` | `unknown[]` | `dict` | `types.Call` |
 | Façade access | `client.secrets()` | `client.secrets` | `client.secrets` | `client.Secrets()` |
 | Method names | `snake_case` | `camelCase` | `snake_case` | `PascalCase` |
 
-All four expose the same five façades and the same thirty fixture-pinned methods;
+All four expose the same façades and the same fixture-pinned methods;
 only the naming convention differs, and `testvectors/facade_calls.json` pins the
 mapping. Rust adds two typed conveniences on top — `grant_to_user` and
 `grant_to_deployment`, thin wrappers that shape a `GrantTarget` and delegate to
@@ -429,4 +429,4 @@ Rust gates the chain client behind a cargo feature and TypeScript behind a packa
 boundary for the same reason expressed two ways: a cargo feature that is off is
 genuinely not fetched or compiled, while npm installs any declared dependency — so
 in npm the package boundary is the only real opt-out. That keeps
-`@openmatter-network/matter-vault` at **zero runtime dependencies**, which CI asserts.
+`@openmatter-network/matter-sdk-core` at **zero runtime dependencies**, which CI asserts.
