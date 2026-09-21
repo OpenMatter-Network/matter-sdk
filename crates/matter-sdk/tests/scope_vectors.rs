@@ -170,10 +170,10 @@ fn emit_scope_vectors() {
     );
 }
 
-/// Call names for `pallet`, from the checked-in spec-329 metadata.
+/// Call names for `pallet`, from the checked-in spec-330 metadata.
 fn calls_of(pallet: &str) -> Vec<String> {
     use parity_scale_codec::Decode;
-    let bytes: &[u8] = include_bytes!("../../../testvectors/spec329_metadata.scale");
+    let bytes: &[u8] = include_bytes!("../../../testvectors/spec330_metadata.scale");
     let metadata = subxt::Metadata::decode(&mut &bytes[..]).expect("fixture decodes");
     metadata
         .pallet_by_name(pallet)

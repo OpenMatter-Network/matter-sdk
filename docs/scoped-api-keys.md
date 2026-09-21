@@ -5,8 +5,8 @@ against the live testnet 2026-09-08).
 Companion (source of truth for the wire contract): `matter-node/docs/api-keys.md`.
 
 > This page is the spec-322 design record and is kept as written. The scope table
-> itself tracks the runtime: as of 2026-09-20 it is pinned to **spec 329**
-> (`testvectors/spec329_metadata.scale`), which added `Jobs.set_deployment_volumes`
+> itself tracks the runtime: as of 2026-09-21 it is pinned to **spec 330**
+> (`testvectors/spec330_metadata.scale`), which added `Jobs.set_deployment_volumes`
 > and `Jobs.set_deployment_restart_policy` to `deployments:w`,
 > `Resources.suspend_resource` to `resources:w`, `Budgets.set_project_spend_cap` to
 > `billing:w`, and the two non-revolving treasury movers to the never-admitted list.

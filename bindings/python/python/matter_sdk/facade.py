@@ -151,14 +151,24 @@ class DeploymentsFacade(_Facade):
             {"deployment": int(deployment), "env_vars": env_vars},
         )
 
-    def register_wg_peer(self, deployment: int, user_wg_pubkey: bytes):
-        """Register a WireGuard peer public key against a deployment."""
+    def register_wg_peer(self, deployment: int, user_wg_pubkey: bytes, pq_ciphertext: bytes):
+        """Register a WireGuard peer public key against a deployment.
+
+        ``pq_ciphertext`` is the ML-KEM-768 ciphertext (1088 bytes) the peer
+        encapsulated to the provider's on-chain ML-KEM key
+        (``OverlayNetworks.PqKemPubkeys``); the provider decapsulates it to
+        derive the tunnel's post-quantum preshared key. Mandatory since spec 330.
+        """
         from .hexutil import to_hex
 
         return self._tx(
             "Jobs",
             "register_wg_peer",
-            {"deployment": int(deployment), "user_wg_pubkey": to_hex(user_wg_pubkey)},
+            {
+                "deployment": int(deployment),
+                "user_wg_pubkey": to_hex(user_wg_pubkey),
+                "pq_ciphertext": to_hex(pq_ciphertext),
+            },
         )
 
 

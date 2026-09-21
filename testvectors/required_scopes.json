@@ -569,6 +569,27 @@
     },
     {
       "arg_sensitive": false,
+      "call": "set_pq_kem_pubkey",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_collab_pq_ciphertext",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
+      "call": "set_client_pq_ciphertext",
+      "pallet": "OverlayNetworks",
+      "required": 2048,
+      "required_text": "networking:w"
+    },
+    {
+      "arg_sensitive": false,
       "call": "report_consumption",
       "pallet": "Resources",
       "required": null,

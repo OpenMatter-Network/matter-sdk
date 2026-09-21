@@ -374,7 +374,7 @@ func TestScopeRefusalsCarryABranchableKind(t *testing.T) {
 // one. Rust and TypeScript pin the V15 blob alongside it.
 func loadSpec322Metadata(t *testing.T) *types.Metadata {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vectorsRel, "spec329_metadata_v14.scale"))
+	raw, err := os.ReadFile(filepath.Join(vectorsRel, "spec330_metadata_v14.scale"))
 	if err != nil {
 		t.Fatalf("read the spec-322 fixture: %v", err)
 	}

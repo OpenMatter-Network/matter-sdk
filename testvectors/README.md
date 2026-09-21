@@ -68,14 +68,14 @@ cryptography, so it does not belong behind `matter-sdk-ffi`, and the two
 whole dynamic argument tree with them. Those two rows are marked in the fixture
 precisely because it can only pin their name-derived half — each binding covers
 the argument-dependent part in its own tests. `required_scopes.json` is generated
-against `testvectors/spec329_metadata.scale`, so regenerate that
+against `testvectors/spec330_metadata.scale`, so regenerate that
 blob first when the runtime adds a call; the recipe is in
 `crates/matter-sdk/src/chain/scopes_table.rs`.
 
 Two metadata blobs sit beside the JSON, for the same runtime in the two versions the
-bindings actually read. `spec329_metadata.scale` is **V15**, which is what subxt and
+bindings actually read. `spec330_metadata.scale` is **V15**, which is what subxt and
 @polkadot load and the only version carrying runtime-API declarations; Rust resolves
-`BudgetsApi_agent_key` from it. `spec329_metadata_v14.scale` is what `state_getMetadata`
+`BudgetsApi_agent_key` from it. `spec330_metadata_v14.scale` is what `state_getMetadata`
 returns and all GSRPC and substrate-interface can decode, so it is the one Go pins its
 argument-sensitive scope rows against. Neither is a lesser copy of the other: each is
 what that binding sees in production.
