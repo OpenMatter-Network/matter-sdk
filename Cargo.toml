@@ -80,3 +80,16 @@ clippy.all = "deny"
 
 [profile.release]
 opt-level = 3
+
+# The static archives shipped in the Go module (scripts/build-ffi-staticlib.sh). Six of
+# them are committed to matter-sdk-go on every release, so size is a real cost: without
+# LTO the archive carries all of std and every dependency, used or not (30 MB).
+#
+# The profile alone shrinks nothing. matter-sdk-ffi also declares `rlib`, and cargo
+# silently skips LTO for any crate that does — so the script builds with
+# `cargo rustc --crate-type staticlib`, which is what lets this take effect.
+# opt-level stays at 3: lattice arithmetic is not the place to trade speed for bytes unmeasured.
+[profile.release-ffi]
+inherits = "release"
+lto = "fat"
+codegen-units = 1

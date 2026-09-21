@@ -6,21 +6,16 @@
 // the committee HTTP client, quorum orchestration, the Signer abstraction, and a
 // chain client that signs and submits extrinsics.
 //
-// Build prerequisites (from the repo root):
-//
-//	cargo build -p matter-sdk-ffi --release   # produces target/release/libmatter_sdk_ffi.{a,so}
-//	go test ./...
-//
-// The cgo LDFLAGS link the cdylib, so a binary using this package needs the
-// repo root's target/release on its search path at run time — e.g. from this
-// directory:
-//
-//	LD_LIBRARY_PATH=../../../target/release go run .
+// The core is linked statically, so a binary built with this package has no run-time
+// dependency on it and needs no Rust toolchain. It does need cgo: build with
+// CGO_ENABLED=1 and a C compiler, and on Alpine or any other musl system add -tags musl.
 package mattersdk
 
+// The link flags live in exactly one file per build flavour (link_dev.go in the
+// monorepo, a generated link.go in the published module); cgo concatenates the
+// directives of every file in the package.
+
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/matter-sdk-ffi/include
-#cgo LDFLAGS: -L${SRCDIR}/../../../target/release -lmatter_sdk_ffi -lm
 #include "matter_sdk.h"
 #include <stdlib.h>
 */

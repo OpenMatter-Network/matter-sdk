@@ -16,7 +16,11 @@ import (
 	"testing"
 )
 
-const vectorsRel = "../../../testvectors"
+// In the monorepo testdata/vectors is a symlink to the repo-root testvectors/, the one
+// fixture set every language replays. The published module cannot reach outside itself,
+// so scripts/assemble-go-module.sh copies the files in at the same path: one code path,
+// and the suite runs unchanged from the module cache.
+const vectorsRel = "testdata/vectors"
 
 func load(t *testing.T, name string, v any) {
 	t.Helper()

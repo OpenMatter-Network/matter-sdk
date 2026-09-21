@@ -9,7 +9,7 @@ client, the quorum orchestration, the signer seam, and the on-chain call builder
 
 This package has **zero runtime dependencies**, which CI asserts, so it stays small
 enough for a browser bundle. To connect to the chain, install
-[`@openmatter-network/matter-sdk`](../typescript-client) — it re-exports everything
+[`@openmatter-network/matter-sdk`](../typescript) — it re-exports everything
 here, so you import one package name.
 
 ## Install

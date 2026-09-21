@@ -55,9 +55,9 @@ cd examples/client-typescript && npm install && MATTER_API_KEY=$TEST_KEY npm sta
 # Python — needs the wheel built (see bindings/python/README.md)
 MATTER_API_KEY=$TEST_KEY ./bindings/python/.venv/bin/python examples/client-python/run.py
 
-# Go — links the FFI cdylib, so it needs the library on its search path
+# Go — links the core statically; in this repo that means building the archive first
 cargo build -p matter-sdk-ffi --release
-cd examples/client-go && LD_LIBRARY_PATH=../../target/release MATTER_API_KEY=$TEST_KEY go run .
+cd examples/client-go && MATTER_API_KEY=$TEST_KEY go run .
 ```
 
 ## What the client examples prove

@@ -1,0 +1,29 @@
+name: Install Rust
+description: >
+  Install the toolchain rust-toolchain.toml pins — the file's channel is the version's
+  only home. The Release workflow uses this rather than a third-party toolchain action
+  given a version of its own: that would be a second copy of the pin (and the file
+  outranks it anyway, so the two could disagree without either one failing), and one
+  more third-party action running in the workflow that holds publish rights. rustup is
+  preinstalled on every GitHub-hosted runner image this workflow uses.
+
+inputs:
+  targets:
+    description: Extra compilation targets, space separated (scripts add their own as needed).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install the pinned toolchain
+      shell: bash
+      env:
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        set -euo pipefail
+        channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' "${GITHUB_ACTION_PATH}/../../../rust-toolchain.toml")
+        test -n "${channel}" || { echo "::error::no channel in rust-toolchain.toml"; exit 1; }
+        rustup toolchain install "${channel}" --profile minimal --no-self-update
+        for target in ${TARGETS}; do rustup target add --toolchain "${channel}" "${target}"; done
+        rustc "+${channel}" --version

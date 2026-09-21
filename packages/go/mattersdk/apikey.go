@@ -1,8 +1,6 @@
 package mattersdk
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../../crates/matter-sdk-ffi/include
-#cgo LDFLAGS: -L${SRCDIR}/../../../target/release -lmatter_sdk_ffi -lm
 #include "matter_sdk.h"
 #include <stdlib.h>
 */

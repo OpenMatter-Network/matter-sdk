@@ -1,0 +1,11 @@
+# The tools that build and check a release wheel, pinned: the one home for these versions.
+# The release workflow and scripts/build-python-wheel.sh / scripts/check-wheel.sh use
+# whatever this installs — a bare `pip install maturin` takes whichever version is
+# current that day, and a rebuild of the same tag need not produce the same wheel.
+#
+#   pip install -r bindings/python/requirements-release.txt
+#
+# maturin[zig] brings the zig toolchain that cross-links the Linux wheels on the host, so
+# they bind glibc 2.17 (manylinux2014) rather than the build machine's own glibc.
+maturin[zig]==1.14.1
+twine==6.2.0

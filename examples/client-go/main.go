@@ -4,7 +4,7 @@
 // with MATTER_SUBMIT=yes, so running it costs nothing and cannot change chain
 // state by accident.
 //
-//	LD_LIBRARY_PATH=../../target/release MATTER_API_KEY=$TEST_KEY go run .
+//	MATTER_API_KEY=$TEST_KEY go run .
 //
 //	MATTER_API_KEY   the key; falls back to MATTER_SIGNER_SEED, then TEST_KEY
 //	MATTER_RPC_URL   endpoint override (default: testnet)

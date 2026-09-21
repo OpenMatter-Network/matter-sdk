@@ -148,8 +148,7 @@ pub async fn recover_secret(
    `is_authorized` account mapping during implementation).
 
 (A third question — ship `recover_secret` here or inline it in the agent — was resolved by
-shipping it here. An earlier version-drift caveat about this checkout being `0.1.0` while the
-published line was at `0.9.x` is obsolete: the tree and its manifests are on the `1.0.0` line.)
+shipping it here.)
 
 ## The credential, since spec 322
 

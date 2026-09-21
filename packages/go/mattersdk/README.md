@@ -10,22 +10,30 @@ TypeScript, and Python against `testvectors/`. On top of that core it adds the
 committee HTTP client, the quorum loop, the `Signer` abstraction, and a chain client
 that signs and submits extrinsics.
 
-## Build & test
-
-cgo needs the FFI library built first:
+## Install
 
 ```bash
-cargo build -p matter-sdk-ffi --release   # -> target/release/libmatter_sdk_ffi.{a,so}
+go get github.com/openmatter-network/matter-sdk-go/v2
+```
+
+The module ships the Rust core as a prebuilt static library for each supported
+platform, so you need **no Rust toolchain** and a built binary has no run-time
+dependency on the core. You do need cgo: `CGO_ENABLED=1` and a C compiler. On Alpine
+or any other musl system, build with `-tags musl`. An unsupported platform — and a
+missing or misplaced `musl` tag — is a compile error that says so.
+
+<!-- monorepo-only -->
+## Build & test (in this repository)
+
+Here the core is built from source, and cgo links the archive it produces
+(`link_dev.go`; the published module carries a generated `link.go` instead):
+
+```bash
+cargo build -p matter-sdk-ffi --release   # -> target/release/libmatter_sdk_ffi.a
 cd packages/go/mattersdk
 go test ./...
 ```
-
-The LDFLAGS link the **cdylib**, so a binary using this package needs the library on
-its search path at run time:
-
-```bash
-LD_LIBRARY_PATH=../../../target/release go run .
-```
+<!-- /monorepo-only -->
 
 ## Quick start
 

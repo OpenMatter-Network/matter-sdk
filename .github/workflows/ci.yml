@@ -4,9 +4,13 @@ on:
   pull_request:
   push:
     branches: [main, master]
+  workflow_call: # the Release workflow runs this whole suite before it builds anything
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A literal prefix, not github.workflow: when Release calls this workflow that context
+  # is "Release", group names compare case-insensitively, and the release's own group
+  # would then cancel — or be cancelled by — the suite it is waiting on.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -27,9 +31,23 @@ jobs:
         run: ./scripts/check-old-names.sh
       - name: Manifest versions agree
         run: ./scripts/check-versions.sh
+      # What a tag publishes, and under which names, is decided by one script. Its rule
+      # is irreversible once it reaches a public registry, so it is pinned as a table.
+      - name: Release gate rule
+        run: ./scripts/test-release-plan.sh
+      - name: Published packages carry the repository's LICENSE
+        run: ./scripts/check-license-copies.sh
+      - name: The README's supported platforms are the ones the release builds
+        run: ./scripts/platform-table.sh --check README.md
   # QuantumGuard's policy fetcher links `matter-sdk --features chain` as a static musl
-  # binary on the engine image's toolchain. A dependency or MSRV bump that only the
-  # 1.93 glibc matrix tolerates would surface as an engine build failure, one repo away.
+  # binary on the engine image's toolchain, and matter-ml consumes it by git tag on 1.90.
+  # A dependency or MSRV bump that only the 1.93 glibc matrix tolerates would surface as
+  # a build failure one repo away.
+  #
+  # The toolchain is the `rust-version` Cargo.toml declares — its only home — and it is
+  # selected with `cargo +<version>`. Installing it as the default is not enough:
+  # rust-toolchain.toml outranks the default, so this job used to name 1.91.1 and build
+  # on 1.93.0, testing nothing the `rust` job does not.
   consumer-musl:
     runs-on: ubuntu-latest
     steps:
@@ -38,14 +56,29 @@ jobs:
       - uses: ./matter-sdk/.github/actions/fetch-core-crates
         with:
           token: ${{ secrets.DEPS_PAT }}
-      - uses: dtolnay/rust-toolchain@1.91.1
+      - name: Read the declared MSRV
+        id: msrv
+        working-directory: matter-sdk
+        run: echo "version=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ steps.msrv.outputs.version }}
           targets: x86_64-unknown-linux-musl
       - name: Install the musl C toolchain (ring)
         run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - name: Build matter-sdk (chain) for musl
+      - name: Build matter-sdk (chain) for musl on the declared MSRV
         working-directory: matter-sdk
-        run: cargo build -p matter-sdk --features chain --target x86_64-unknown-linux-musl --locked
+        env:
+          MSRV: ${{ steps.msrv.outputs.version }}
+        run: |
+          cargo "+${MSRV}" --version
+          cargo "+${MSRV}" build -p matter-sdk --features chain --target x86_64-unknown-linux-musl --locked
+      # The git tag is the Rust release channel (the core is private, so crates.io is not
+      # an option), and every example in this repository is a workspace member with a path
+      # dependency — so nothing else depends on matter-sdk the way a consumer does.
+      - name: An out-of-workspace crate can depend on this commit
+        working-directory: matter-sdk
+        run: scripts/smoke-rust-consumer.sh "file://$PWD" "$GITHUB_SHA"
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -133,8 +166,7 @@ jobs:
           token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
         with: { targets: wasm32-unknown-unknown }
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: ./matter-sdk/.github/actions/install-wasm-pack
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Build wasm + TS package and run vector conformance
@@ -216,6 +248,15 @@ jobs:
           test ! -s /tmp/unformatted || { echo "::error::gofmt would reformat these"; exit 1; }
           go vet ./...
           go test ./...
+      # The module developers `go get` is assembled at release time, not checked in, so
+      # nothing above would notice it break between releases. Build this runner's row of
+      # the platform table and consume it exactly as the release's verify stage does.
+      - name: The assembled Go module works for an outside consumer
+        working-directory: matter-sdk
+        run: |
+          scripts/build-ffi-staticlib.sh glibc_linux_amd64 "$RUNNER_TEMP/ffi"
+          scripts/assemble-go-module.sh "$RUNNER_TEMP/ffi" "$RUNNER_TEMP/go-module" --partial
+          scripts/smoke-go-module.sh "$RUNNER_TEMP/go-module"
       # The examples are part of the surface: a client example that stops compiling
       # is a broken quick-start, and nothing else in CI builds them.
       - name: Build the Go examples

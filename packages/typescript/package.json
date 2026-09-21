@@ -5,20 +5,35 @@
   "license": "Apache-2.0",
   "author": "Open Matter <admin@openmatter.network>",
   "homepage": "https://openmatter.network",
-  "repository": "https://github.com/openmatter-network/matter-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenMatter-Network/matter-sdk.git",
+    "directory": "packages/typescript"
+  },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "echo 'Publish the CI-built, checked tarball (npm publish <file>.tgz), never this directory; see RELEASING.md.' >&2 && exit 1"
   },
   "dependencies": {
     "@openmatter-network/matter-sdk-core": "^2.0.0",

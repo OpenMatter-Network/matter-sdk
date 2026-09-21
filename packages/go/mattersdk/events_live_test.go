@@ -10,7 +10,7 @@ package mattersdk
 // decoding is now load-bearing for reading a secret id, so it must be proven rather
 // than assumed.
 //
-//	MATTER_LIVE=yes LD_LIBRARY_PATH=../../../target/release go test -run Live -v ./...
+//	MATTER_LIVE=yes go test -run Live -v ./...
 
 import (
 	"os"

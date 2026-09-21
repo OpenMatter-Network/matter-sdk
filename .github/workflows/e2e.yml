@@ -90,8 +90,7 @@ jobs:
           token: ${{ secrets.DEPS_PAT }}
       - uses: dtolnay/rust-toolchain@1.93.0
         with: { targets: wasm32-unknown-unknown }
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: ./matter-sdk/.github/actions/install-wasm-pack
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Live store -> gas -> decrypt
@@ -147,4 +146,4 @@ jobs:
         run: |
           cargo build -p matter-sdk-ffi --release
           cd examples/go-e2e
-          LD_LIBRARY_PATH=../../target/release go run .
+          go run .

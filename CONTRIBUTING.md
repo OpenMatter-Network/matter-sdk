@@ -33,7 +33,7 @@ cargo clippy --all-targets -- -Dwarnings
 cargo clippy -p matter-sdk --features chain --all-targets -- -Dwarnings
 ```
 
-For the TypeScript packages, see `packages/typescript-core/README.md` (vault) and
+For the TypeScript packages, see `packages/typescript-core/README.md` (core) and
 `packages/typescript/README.md` (chain client).
 
 ## Style

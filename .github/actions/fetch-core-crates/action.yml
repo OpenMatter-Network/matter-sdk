@@ -37,3 +37,24 @@ runs:
         git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
         git config --global credential.helper \
           "!f() { echo username=x-access-token; echo \"password=\$(cat '${TOKEN_FILE}')\"; }; f"
+    # A token that is present but expired (or has lost access to one repo) passes the
+    # emptiness check above and fails minutes later inside cargo, with an error that
+    # names neither the token nor the repo — which is how every workflow stayed red
+    # from 2026-09-08 without anyone being pointed at the secret. Probe each private
+    # source through the same ssh:// URL cargo will fetch, so the rewrite and the
+    # credential are both exercised. The list is read from Cargo.toml, its only home,
+    # so a newly pinned private repo is probed without editing this action.
+    - name: Prove the token can read every private core repo
+      shell: bash
+      env:
+        GIT_TERMINAL_PROMPT: "0"
+      run: |
+        set -euo pipefail
+        manifest="${GITHUB_ACTION_PATH}/../../../Cargo.toml"
+        # No mapfile: the macOS runners that build the darwin artifacts ship bash 3.2.
+        repos=$(grep -oE 'ssh://git@github\.com/[^"]+' "${manifest}" | sort -u)
+        test -n "${repos}" || { echo "::error::no private git sources found in ${manifest}"; exit 1; }
+        for repo in ${repos}; do
+          git ls-remote --exit-code "${repo}" HEAD >/dev/null \
+            || { echo "::error::DEPS_PAT cannot read ${repo} — expired, revoked, or not granted that repository"; exit 1; }
+        done

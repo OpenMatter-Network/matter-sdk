@@ -85,4 +85,7 @@ HSM/KMS integration patterns you should use instead.
 
 ## Supported versions
 
-During early access, only the latest `0.x` release receives security fixes.
+Security fixes go to the latest release of the current major version (`2.x`), across every
+binding at once — they are released together from one tag. Earlier majors are not
+maintained; nothing before 2.1.1 was published to a public registry. See
+[`CHANGELOG.md`](CHANGELOG.md).

@@ -51,15 +51,20 @@ still imports one package name.
 
 ## Development
 
-`matter-sdk` is a **peer** dependency (so consumers resolve the published
-version) and is **linked from the sibling directory** as a dev dependency, since
-it is published to a private registry:
+`@openmatter-network/matter-sdk-core` is a regular **dependency**, at exactly
+`^<this version>` — both packages are released together, and
+`scripts/check-versions.sh` fails if the range drifts. For development it is also
+**linked from the sibling directory** as a dev dependency, which takes precedence
+locally, so the client always builds against the core next to it:
 
 ```bash
-npm --prefix ../typescript run build   # build the wasm core + dist first
-npm install
+npm --prefix ../typescript-core ci
+npm --prefix ../typescript-core run build   # the wasm core + dist, which this package links
+npm ci
 npm test
 npm run typecheck
 ```
 
-`npm publish` refuses a `file:` specifier, so the dev link cannot silently ship.
+Neither package is ever published from its directory (`prepublishOnly` refuses). The
+release builds one tarball, `scripts/check-npm-tarball.sh` asserts that no `file:`
+specifier reached its `dependencies`, and that same file is what gets published.

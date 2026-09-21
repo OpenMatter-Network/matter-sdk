@@ -48,13 +48,72 @@ be four chances to get lattice crypto subtly wrong).
 | **Rust SDK** | Committee HTTP client, quorum + retry, `Signer`, call builders; the chain client + façades behind the `chain` feature. | `crates/matter-sdk` |
 | **C ABI** | FFI over the cores; drives the Go binding. | `crates/matter-sdk-ffi` |
 | **wasm binding** | `wasm-bindgen` over the cores; drives the TS packages. | `bindings/wasm` |
-| **TypeScript** | `matter-sdk` (seal/recover, zero runtime deps) + `matter-client` (chain client + façades). | `packages/typescript-core`, `packages/typescript` |
+| **TypeScript** | `@openmatter-network/matter-sdk-core` (seal/recover, zero runtime deps) + `@openmatter-network/matter-sdk` (chain client + façades; re-exports the core). | `packages/typescript-core`, `packages/typescript` |
 | **Python** | PyO3 binding + pure-Python online layer; chain client via the `[sdk]` extra. | `bindings/python` |
 | **Go** | cgo over the C ABI + native online layer and chain client. | `packages/go/mattersdk` |
 
 Networking, the quorum loop, and **signing** are idiomatic per language; only the
 cryptography is shared. A [conformance vector suite](testvectors/) generated from
 the core guarantees every binding agrees byte-for-byte. See [`docs/architecture.md`](docs/architecture.md).
+
+## Install
+
+Every binding is released together, from one tag, at one version
+([`CHANGELOG.md`](CHANGELOG.md)).
+
+```bash
+# TypeScript / JavaScript (Node 22+). The client re-exports the core; install the core
+# alone for a browser bundle or anything that only seals and recovers.
+npm install @openmatter-network/matter-sdk
+npm install @openmatter-network/matter-sdk-core
+
+# Python 3.9+. The [sdk] extra adds the chain client; the cryptography needs nothing.
+pip install "matter-sdk[sdk]"
+
+# Go 1.22+, with cgo (CGO_ENABLED=1 and a C compiler). On Alpine/musl add -tags musl.
+go get github.com/openmatter-network/matter-sdk-go/v2
+```
+
+The Python wheel and the Go module carry the Rust core **prebuilt** — as a compiled
+extension and as a static library — so neither needs a Rust toolchain, and a Go binary
+has no run-time dependency on the core. They are built for:
+
+<!-- platforms:begin -->
+| OS | Architecture | C library | Python wheel | Go build |
+|---|---|---|---|---|
+| Linux | x86-64 | glibc | `manylinux_2_17_x86_64` | `go build` |
+| Linux | arm64 | glibc | `manylinux_2_17_aarch64` | `go build` |
+| Linux | x86-64 | musl | `musllinux_1_2_x86_64` | `go build -tags musl` |
+| Linux | arm64 | musl | `musllinux_1_2_aarch64` | `go build -tags musl` |
+| macOS | x86-64 | — | `macosx_11_0_x86_64` | `go build` |
+| macOS | arm64 | — | `macosx_11_0_arm64` | `go build` |
+<!-- platforms:end -->
+
+That is glibc 2.17+, musl 1.2+ and macOS 11+. **Windows is not supported yet.** There
+is no Python source distribution (the cryptographic core is not public), so on any other
+platform — Windows, PyPy, free-threaded CPython, 32-bit — `pip` reports *"No matching
+distribution found"*; in Go an unsupported platform, or a missing or misplaced `musl`
+tag, is a compile error that says so. The npm packages are WebAssembly and run anywhere
+Node 22+ or a bundler does.
+
+**Rust** is not on crates.io: the crate depends on the private cryptographic core, and
+crates.io accepts neither git dependencies nor private source. Depend on the release tag,
+which requires read access to the `openmatter-network` core repositories:
+
+```toml
+[dependencies]
+matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.0.0" }
+# features = ["chain"] adds the chain client and façades (subxt + tokio); default is off.
+```
+
+```toml
+# .cargo/config.toml — yours. A dependency's own cargo config is never read, and the core
+# is pinned by ssh:// URL, which only the git CLI can authenticate with your credentials.
+[net]
+git-fetch-with-cli = true
+```
+
+The MSRV is Rust 1.90, and CI builds on exactly that.
 
 ## Quickstart
 
