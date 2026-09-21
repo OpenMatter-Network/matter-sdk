@@ -101,7 +101,7 @@ const FACADE_CALLS: &[(&str, &str, &str, &str, &[&str])] = &[
         "register_wg_peer",
         "Jobs",
         "register_wg_peer",
-        &["deployment", "user_wg_pubkey"],
+        &["deployment", "user_wg_pubkey", "pq_ciphertext"],
     ),
     // --- resources ---
     (
@@ -276,7 +276,7 @@ fn every_row_is_unique() {
 #[test]
 fn fixture_args_match_the_runtime_fields() {
     use parity_scale_codec::Decode;
-    let bytes: &[u8] = include_bytes!("../../../testvectors/spec329_metadata.scale");
+    let bytes: &[u8] = include_bytes!("../../../testvectors/spec330_metadata.scale");
     let metadata = subxt::Metadata::decode(&mut &bytes[..]).expect("fixture decodes");
 
     let mut problems: Vec<String> = Vec::new();

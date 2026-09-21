@@ -223,12 +223,26 @@ impl Deployments<'_> {
     }
 
     /// Register a WireGuard peer public key against a deployment.
-    pub async fn register_wg_peer(&self, deployment: u128, pubkey: [u8; 32]) -> Result<TxReceipt> {
+    ///
+    /// `pq_ciphertext` is the ML-KEM-768 ciphertext (1088 bytes) the peer
+    /// encapsulated to the provider's on-chain ML-KEM key
+    /// (`OverlayNetworks.PqKemPubkeys`); the provider decapsulates it to
+    /// derive the tunnel's post-quantum preshared key. Mandatory since spec 330.
+    pub async fn register_wg_peer(
+        &self,
+        deployment: u128,
+        pubkey: [u8; 32],
+        pq_ciphertext: Vec<u8>,
+    ) -> Result<TxReceipt> {
         self.0
             .tx(
                 "Jobs",
                 "register_wg_peer",
-                vec![Value::u128(deployment), Value::from_bytes(pubkey)],
+                vec![
+                    Value::u128(deployment),
+                    Value::from_bytes(pubkey),
+                    Value::from_bytes(pq_ciphertext),
+                ],
             )
             .await
     }

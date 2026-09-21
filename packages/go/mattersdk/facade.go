@@ -124,9 +124,14 @@ func (f DeploymentsFacade) SetEnv(deployment SecretID, envVars any) (string, err
 }
 
 // RegisterWgPeer registers a WireGuard peer public key against a deployment.
-func (f DeploymentsFacade) RegisterWgPeer(deployment SecretID, pubkey [32]byte) (string, error) {
+//
+// pqCiphertext is the ML-KEM-768 ciphertext (1088 bytes) the peer
+// encapsulated to the provider's on-chain ML-KEM key
+// (OverlayNetworks.PqKemPubkeys); the provider decapsulates it to derive the
+// tunnel's post-quantum preshared key. Mandatory since spec 330.
+func (f DeploymentsFacade) RegisterWgPeer(deployment SecretID, pubkey [32]byte, pqCiphertext []byte) (string, error) {
 	return f.client.call("Jobs", "register_wg_peer",
-		types.NewU128(*deployment.BigInt()), pubkey)
+		types.NewU128(*deployment.BigInt()), pubkey, types.Bytes(pqCiphertext))
 }
 
 // --- resources -------------------------------------------------------------

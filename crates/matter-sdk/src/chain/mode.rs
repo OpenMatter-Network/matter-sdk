@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn the_spec329_fixture_declares_the_agent_key_runtime_api() {
+    fn the_spec330_fixture_declares_the_agent_key_runtime_api() {
         assert!(supports_agent_keys(&super::super::test_metadata()));
     }
 

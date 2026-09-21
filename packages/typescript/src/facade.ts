@@ -123,9 +123,20 @@ export class DeploymentsFacade {
     return this.host.tx("Jobs", "set_deployment_env", [deployment, env]);
   }
 
-  /** Register a WireGuard peer public key against a deployment. */
-  async registerWgPeer(deployment: bigint, pubkey: Uint8Array): Promise<TxReceipt> {
-    return this.host.tx("Jobs", "register_wg_peer", [deployment, pubkey]);
+  /**
+   * Register a WireGuard peer public key against a deployment.
+   *
+   * `pqCiphertext` is the ML-KEM-768 ciphertext (1088 bytes) the peer
+   * encapsulated to the provider's on-chain ML-KEM key
+   * (`OverlayNetworks.PqKemPubkeys`); the provider decapsulates it to derive
+   * the tunnel's post-quantum preshared key. Mandatory since spec 330.
+   */
+  async registerWgPeer(
+    deployment: bigint,
+    pubkey: Uint8Array,
+    pqCiphertext: Uint8Array,
+  ): Promise<TxReceipt> {
+    return this.host.tx("Jobs", "register_wg_peer", [deployment, pubkey, pqCiphertext]);
   }
 }
 

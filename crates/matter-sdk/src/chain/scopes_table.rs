@@ -2,7 +2,7 @@
 //!
 //! Source of truth is `matter-node`'s `runtime/src/configs/budgets.rs`. This is
 //! a copy, and [`tests::the_table_classifies_every_call_of_the_scoped_pallets`]
-//! is what keeps the copy honest against a checked-in spec-329 metadata blob.
+//! is what keeps the copy honest against a checked-in spec-330 metadata blob.
 //!
 //! # This check is a courtesy, not a boundary
 //!
@@ -274,8 +274,8 @@ fn request_references_secret(request: Option<&Value>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    /// The checked-in spec-329 metadata. Regenerate against a `matter-node` at
-    /// spec >= 329 running `--dev`:
+    /// The checked-in spec-330 metadata. Regenerate against a `matter-node` at
+    /// spec >= 330 running `--dev`:
     ///
     /// ```text
     /// curl -s -H 'Content-Type: application/json' \
@@ -290,10 +290,10 @@ mod tests {
     /// and the client resolves `BudgetsApi_agent_key` from these same bytes.
     ///
     /// Go and Python read V14 — GSRPC and substrate-interface have no V15
-    /// decoder — so `testvectors/spec329_metadata_v14.scale` is its sibling,
+    /// decoder — so `testvectors/spec330_metadata_v14.scale` is its sibling,
     /// taken from `state_getMetadata` on the same runtime.
     ///
-    /// # When the runtime moves past 329
+    /// # When the runtime moves past 330
     ///
     /// The live tripwire in `tests/live_chain.rs` fails first, naming the call
     /// the table does not classify. Spec 323 is known to add

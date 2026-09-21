@@ -94,7 +94,8 @@
     {
       "args": [
         "deployment",
-        "user_wg_pubkey"
+        "user_wg_pubkey",
+        "pq_ciphertext"
       ],
       "call": "register_wg_peer",
       "facade": "deployments",

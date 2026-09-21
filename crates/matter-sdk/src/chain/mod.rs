@@ -1046,12 +1046,12 @@ fn proxy_payload(
     )
 }
 
-/// Metadata from a `matter-node` at spec 329, for tests that need real type
+/// Metadata from a `matter-node` at spec 330, for tests that need real type
 /// information. See `scopes_table`'s test module for the regeneration recipe.
 #[cfg(test)]
 pub(super) fn test_metadata() -> subxt::Metadata {
     use parity_scale_codec::Decode;
-    let bytes: &[u8] = include_bytes!("../../../../testvectors/spec329_metadata.scale");
+    let bytes: &[u8] = include_bytes!("../../../../testvectors/spec330_metadata.scale");
     subxt::Metadata::decode(&mut &bytes[..]).expect("fixture decodes as subxt metadata")
 }
 
