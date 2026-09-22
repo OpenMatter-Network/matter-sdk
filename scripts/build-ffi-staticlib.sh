@@ -39,8 +39,11 @@ trap 'rm -f "$log"' EXIT
 remap="--remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo"
 remap+=" --remap-path-prefix=$PWD=/matter-sdk"
 remap+=" --remap-path-prefix=$(rustc --print sysroot)=/rustc"
+# --color never: the native-static-libs note is parsed below. Some toolchain actions set
+# CARGO_TERM_COLOR=always, and the ANSI reset glued to the last library name then reads
+# as a library the row omits — invisibly, since the log viewer renders the escape.
 RUSTFLAGS="$remap $rustflags" \
-  cargo rustc -p matter-sdk-ffi --lib --locked --profile "$PROFILE" --target "$triple" \
+  cargo rustc --color never -p matter-sdk-ffi --lib --locked --profile "$PROFILE" --target "$triple" \
   --crate-type staticlib -- --print native-static-libs 2>&1 | tee "$log" >&2
 
 # rustc is the authority on what the archive must be linked with. The row's ldflags

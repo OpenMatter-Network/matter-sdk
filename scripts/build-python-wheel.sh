@@ -30,4 +30,6 @@ read -ra maturin_args <<<"$(target_field "$id" maturin_args)"
 
 rustup target add "$triple" >/dev/null 2>&1
 cd bindings/python
-maturin build --release --locked --strip --out "$out" --target "$triple" "${maturin_args[@]}"
+# ${arr[@]+"${arr[@]}"}: the darwin rows have no extra arguments, and the macOS runners'
+# bash 3.2 treats a plain expansion of an empty array as an unbound variable under set -u.
+maturin build --release --locked --strip --out "$out" --target "$triple" ${maturin_args[@]+"${maturin_args[@]}"}

@@ -11,9 +11,12 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-# `rlib` for the native Rust SDK + tests; `cdylib` so the same core compiles to
-# wasm32 (the wasm binding) and to a C ABI staticlib (the Go binding).
-crate-type = ["cdylib", "rlib"]
+# `rlib` only. Every shell over this core is its own cdylib/staticlib that links the
+# core as an rlib: bindings/wasm (wasm32), bindings/python (PyO3), crates/matter-sdk-ffi
+# (the C ABI). Declaring `cdylib` here as well made cargo link a libmatter_sdk_core.so
+# nobody uses on every build — and a shared library, unlike a static archive, needs a
+# linker for its target, which broke the cross-compiled FFI archives (aarch64 from x86-64).
+crate-type = ["rlib"]
 
 [dependencies]
 # The novel RLWE/BGV threshold crypto. We wrap it; we never re-implement it.

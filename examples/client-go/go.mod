@@ -2,7 +2,7 @@ module github.com/openmatter-network/matter-sdk/examples/client-go
 
 go 1.22
 
-require github.com/openmatter-network/matter-sdk-go/v2 v2.1.1-rc.1
+require github.com/openmatter-network/matter-sdk-go/v2 v2.1.1-rc.2
 
 require (
 	github.com/ChainSafe/go-schnorrkel v1.0.0 // indirect
