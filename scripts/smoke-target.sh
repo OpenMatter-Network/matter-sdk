@@ -27,6 +27,8 @@ readonly ALPINE_BUILD_PACKAGES='bash build-base git'
 readonly BARE_IMAGE=alpine:3
 
 # A directory spec is mounted into the container; a version spec is passed through.
+# Expanded as ${mount[@]+"${mount[@]}"}: bash 3.2 (macOS runners) treats a plain
+# expansion of an empty array as an unbound variable under set -u.
 mount=()
 inner=$spec
 if [ -d "$spec" ]; then
@@ -43,7 +45,7 @@ case "$kind" in
     else
       out=$(mktemp -d)
       trap 'rm -rf "$out"' EXIT
-      docker run --rm -v "$repo:/repo:ro" "${mount[@]}" -v "$out:/out" -e GOTAGS="$tags" -e SMOKE_BINARY_OUT=/out/smoke "$image" \
+      docker run --rm -v "$repo:/repo:ro" ${mount[@]+"${mount[@]}"} -v "$out:/out" -e GOTAGS="$tags" -e SMOKE_BINARY_OUT=/out/smoke "$image" \
         sh -c "apk add --no-cache $ALPINE_BUILD_PACKAGES >/dev/null && /repo/scripts/smoke-go-module.sh '$inner'"
       docker run --rm -v "$out:/out:ro" -v "$repo/testvectors:/vectors:ro" "$BARE_IMAGE" /out/smoke /vectors/open_secret.json
       echo "go consumer binary runs on bare $BARE_IMAGE"
@@ -55,7 +57,7 @@ case "$kind" in
       "$repo/scripts/smoke-python-wheel.sh" "$spec"
     else
       for python in "${PYPA_INTERPRETERS[@]}"; do
-        docker run --rm -v "$repo:/repo:ro" "${mount[@]}" -e PYTHON="$python" "$image" /repo/scripts/smoke-python-wheel.sh "$inner"
+        docker run --rm -v "$repo:/repo:ro" ${mount[@]+"${mount[@]}"} -e PYTHON="$python" "$image" /repo/scripts/smoke-python-wheel.sh "$inner"
       done
     fi
     ;;

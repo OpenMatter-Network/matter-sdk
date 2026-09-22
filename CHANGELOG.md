@@ -6,7 +6,7 @@ All notable changes to MatterSDK are recorded here. The format follows
 binding: the Rust crates, both npm packages, the PyPI wheel and the Go module are
 released together from one tag (see [`RELEASING.md`](RELEASING.md)).
 
-## [2.1.1]
+## [2.1.2]
 
 The first release published to public registries. Nothing in the SDK's API changes;
 what changes is that the install commands in the documentation now work.
@@ -48,11 +48,16 @@ what changes is that the install commands in the documentation now work.
 - A `DEPS_PAT` that is present but expired now fails at the step that uses it, naming the
   repository it cannot read, instead of minutes later inside cargo.
 
+## [2.1.1] - 2026-09-21
+
+Tagged, never released: the manifests at this tag still said 2.0.0. The tag stays where
+it is — a pushed tag is never moved — and its changes ship in 2.1.2.
+
 ## [2.1.0] - 2026-09-21
 
 Tagged, never released: the release workflow failed before building anything, and the
 manifests at this tag still said 2.0.0. The tag stays where it is — a pushed tag is never
-moved — and its changes ship in 2.1.1.
+moved — and its changes ship in 2.1.2.
 
 ### Changed
 
@@ -61,7 +66,7 @@ moved — and its changes ship in 2.1.1.
 
 ## [2.0.0] - 2026-09-20
 
-Tagged, never released (the release workflow failed). Its changes ship in 2.1.1.
+Tagged, never released (the release workflow failed). Its changes ship in 2.1.2.
 
 ### Changed
 

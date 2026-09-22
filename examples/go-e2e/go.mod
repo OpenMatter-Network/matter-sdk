@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
-	github.com/openmatter-network/matter-sdk-go/v2 v2.1.1-rc.1
+	github.com/openmatter-network/matter-sdk-go/v2 v2.1.2-rc.1
 )
 
 require (

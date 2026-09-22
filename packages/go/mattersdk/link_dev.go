@@ -18,5 +18,6 @@ package mattersdk
 #cgo CFLAGS: -I${SRCDIR}/../../../crates/matter-sdk-ffi/include
 #cgo LDFLAGS: ${SRCDIR}/../../../target/release/libmatter_sdk_ffi.a -lm
 #cgo linux LDFLAGS: -lrt -lpthread -lutil -ldl
+#cgo darwin LDFLAGS: -liconv
 */
 import "C"
