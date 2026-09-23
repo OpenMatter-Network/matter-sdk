@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-core"
-version = "2.1.2-rc.1"
+version = "2.2.0"
 dependencies = [
  "bincode",
  "getrandom",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-key"
-version = "2.1.2-rc.1"
+version = "2.2.0"
 dependencies = [
  "getrandom",
  "hex",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-wasm"
-version = "2.1.2-rc.1"
+version = "2.2.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",

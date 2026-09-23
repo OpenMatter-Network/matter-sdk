@@ -102,7 +102,7 @@ which requires read access to the `openmatter-network` core repositories:
 
 ```toml
 [dependencies]
-matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.1.2-rc.1" }
+matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.2.0" }
 # features = ["chain"] adds the chain client and façades (subxt + tokio); default is off.
 ```
 
