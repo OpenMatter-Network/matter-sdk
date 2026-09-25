@@ -1,0 +1,55 @@
+# MatterSDK workspace. Layout: see README.md.
+#
+# The threshold crypto (matter-crypto), wire types (matter-kgc-proto) and on-chain
+# config codec (matter-kgc-config) are depended on, never re-implemented. They are
+# private git-tag deps: bump tags here and in Cargo.lock together.
+
+[workspace]
+members = ["crates/matter-sdk-core", "crates/matter-sdk-key", "crates/matter-sdk", "crates/matter-sdk-ffi", "examples/rust", "examples/rust-e2e", "examples/client-rust", "examples/delegated-e2e"]
+# Built by wasm-pack / maturin, not the native workspace.
+exclude = ["bindings/wasm", "bindings/python"]
+resolver = "2"
+
+[workspace.package]
+license = "Apache-2.0"
+authors = ["Open Matter <admin@openmatter.network>"]
+version = "2.3.0"
+homepage = "https://openmatter.network"
+repository = "https://github.com/openmatter-network/matter-sdk"
+edition = "2021"
+# MSRV, below the pinned toolchain on purpose; CI builds on it (`consumer-musl`).
+rust-version = "1.90"
+
+[workspace.dependencies]
+matter-crypto = { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.8.1", default-features = false }
+matter-kgc-proto = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
+# Keep on the same tag as matter-kgc-proto.
+matter-kgc-config = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
+
+matter-sdk-core = { path = "crates/matter-sdk-core", default-features = false }
+matter-sdk-key = { path = "crates/matter-sdk-key", default-features = false }
+
+# Versions aligned with the matter-kgc workspace.
+serde = { version = "1.0.219", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.132" }
+bincode = "1.3"
+hex = "0.4"
+thiserror = "2"
+zeroize = { version = "1", features = ["alloc", "derive"] }
+rand = "0.8"
+once_cell = "1"
+
+[workspace.lints]
+rust.missing_docs = "deny"
+clippy.all = "deny"
+
+[profile.release]
+opt-level = 3
+
+# Go module static archives (scripts/build-ffi-staticlib.sh); LTO keeps them small.
+# Cargo skips LTO for crates that also declare `rlib`, so the script must build with
+# `cargo rustc --crate-type staticlib` for this to apply.
+[profile.release-ffi]
+inherits = "release"
+lto = "fat"
+codegen-units = 1

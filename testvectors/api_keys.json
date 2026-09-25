@@ -1,0 +1,77 @@
+{
+  "comment": "API-key ingestion contract. `valid` cases must parse to `account_id_hex`; `invalid` cases must be rejected with the named error kind. Sibling of seed_formats.json, which pins positive derivation only.",
+  "invalid": [
+    {
+      "error": "empty",
+      "key": "",
+      "name": "empty"
+    },
+    {
+      "error": "empty",
+      "key": "   ",
+      "name": "whitespace only"
+    },
+    {
+      "error": "empty",
+      "key": "sr25519:",
+      "name": "scheme with no body"
+    },
+    {
+      "error": "malformed",
+      "key": "//Alice",
+      "name": "phraseless suri would use the public dev phrase"
+    },
+    {
+      "error": "unsupported_scheme",
+      "key": "secp256k1:0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e",
+      "name": "reserved ethereum scheme"
+    },
+    {
+      "error": "unsupported_scheme",
+      "key": "banana:whatever",
+      "name": "unknown scheme"
+    },
+    {
+      "error": "malformed",
+      "key": "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb779747",
+      "name": "hex too short"
+    },
+    {
+      "error": "malformed",
+      "key": "0xgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "name": "hex non-hex character"
+    }
+  ],
+  "valid": [
+    {
+      "account_id_hex": "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a",
+      "key": "bottom drive obey lake curtain smoke basket hold race lonely fit walk",
+      "name": "bare mnemonic"
+    },
+    {
+      "account_id_hex": "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a",
+      "key": "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e",
+      "name": "bare hex mini-secret"
+    },
+    {
+      "account_id_hex": "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a",
+      "key": "sr25519:0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e",
+      "name": "scheme-prefixed hex"
+    },
+    {
+      "account_id_hex": "46ebddef8cd9bb167dc30878d7113b7e168e6f0646beffd77d69d39bad76b47a",
+      "key": "  0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e\n",
+      "name": "surrounding whitespace"
+    },
+    {
+      "account_id_hex": "7444f9dafb81e391ef90714f58b662f4197d982fd47be8ed1f2ed2fea44e2d79",
+      "key": "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e//hard",
+      "name": "hex with hard junction"
+    },
+    {
+      "account_id_hex": "7444f9dafb81e391ef90714f58b662f4197d982fd47be8ed1f2ed2fea44e2d79",
+      "key": "bottom drive obey lake curtain smoke basket hold race lonely fit walk//hard",
+      "name": "mnemonic with hard junction"
+    }
+  ]
+}

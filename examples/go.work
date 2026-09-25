@@ -1,0 +1,16 @@
+// The Go examples are written exactly as a consumer's module is: they `require` the
+// published github.com/openmatter-network/matter-sdk-go, with no `replace` of their own.
+// Inside this repository this workspace points that requirement at the sources next
+// door, so CI builds the examples against the code under review. `GOWORK=off go build`
+// builds them against the released module instead.
+//
+// The package is replaced, not `use`d: Go refuses to replace a workspace member at every
+// version, and pinning one here would give the release version another home to drift in.
+go 1.22
+
+use (
+	./client-go
+	./go-e2e
+)
+
+replace github.com/openmatter-network/matter-sdk-go/v2 => ../packages/go/mattersdk

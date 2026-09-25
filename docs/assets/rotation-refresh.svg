@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <title>Proactive resharing: the key survives, the shares don't</title>
+  <desc>On rotation the committee reshares the same secret to the next epoch, refreshing every node's share without ever rebuilding the full key. The joint public key is unchanged, so previously stored ciphertext still decrypts; the old shares become useless.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4aff"/>
+      <stop offset="1" stop-color="#3f23c4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#ff5fa2"/>
+    </linearGradient>
+    <marker id="arrowT" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5fe6d4"/>
+    </marker>
+  </defs>
+  <style>
+    text{fill:#ffffff}
+    .title{font-weight:700}
+    .muted{fill:#cfc8f4}
+    .teal{fill:#5fe6d4}
+    .hexN{fill:#ffffff;fill-opacity:.06;stroke:#cbb8ff;stroke-opacity:.6;stroke-width:1.8}
+    .hexF{fill:#5fe6d4;fill-opacity:.13;stroke:#5fe6d4;stroke-opacity:.8;stroke-width:1.8}
+    .card{fill:#ffffff;fill-opacity:.05;stroke:#ffffff;stroke-opacity:.18;stroke-width:1.5}
+    .dash{stroke:#cfc8f4;stroke-opacity:.4;stroke-width:1.6;stroke-dasharray:6 7;fill:none}
+    .reshare{stroke:#5fe6d4;stroke-width:3.5;fill:none}
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="1400" cy="60" rx="540" ry="340" fill="#ffffff" fill-opacity="0.045"/>
+
+  <text class="teal" x="800" y="82" text-anchor="middle" font-size="18" letter-spacing="6">KEY ROTATION · PROACTIVE RESHARING</text>
+  <text class="title" x="800" y="148" text-anchor="middle" font-size="44">The key survives. The shares don't.</text>
+
+  <!-- joint public key, unchanged -->
+  <rect x="500" y="250" width="600" height="78" rx="20" fill="#ffffff" fill-opacity="0.10" stroke="#cbb8ff" stroke-opacity="0.7" stroke-width="2"/>
+  <rect x="500" y="250" width="7" height="78" rx="3.5" fill="url(#accent)"/>
+  <text class="title" x="800" y="286" text-anchor="middle" font-size="23">Joint public key — unchanged across rotations</text>
+  <text class="muted" x="800" y="312" text-anchor="middle" font-size="15">ciphertext stays decryptable · each one stamped with its epoch</text>
+
+  <!-- connectors: same pk governs both committees -->
+  <path class="dash" d="M650,330 L390,418"/>
+  <path class="dash" d="M950,330 L1210,418"/>
+
+  <!-- Epoch N committee -->
+  <rect class="card" x="110" y="418" width="560" height="300" rx="20"/>
+  <text class="title" x="390" y="466" text-anchor="middle" font-size="26">Epoch N</text>
+  <text class="muted" x="390" y="495" text-anchor="middle" font-size="16">current committee</text>
+  <g font-size="18" font-weight="700">
+    <polygon class="hexN" points="180,526 150.56,543 150.56,577 180,594 209.44,577 209.44,543"/><text x="180" y="567" text-anchor="middle">s1</text>
+    <polygon class="hexN" points="285,526 255.56,543 255.56,577 285,594 314.44,577 314.44,543"/><text x="285" y="567" text-anchor="middle">s2</text>
+    <polygon class="hexN" points="390,526 360.56,543 360.56,577 390,594 419.44,577 419.44,543"/><text x="390" y="567" text-anchor="middle">s3</text>
+    <polygon class="hexN" points="495,526 465.56,543 465.56,577 495,594 524.44,577 524.44,543"/><text x="495" y="567" text-anchor="middle">s4</text>
+    <polygon class="hexN" points="600,526 570.56,543 570.56,577 600,594 629.44,577 629.44,543"/><text x="600" y="567" text-anchor="middle">s5</text>
+  </g>
+  <text class="muted" x="390" y="660" text-anchor="middle" font-size="15">old shares</text>
+
+  <!-- Epoch N+1 committee -->
+  <rect class="card" x="930" y="418" width="560" height="300" rx="20"/>
+  <text class="title" x="1210" y="466" text-anchor="middle" font-size="26">Epoch N + 1</text>
+  <text class="muted" x="1210" y="495" text-anchor="middle" font-size="16">after rotation</text>
+  <g font-size="18" font-weight="700">
+    <polygon class="hexF" points="1000,526 970.56,543 970.56,577 1000,594 1029.44,577 1029.44,543"/><text class="teal" x="1000" y="567" text-anchor="middle">s1'</text>
+    <polygon class="hexF" points="1105,526 1075.56,543 1075.56,577 1105,594 1134.44,577 1134.44,543"/><text class="teal" x="1105" y="567" text-anchor="middle">s2'</text>
+    <polygon class="hexF" points="1210,526 1180.56,543 1180.56,577 1210,594 1239.44,577 1239.44,543"/><text class="teal" x="1210" y="567" text-anchor="middle">s3'</text>
+    <polygon class="hexF" points="1315,526 1285.56,543 1285.56,577 1315,594 1344.44,577 1344.44,543"/><text class="teal" x="1315" y="567" text-anchor="middle">s4'</text>
+    <polygon class="hexF" points="1420,526 1390.56,543 1390.56,577 1420,594 1449.44,577 1449.44,543"/><text class="teal" x="1420" y="567" text-anchor="middle">s5'</text>
+  </g>
+  <text class="teal" x="1210" y="660" text-anchor="middle" font-size="15">fresh shares</text>
+
+  <!-- reshare between committees -->
+  <text class="teal title" x="800" y="478" text-anchor="middle" font-size="20">reshare</text>
+  <path class="reshare" d="M783,520 A18 18 0 1 1 783,508" marker-end="url(#arrowT)"/>
+  <path class="reshare" d="M676,560 L924,560" marker-end="url(#arrowT)"/>
+  <text class="muted" x="800" y="606" text-anchor="middle" font-size="15">full key never</text>
+  <text class="muted" x="800" y="626" text-anchor="middle" font-size="15">reassembled</text>
+
+  <!-- footer -->
+  <rect class="card" x="160" y="772" width="1280" height="86" rx="14"/>
+  <text x="800" y="812" text-anchor="middle" font-size="20"><tspan class="title">Old shares become useless</tspan><tspan class="muted"> — they can't combine with the refreshed committee.</tspan></text>
+  <text class="muted" x="800" y="840" text-anchor="middle" font-size="15">The joint public key never changed, so a secret sealed under epoch N still decrypts after the rotation.</text>
+</svg>

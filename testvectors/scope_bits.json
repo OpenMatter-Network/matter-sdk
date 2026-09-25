@@ -1,0 +1,110 @@
+{
+  "algebra": [
+    {
+      "held": 2,
+      "held_text": "deployments:w",
+      "is_superset": true,
+      "required": 2
+    },
+    {
+      "held": 2,
+      "held_text": "deployments:w",
+      "is_superset": false,
+      "required": 16
+    },
+    {
+      "held": 48,
+      "held_text": "secrets:rw",
+      "is_superset": true,
+      "required": 16
+    },
+    {
+      "held": 16,
+      "held_text": "secrets:r",
+      "is_superset": false,
+      "required": 32
+    },
+    {
+      "held": 1048575,
+      "held_text": "deployments:rw, collaborations:rw, secrets:rw, volumes:rw, datasets:rw, networking:rw, resources:rw, organization:rw, billing:rw, communities:rw",
+      "is_superset": true,
+      "required": 48
+    },
+    {
+      "held": 0,
+      "held_text": "(none)",
+      "is_superset": false,
+      "required": 2
+    },
+    {
+      "held": 2,
+      "held_text": "deployments:w",
+      "is_superset": true,
+      "required": 0
+    }
+  ],
+  "all_bits": 1048575,
+  "comment": "ScopeSet wire contract: bit = scope * 2 + access, encoded as a bare u32. Mirrors matter-node's common/src/scopes.rs; both enums are append-only. `algebra` pins is_superset, where Read and Write are independent bits.",
+  "scopes": [
+    {
+      "index": 0,
+      "read_bit": 1,
+      "scope": "deployments",
+      "write_bit": 2
+    },
+    {
+      "index": 1,
+      "read_bit": 4,
+      "scope": "collaborations",
+      "write_bit": 8
+    },
+    {
+      "index": 2,
+      "read_bit": 16,
+      "scope": "secrets",
+      "write_bit": 32
+    },
+    {
+      "index": 3,
+      "read_bit": 64,
+      "scope": "volumes",
+      "write_bit": 128
+    },
+    {
+      "index": 4,
+      "read_bit": 256,
+      "scope": "datasets",
+      "write_bit": 512
+    },
+    {
+      "index": 5,
+      "read_bit": 1024,
+      "scope": "networking",
+      "write_bit": 2048
+    },
+    {
+      "index": 6,
+      "read_bit": 4096,
+      "scope": "resources",
+      "write_bit": 8192
+    },
+    {
+      "index": 7,
+      "read_bit": 16384,
+      "scope": "organization",
+      "write_bit": 32768
+    },
+    {
+      "index": 8,
+      "read_bit": 65536,
+      "scope": "billing",
+      "write_bit": 131072
+    },
+    {
+      "index": 9,
+      "read_bit": 262144,
+      "scope": "communities",
+      "write_bit": 524288
+    }
+  ]
+}

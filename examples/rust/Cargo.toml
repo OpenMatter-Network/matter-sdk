@@ -1,0 +1,23 @@
+[package]
+name = "matter-sdk-example"
+description = "Runnable end-to-end MatterSDK demo: seal a secret and recover it from a local in-process committee."
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[dependencies]
+matter-sdk = { path = "../../crates/matter-sdk" }
+# Only for the in-process demo committee; a real app depends on matter-sdk alone.
+matter-crypto = { workspace = true }
+# Decodes the version-tagged plaintext proof, as a committee node does.
+matter-kgc-config = { workspace = true, features = ["wire"] }
+bincode = { workspace = true }
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+
+# Empty: opts out of workspace lints (teaching binary, not library API).
+[lints]

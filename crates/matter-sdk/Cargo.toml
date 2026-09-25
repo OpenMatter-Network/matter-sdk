@@ -1,0 +1,54 @@
+[package]
+name = "matter-sdk"
+description = "The Rust SDK for OpenMatter: seal secrets under the matter-kgc committee and recover them via a signed, threshold /partial-decrypt quorum, plus (behind the `chain` feature) a metadata-driven MatterChain client — generic tx/query/runtimeApi over every pallet and curated typed façades. Wraps the pure matter-sdk-core with a committee HTTP client, quorum orchestration, a bring-your-own Signer abstraction, and on-chain call builders."
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+default = []
+# The MatterChain client. Off by default so crypto-only consumers need neither
+# subxt nor a tokio runtime (check with `cargo tree -p matter-sdk`).
+chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio", "dep:tracing"]
+
+[dependencies]
+matter-sdk-core = { workspace = true }
+# API-key ingestion and `KeySigner`; owns the sr25519 dependency.
+matter-sdk-key = { workspace = true }
+# On-chain extrinsic argument types for `calls`.
+matter-kgc-config = { workspace = true, features = ["wire"] }
+
+serde = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+# Quorum selection uses `OsRng` so the decrypt future stays `Send`.
+rand = { workspace = true }
+
+# Committee HTTP transport; the caller drives the async runtime.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# --- `chain` feature only. ---
+# Metadata-driven access to every pallet without vendoring metadata.
+subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"], optional = true }
+parity-scale-codec = { version = "3", features = ["derive"], optional = true }
+tokio = { version = "1.47.1", features = ["rt", "time"], optional = true }
+# Connect diagnostics; silent without a subscriber. Already a subxt dependency.
+tracing = { version = "0.1", default-features = false, features = ["std"], optional = true }
+
+[dev-dependencies]
+# The fake-committee test computes real partials.
+matter-crypto = { workspace = true }
+bincode = { workspace = true }
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+# Replay tests need raw sr25519 to model an attacker and a verifying node. The
+# shipped crate signs only through `matter-sdk-key`.
+subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+
+[lints]
+workspace = true

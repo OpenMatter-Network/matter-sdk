@@ -1,0 +1,30 @@
+name: Install wasm-pack
+description: >
+  Install one pinned, checksum-verified wasm-pack. CI and Release both used to pipe
+  the project's installer script from the network into a shell, which takes whatever
+  version is current that day: the wasm in a published npm package was then built by
+  a tool nobody chose, and a rebuild of the same tag need not produce the same bytes.
+  The version and its checksum live here, their only home; to bump, change both
+  together (sha256sum of the release asset).
+
+runs:
+  using: composite
+  steps:
+    - name: Install wasm-pack (pinned)
+      shell: bash
+      env:
+        WASM_PACK_VERSION: "0.15.0"
+        WASM_PACK_SHA256: c09f971ecaed9a2efc80fdcea7a00ef6b53c7fadc8c57d1f61b53a6aa66b668a
+      run: |
+        set -euo pipefail
+        # Static musl build: runs on any Linux runner image.
+        asset="wasm-pack-v${WASM_PACK_VERSION}-x86_64-unknown-linux-musl"
+        test "${RUNNER_OS}-${RUNNER_ARCH}" = "Linux-X64" \
+          || { echo "::error::install-wasm-pack pins the Linux x64 asset; this runner is ${RUNNER_OS}-${RUNNER_ARCH}"; exit 1; }
+        cd "${RUNNER_TEMP}"
+        curl --fail --silent --show-error --location --retry 3 -o "${asset}.tar.gz" \
+          "https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/${asset}.tar.gz"
+        echo "${WASM_PACK_SHA256}  ${asset}.tar.gz" | sha256sum --check --quiet
+        tar -xzf "${asset}.tar.gz"
+        install -m 755 "${asset}/wasm-pack" "${HOME}/.cargo/bin/wasm-pack"
+        test "$(wasm-pack --version)" = "wasm-pack ${WASM_PACK_VERSION}"

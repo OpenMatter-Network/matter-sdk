@@ -1,0 +1,67 @@
+{
+  "name": "@openmatter-network/matter-sdk-core",
+  "version": "2.3.0",
+  "description": "MatterSDK core, with zero runtime dependencies: seal secrets under the matter-kgc committee and recover them via a signed, threshold partial-decrypt quorum.",
+  "keywords": [
+    "openmatter",
+    "matterchain",
+    "threshold-encryption",
+    "secrets",
+    "post-quantum",
+    "wasm"
+  ],
+  "license": "Apache-2.0",
+  "author": "Open Matter <admin@openmatter.network>",
+  "homepage": "https://openmatter.network",
+  "bugs": {
+    "url": "https://github.com/OpenMatter-Network/matter-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenMatter-Network/matter-sdk.git",
+    "directory": "packages/typescript-core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#wasm": {
+      "browser": "./wasm-web/matter_sdk_wasm.js",
+      "default": "./wasm/matter_sdk_wasm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "wasm-web"
+  ],
+  "scripts": {
+    "build:wasm": "cd ../../bindings/wasm && wasm-pack build --target nodejs --out-dir ../../packages/typescript-core/wasm --out-name matter_sdk_wasm && rm -f ../../packages/typescript-core/wasm/.gitignore",
+    "build:wasm-web": "cd ../../bindings/wasm && wasm-pack build --target bundler --out-dir ../../packages/typescript-core/wasm-web --out-name matter_sdk_wasm && rm -f ../../packages/typescript-core/wasm-web/.gitignore",
+    "build": "npm run build:wasm && npm run build:wasm-web && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build:wasm && vitest run",
+    "prepublishOnly": "echo 'Publish the CI-built, checked tarball (npm publish <file>.tgz), never this directory; see RELEASING.md.' >&2 && exit 1"
+  },
+  "devDependencies": {
+    "@polkadot/keyring": "^14.0.3",
+    "@polkadot/util": "^14.0.3",
+    "@polkadot/util-crypto": "^14.0.3",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

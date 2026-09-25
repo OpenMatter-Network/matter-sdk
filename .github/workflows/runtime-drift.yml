@@ -1,0 +1,42 @@
+# Nightly check that the live runtimes still match the SDK's by-name pallet/call
+# resolution (forkless upgrades can rename or add calls). Not PR CI: a red run reports
+# upstream drift, not a broken build. Read-only: no signing key, no submission.
+name: runtime-drift
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - network: testnet
+            rpc: wss://node2.testnet.openmatter.network
+          - network: mainnet
+            rpc: wss://node2.mainnet.openmatter.network
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+
+      # Includes a scope classification for every call of the scoped pallets: an upgrade can
+      # add a call the local scope check would then wrongly refuse.
+      - name: Check the curated surface against ${{ matrix.network }}
+        working-directory: matter-sdk
+        env:
+          MATTER_RPC_URL: ${{ matrix.rpc }}
+          MATTER_NETWORK: ${{ matrix.network }}
+        run: |
+          cargo test -p matter-sdk --features chain --test live_chain \
+            -- --ignored --nocapture

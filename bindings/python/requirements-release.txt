@@ -1,0 +1,8 @@
+# Pinned wheel build/check tools for the release workflow, scripts/build-python-wheel.sh,
+# and scripts/check-wheel.sh, so rebuilding a tag reproduces the wheel.
+#
+#   pip install -r bindings/python/requirements-release.txt
+#
+# maturin[zig] cross-links Linux wheels against glibc 2.17 (manylinux2014).
+maturin[zig]==1.14.1
+twine==6.2.0

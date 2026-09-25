@@ -1,0 +1,257 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_call: # Release runs this suite first
+
+concurrency:
+  # Literal prefix, not github.workflow: under Release that is "Release", and the two
+  # groups would cancel each other.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FMT_CONFIG: imports_granularity=Module,group_imports=StdExternalCrate,imports_layout=HorizontalVertical
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No pre-2.0 names outside the historical record
+        run: ./scripts/check-old-names.sh
+      - name: Manifest versions agree
+        run: ./scripts/check-versions.sh
+      - name: Release gate rule
+        run: ./scripts/test-release-plan.sh
+      - name: Published packages carry the repository's LICENSE
+        run: ./scripts/check-license-copies.sh
+      - name: The README's supported platforms are the ones the release builds
+        run: ./scripts/platform-table.sh --check README.md
+      - name: Documentation links resolve, and none points at a private repository
+        run: ./scripts/check-doc-links.sh
+  # Consumers build `matter-sdk --features chain` as static musl on the MSRV.
+  # `cargo +<msrv>` is required: rust-toolchain.toml outranks the default toolchain.
+  consumer-musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - name: Read the declared MSRV
+        id: msrv
+        working-directory: matter-sdk
+        run: echo "version=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - uses: ./matter-sdk/.github/actions/install-rust
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+          targets: x86_64-unknown-linux-musl
+      - name: Install the musl C toolchain (ring)
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build matter-sdk (chain) for musl on the declared MSRV
+        working-directory: matter-sdk
+        env:
+          MSRV: ${{ steps.msrv.outputs.version }}
+        run: |
+          cargo "+${MSRV}" --version
+          cargo "+${MSRV}" build -p matter-sdk --features chain --target x86_64-unknown-linux-musl --locked
+      # Rust ships by git tag, and no in-repo crate consumes it that way.
+      - name: An out-of-workspace crate can depend on this commit
+        working-directory: matter-sdk
+        run: scripts/smoke-rust-consumer.sh "file://$PWD" "$GITHUB_SHA"
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+        with:
+          components: rustfmt clippy
+          targets: wasm32-unknown-unknown
+      - name: Check fmt
+        working-directory: matter-sdk
+        run: cargo fmt --all --check -- --config ${{ env.FMT_CONFIG }}
+      - name: Clippy (default features)
+        working-directory: matter-sdk
+        run: cargo clippy --workspace --all-targets -- -Dwarnings
+      - name: Clippy (chain feature)
+        working-directory: matter-sdk
+        run: cargo clippy -p matter-sdk --features chain --all-targets -- -Dwarnings
+      - name: Build
+        working-directory: matter-sdk
+        run: cargo build --workspace
+      - name: Test (default features)
+        working-directory: matter-sdk
+        run: cargo test --workspace
+      - name: Test (chain feature)
+        working-directory: matter-sdk
+        run: cargo test -p matter-sdk --features chain
+      # Crypto-only consumers must not pull subxt or tokio.
+      - name: Assert subxt stays out of the default dependency graph
+        working-directory: matter-sdk
+        run: |
+          if cargo tree -p matter-sdk --edges normal | grep -qE '^[^a-zA-Z]*subxt v[0-9]'; then
+            echo "::error::the subxt client leaked into matter-sdk's default features"
+            cargo tree -p matter-sdk --edges normal | grep -E 'subxt'
+            exit 1
+          fi
+      # SECURITY.md: `*_insecure_dev_only` helpers never ship. Allowed only at the
+      # definition site, tests/, and examples/.
+      - name: Assert insecure_dev_only helpers stay out of shipped library code
+        working-directory: matter-sdk
+        run: |
+          hits=$(grep -rln "insecure_dev_only" --include='*.rs' crates/*/src bindings/*/src \
+            | grep -v '^crates/matter-sdk/src/signer.rs$' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::insecure_dev_only referenced outside its definition site (see SECURITY.md):"
+            echo "$hits"
+            exit 1
+          fi
+      # The other bindings only replay this fixture, so a stale one would fail nothing.
+      - name: Scope fixture is in sync with the checked-in metadata
+        working-directory: matter-sdk
+        run: |
+          cargo test -p matter-sdk --features chain --test scope_vectors -- --ignored
+          if ! git diff --exit-code -- testvectors/required_scopes.json testvectors/scope_bits.json; then
+            echo "::error::testvectors/required_scopes.json is stale; the emitter above rewrote it."
+            echo "::error::Commit the regenerated fixture (and port any new row to the TS/Python/Go tables)."
+            exit 1
+          fi
+      - name: Build cores for wasm32
+        working-directory: matter-sdk
+        run: |
+          cargo build -p matter-sdk-core --target wasm32-unknown-unknown
+          cargo build -p matter-sdk-key --target wasm32-unknown-unknown
+      # Binding crates are outside the workspace; the clippy steps above miss them.
+      - name: Clippy (binding crates)
+        working-directory: matter-sdk
+        run: |
+          (cd bindings/wasm && cargo clippy --target wasm32-unknown-unknown --all-targets --locked -- -Dwarnings)
+          (cd bindings/python && cargo clippy --all-targets --locked -- -Dwarnings)
+
+  # deny.toml, for every shipped lockfile.
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny@0.19.0
+      - name: cargo deny
+        working-directory: matter-sdk
+        run: |
+          cargo deny check
+          cargo deny --manifest-path bindings/python/Cargo.toml check --config deny.toml
+          cargo deny --manifest-path bindings/wasm/Cargo.toml check --config deny.toml
+
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+        with: { targets: wasm32-unknown-unknown }
+      - uses: ./matter-sdk/.github/actions/install-wasm-pack
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22 }
+      - name: Build wasm + TS package and run vector conformance
+        working-directory: matter-sdk/packages/typescript-core
+        run: |
+          npm ci
+          npm run build
+          npm test
+      - name: Assert matter-sdk-core has no runtime dependencies
+        working-directory: matter-sdk/packages/typescript-core
+        run: |
+          deps=$(npm ls --omit=dev --depth=0 --parseable 2>/dev/null | tail -n +2)
+          if [ -n "$deps" ]; then
+            echo "::error::matter-sdk-core gained a runtime dependency:"
+            echo "$deps"
+            exit 1
+          fi
+      - name: Build and test the chain client
+        working-directory: matter-sdk/packages/typescript
+        run: |
+          npm install
+          npm run typecheck
+          npm test
+          npm run build
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.11" }
+      # Build-then-install: `maturin develop` needs `uv pip`, not always available.
+      - name: Build the extension and run the full suite
+        working-directory: matter-sdk/bindings/python
+        run: |
+          pip install maturin pytest 'substrate-interface>=1.7'
+          maturin build --release
+          pip install --force-reinstall --no-deps target/wheels/matter_sdk-*.whl
+          pytest -q
+      # Chain tests use `pytest.importorskip`; without substrate-interface they skip.
+      - name: Assert the chain tests were not silently skipped
+        working-directory: matter-sdk/bindings/python
+        run: |
+          python -c "import substrateinterface" || {
+            echo "::error::substrate-interface missing; the chain tests would skip"
+            exit 1
+          }
+
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: { go-version: "1.22" }
+      - name: Build the FFI library and run the full Go suite
+        working-directory: matter-sdk
+        run: |
+          cargo build -p matter-sdk-ffi --release
+          cd packages/go/mattersdk
+          gofmt -l . | tee /tmp/unformatted
+          test ! -s /tmp/unformatted || { echo "::error::gofmt would reformat these"; exit 1; }
+          go vet ./...
+          go test ./...
+      # The published Go module is assembled at release time; smoke this runner's row.
+      - name: The assembled Go module works for an outside consumer
+        working-directory: matter-sdk
+        run: |
+          scripts/build-ffi-staticlib.sh glibc_linux_amd64 "$RUNNER_TEMP/ffi"
+          scripts/assemble-go-module.sh "$RUNNER_TEMP/ffi" "$RUNNER_TEMP/go-module" --partial
+          scripts/smoke-go-module.sh "$RUNNER_TEMP/go-module"
+      - name: Build the Go examples
+        working-directory: matter-sdk
+        run: |
+          for example in examples/go-e2e examples/client-go; do
+            (cd "$example" && go build ./...)
+          done

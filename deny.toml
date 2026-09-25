@@ -1,0 +1,46 @@
+# Supply-chain gate: `cargo deny check` (CI runs the same).
+
+[graph]
+all-features = true
+
+[advisories]
+# Unmaintained crates fail only when this workspace depends on them directly.
+unmaintained = "workspace"
+yanked = "deny"
+ignore = [
+  # bincode 1.x: the committee wire format, owned by the core crates. Every decode of
+  # untrusted bytes is size-bounded and rejects trailing bytes (matter-sdk-core decrypt.rs).
+  { id = "RUSTSEC-2025-0141", reason = "wire format owned by the private core crates; decoding is bounded and strict" },
+]
+
+[licenses]
+# Permissive only: everything ships inside Apache-2.0 packages.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Duplicates warn only: they come from upstream (e.g. `sha2` 0.9 via sr25519).
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# The private cryptographic core, pinned by tag in Cargo.toml.
+allow-git = [
+  "https://github.com/openmatter-network/matter-crypto",
+  "https://github.com/openmatter-network/matter-kgc",
+]

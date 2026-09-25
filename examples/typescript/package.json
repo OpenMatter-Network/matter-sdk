@@ -1,0 +1,12 @@
+{
+  "name": "matter-sdk-ts-example",
+  "private": true,
+  "type": "module",
+  "description": "Runnable MatterSDK TypeScript demo.",
+  "scripts": {
+    "demo": "tsx demo.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

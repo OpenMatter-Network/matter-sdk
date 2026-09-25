@@ -1,0 +1,4 @@
+[net]
+# Use the system `git` so the private git-tag deps fetch with your git config
+# (SSH locally; HTTPS + PAT in CI via .github/actions/fetch-core-crates).
+git-fetch-with-cli = true

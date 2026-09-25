@@ -1,0 +1,25 @@
+[package]
+name = "matter-sdk-e2e"
+description = "Live end-to-end Secrets test (Rust): seal -> secrets.storeSecret on chain -> read back -> threshold-decrypt from the live committee -> verify. Mirrors examples/e2e (TypeScript)."
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "e2e"
+path = "src/main.rs"
+
+[dependencies]
+matter-sdk = { path = "../../crates/matter-sdk", features = ["chain"] }
+
+# Chain half (state calls + storeSecret); the SDK leaves submission to your own client.
+subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"] }
+subxt-signer = { version = "0.44.0", features = ["sr25519"] }
+parity-scale-codec = { version = "3", features = ["derive"] }
+
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+serde_json = { workspace = true }
+
+# Empty: opts out of workspace lints (teaching binary, not library API).
+[lints]
