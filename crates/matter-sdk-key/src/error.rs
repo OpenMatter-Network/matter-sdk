@@ -19,7 +19,8 @@ pub enum KeyError {
     /// reserved-but-unimplemented ones such as `secp256k1`.
     #[error("unsupported api key scheme {scheme:?}: this build supports {supported}")]
     UnsupportedScheme {
-        /// The lowercased text before the first `:`. Never key material.
+        /// The reserved scheme's name, from this crate's own list; never text
+        /// taken from the input.
         scheme: String,
         /// The schemes this build does support, comma-separated.
         supported: &'static str,

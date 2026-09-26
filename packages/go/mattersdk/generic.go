@@ -21,11 +21,11 @@ func (c *ChainClient) Query(result any, pallet, entry string, keys ...[]byte) (b
 	target := pallet + "." + entry
 	key, err := types.CreateStorageKey(c.meta, pallet, entry, keys...)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w (was the runtime upgraded?)", target, err)
+		return false, wrapChainError(KindChain, target, err, "%s: %v (was the runtime upgraded?)", target, err)
 	}
 	found, err := c.api.RPC.State.GetStorageLatest(key, result)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", target, err)
+		return false, wrapChainError(KindChain, target, err, "%s: %v", target, err)
 	}
 	return found, nil
 }
@@ -36,11 +36,11 @@ func (c *ChainClient) QueryRaw(pallet, entry string, keys ...[]byte) ([]byte, er
 	target := pallet + "." + entry
 	key, err := types.CreateStorageKey(c.meta, pallet, entry, keys...)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w (was the runtime upgraded?)", target, err)
+		return nil, wrapChainError(KindChain, target, err, "%s: %v (was the runtime upgraded?)", target, err)
 	}
 	raw, err := c.api.RPC.State.GetStorageRawLatest(key)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", target, err)
+		return nil, wrapChainError(KindChain, target, err, "%s: %v", target, err)
 	}
 	if raw == nil || len(*raw) == 0 {
 		return nil, nil
@@ -55,7 +55,7 @@ func (c *ChainClient) QueryRaw(pallet, entry string, keys ...[]byte) ([]byte, er
 func (c *ChainClient) RuntimeAPI(method string, args []byte) ([]byte, error) {
 	raw, err := c.stateCall(method, args)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", method, err)
+		return nil, wrapChainError(KindChain, method, err, "%s: %v", method, err)
 	}
 	return raw, nil
 }
@@ -72,7 +72,8 @@ func (c *ChainClient) Constant(pallet, name string) ([]byte, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("%s.%s: no such constant in the live metadata", pallet, name)
+	target := pallet + "." + name
+	return nil, chainErrorf(KindChain, target, "%s: no such constant in the live metadata", target)
 }
 
 // WaitForFinalized polls the finalized head for up to two minutes until

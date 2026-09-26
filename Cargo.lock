@@ -1805,7 +1805,7 @@ dependencies = [
 
 [[package]]
 name = "matter-delegated-e2e"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "anyhow",
  "matter-sdk",
@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "bincode",
  "hex",
@@ -1855,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-client-example"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "anyhow",
  "matter-sdk",
@@ -1864,7 +1864,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-core"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "bincode",
  "getrandom 0.2.17",
@@ -1882,11 +1882,10 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-e2e"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "matter-sdk",
  "parity-scale-codec",
- "serde_json",
  "subxt",
  "subxt-signer",
  "tokio",
@@ -1894,7 +1893,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-example"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "bincode",
  "matter-crypto",
@@ -1905,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-ffi"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "hex",
  "matter-sdk-core",
@@ -1915,7 +1914,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-key"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "getrandom 0.2.17",
  "hex",

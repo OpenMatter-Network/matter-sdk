@@ -37,6 +37,8 @@ type ChainNode struct {
 	Account  []byte
 	Index    uint64
 	Endpoint string
+	// rawEndpoint is the endpoint as registered, before normalizeEndpoint.
+	rawEndpoint string
 }
 
 // NewChainClient connects and loads metadata.
@@ -125,7 +127,8 @@ func (c *ChainClient) DkgEpoch() (uint32, error) {
 	return uint32(e), nil
 }
 
-// SharedA returns the committee shared_a for the current epoch.
+// SharedA returns the committee shared_a for the current epoch. To decrypt a
+// secret, use CommitteeAt with the secret's own epoch instead.
 func (c *ChainClient) SharedA() ([]byte, error) {
 	raw, err := c.stateCall("KgcApi_shared_a", nil)
 	if err != nil {
@@ -159,7 +162,8 @@ func (c *ChainClient) ThresholdAtEpoch(epoch uint32) (int, error) {
 	return int(t.B), nil
 }
 
-// Nodes returns the registered committee nodes.
+// Nodes returns the registered committee nodes with their current DKG indices.
+// To decrypt a secret, use CommitteeAt with the secret's own epoch instead.
 func (c *ChainClient) Nodes() ([]ChainNode, error) {
 	raw, err := c.stateCall("KgcApi_kgc_nodes", nil)
 	if err != nil {
@@ -177,7 +181,12 @@ func (c *ChainClient) Nodes() ([]ChainNode, error) {
 	for i, r := range rows {
 		acct := make([]byte, 32)
 		copy(acct, r.Account[:])
-		out[i] = ChainNode{Account: acct, Index: uint64(r.DkgIndex), Endpoint: normalizeEndpoint(string(r.Endpoint))}
+		out[i] = ChainNode{
+			Account:     acct,
+			Index:       uint64(r.DkgIndex),
+			Endpoint:    normalizeEndpoint(string(r.Endpoint)),
+			rawEndpoint: string(r.Endpoint),
+		}
 	}
 	return out, nil
 }
@@ -490,51 +499,37 @@ func (c *ChainClient) signingContext(accountID []byte) (SigningContext, error) {
 	return ctx, nil
 }
 
-// StoreSecret submits Secrets.store_secret and returns the chain-assigned id once
-// it is finalized: the committee authorizes against the finalized head, so a
-// decrypt before then gets HTTP 403.
-func (c *ChainClient) StoreSecret(kp signature.KeyringPair, env EncryptedSecret, epoch uint32, aad Aad) (SecretID, error) {
-	payload := struct {
-		BindingID types.Bytes
-		Capsule   types.Bytes
-		Proof     types.Bytes
-		CT        types.Bytes
-	}{types.NewBytes(env.BindingID), types.NewBytes(env.Capsule), types.NewBytes(env.Proof), types.NewBytes(env.CT)}
-
-	call, err := types.NewCall(c.meta, "Secrets.store_secret", payload, types.NewU32(epoch), types.NewBytes([]byte{}), types.NewBytes(AadBytes(aad)))
+// StoreSecret submits Secrets.store_secret as signer and returns the
+// chain-assigned id once the block is finalized: the committee authorizes against
+// the finalized head, so a decrypt before then gets HTTP 403. The id is read from
+// the signer's own Secrets.SecretStored event, never predicted from a counter.
+//
+// It submits directly, as signer's own account. A MatterClient built on a
+// member-tied key should use client.Secrets().Store, which wraps the call for the
+// member, and then FindStoredSecret.
+func (c *ChainClient) StoreSecret(signer ExtrinsicSigner, env EncryptedSecret, epoch uint32, label string, aad Aad) (SecretID, error) {
+	call, err := c.StoreSecretCall(env, epoch, label, aad)
 	if err != nil {
 		return SecretID{}, err
 	}
-
-	txHash, err := c.SubmitCall(KeyringSigner{Pair: kp}, call)
+	receipt, outcome, err := c.SubmitAndWatch(signer, call, 0)
 	if err != nil {
 		return SecretID{}, err
 	}
-
-	// Take the id from our account's `Secrets.SecretStored` event in a finalized
-	// block; NextSecretId would race with concurrent submitters.
-	var lastScanned types.Hash
-	for i := 0; i < storeFinalityAttempts; i++ {
-		time.Sleep(storeFinalityInterval)
-		fin, err := c.api.RPC.Chain.GetFinalizedHead()
-		if err != nil || fin == lastScanned {
-			continue
-		}
-		lastScanned = fin
-
-		id, found, err := c.FindStoredSecret(fin, kp.PublicKey)
-		if err != nil {
-			// The extrinsic may land in a later block.
-			continue
-		}
-		if found {
-			return id, nil
-		}
+	if outcome.Failed != nil {
+		return SecretID{}, chainErrorf(KindChain, "Secrets.store_secret",
+			"Secrets.store_secret was refused: %s", c.describeDispatchError(*outcome.Failed))
 	}
-	return SecretID{}, fmt.Errorf(
-		"store submitted (tx %s) but no Secrets.SecretStored event for this account was "+
-			"finalized in time; it may still land, so check the chain before resubmitting",
-		txHash)
+	id, found, err := storedSecretID(receipt.Events, signer.AccountID())
+	if err != nil {
+		return SecretID{}, err
+	}
+	if !found {
+		return SecretID{}, chainErrorf(KindChain, "Secrets.store_secret",
+			"Secrets.store_secret finalized in %s without a SecretStored event for this account",
+			receipt.BlockHash.Hex())
+	}
+	return id, nil
 }
 
 func (c *ChainClient) secretExistsAt(at types.Hash, id SecretID) (bool, error) {

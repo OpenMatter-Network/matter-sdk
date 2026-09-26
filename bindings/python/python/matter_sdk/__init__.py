@@ -37,6 +37,7 @@ from .errors import (
     DecryptError,
     DispatchError,
     FaultStage,
+    FinalityTimeoutError,
     KeyRevokedError,
     MainnetNotConfirmedError,
     NeverAdmittedError,
@@ -62,6 +63,7 @@ try:
     from .chain import (
         ApiKeySigner,
         ChainClient,
+        CommitteeState,
         TxReceipt,
         api_key_signer,
     )
@@ -93,6 +95,7 @@ except ImportError as exc:  # pragma: no cover - depends on the install extra
         return _raise
 
     ChainClient = _needs_sdk_extra("ChainClient")  # type: ignore[assignment,misc]
+    CommitteeState = _needs_sdk_extra("CommitteeState")  # type: ignore[assignment,misc]
     MatterClient = _needs_sdk_extra("MatterClient")  # type: ignore[assignment,misc]
     TxReceipt = _needs_sdk_extra("TxReceipt")  # type: ignore[assignment,misc]
     ChainProperties = _needs_sdk_extra("ChainProperties")  # type: ignore[assignment,misc]
@@ -144,12 +147,14 @@ __all__ = [
     # chain
     "MatterClient",
     "ChainClient",
+    "CommitteeState",
     "ChainProperties",
     "ChainError",
     "ReadOnlyError",
     "ConfigError",
     "WrongNetworkError",
     "MainnetNotConfirmedError",
+    "FinalityTimeoutError",
     "TxReceipt",
     "Network",
     "ApiKeySigner",

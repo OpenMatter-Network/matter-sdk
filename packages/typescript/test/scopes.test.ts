@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { Access, Scope, ScopeSet, requiredScopes } from "../src/scopes.js";
+import { Access, LOCALLY_NAMED_CALLS, Scope, ScopeSet, requiredScopes } from "../src/scopes.js";
 
 const vectorsDir = resolve(import.meta.dirname, "../../../testvectors");
 
@@ -93,6 +93,16 @@ describe("requiredScopes", () => {
       } else {
         expect(got?.bits, `${target} requires ${row.required_text}`).toBe(row.required);
       }
+    }
+  });
+
+  it("names no call the fixture does not pin", () => {
+    // The other direction: a call named locally but absent from the runtime is
+    // drift (a renamed or removed call) that the forward replay cannot see.
+    const pinned = new Set(table.calls.map((row) => `${row.pallet}.${row.call}`));
+    expect(LOCALLY_NAMED_CALLS.length).toBeGreaterThan(0);
+    for (const [pallet, call] of LOCALLY_NAMED_CALLS) {
+      expect(pinned.has(`${pallet}.${call}`), `${pallet}.${call} has no fixture row`).toBe(true);
     }
   });
 

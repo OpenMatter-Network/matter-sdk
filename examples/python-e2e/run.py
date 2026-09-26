@@ -14,7 +14,6 @@ import sys
 from matter_sdk import (
     Aad,
     ChainClient,
-    CommitteeNode,
     DecryptParams,
     Network,
     UrllibTransport,
@@ -27,6 +26,9 @@ from matter_sdk import (
 )
 
 DEFAULT_SECRET = "API_KEY=swordfish\nDATABASE_URL=postgres://prod"
+
+#: The on-chain label of a secret this harness stores; the other harnesses use the same.
+LABEL = "matter-sdk e2e"
 
 
 def guard_mainnet(rpc_url: str) -> None:
@@ -48,6 +50,10 @@ def guard_mainnet(rpc_url: str) -> None:
 
 
 def main() -> int:
+    # Without the [sdk] extra the chain names are stubs that raise on use, not None.
+    if not isinstance(ChainClient, type):
+        print('install the chain client: pip install "matter-sdk[sdk]"', file=sys.stderr)
+        return 2
     # Default endpoint per network: testvectors/networks.json.
     network = os.environ.get("MATTER_NETWORK", Network.TESTNET)
     if network not in (Network.TESTNET, Network.MAINNET):
@@ -57,9 +63,6 @@ def main() -> int:
     seed = os.environ.get("MATTER_SIGNER_SEED") or os.environ.get("TEST_KEY")
     if not seed:
         print("set MATTER_SIGNER_SEED or TEST_KEY (sr25519 SURI / 0x-seed)", file=sys.stderr)
-        return 2
-    if ChainClient is None:
-        print("install the chain client: pip install matter-sdk[sdk]", file=sys.stderr)
         return 2
     secret_text = os.environ.get("MATTER_SECRET", DEFAULT_SECRET)
     existing = os.environ.get("MATTER_SECRET_ID")
@@ -92,21 +95,14 @@ def main() -> int:
             env = encrypt(joint_pk, epoch, secret_text.encode(), aad_bytes(aad))
             print(f"Sealed {len(secret_text.encode())}B -> capsule {len(env[1])}B, proof {len(env[2])}B, ct {len(env[3])}B")
             print("Submitting secrets.storeSecret ...")
-            secret_id = chain.store_secret(keypair, store_secret(env, epoch, b"", aad))
+            secret_id = chain.store_secret(keypair, store_secret(env, epoch, LABEL, aad))
             print(f"Stored on chain: secret_id={secret_id}.")
 
         secret_epoch = chain.secret_epoch(secret_id)
         wire = chain.secret_payload(secret_id)
-        threshold = chain.threshold_at_epoch(secret_epoch)
-        shared_a = chain.shared_a()
-        nodes = chain.nodes()
-        print(f"Committee: {len(nodes)} nodes, threshold t={threshold}.")
-
-        committee_nodes = [
-            CommitteeNode(index=index, endpoint=endpoint, share_commitment=chain.share_commitment(secret_epoch, account))
-            for (account, index, endpoint) in nodes
-        ]
-        block_hash = chain.finalized_head()
+        # The committee as it stood at the secret's epoch, which survives rotations.
+        committee = chain.committee_at(secret_epoch)
+        print(f"Committee: {len(committee.nodes)} reachable nodes, threshold t={committee.threshold}.")
         signer = substrate_signer(bytes(keypair.public_key), sign)
 
         print("Collecting partial decryptions ...")
@@ -120,10 +116,10 @@ def main() -> int:
                 aad=aad,
                 capsule=wire["capsule"],
                 ct=wire["ct"],
-                shared_a=shared_a,
-                block_hash=block_hash,
-                threshold=threshold,
-                nodes=committee_nodes,
+                shared_a=committee.shared_a,
+                block_hash=committee.block_hash,
+                threshold=committee.threshold,
+                nodes=committee.nodes,
             ),
         )
 

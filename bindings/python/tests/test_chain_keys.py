@@ -72,3 +72,11 @@ def test_raw_keypair_helper_still_agrees_where_it_is_usable():
     ):
         pair = ChainClient.keypair_from_seed(key)
         assert bytes(pair.public_key) == ApiKey(key).account_id, key
+
+
+def test_the_adapter_renders_its_address_in_the_chains_format():
+    from substrateinterface.utils.ss58 import ss58_encode
+
+    key = ApiKey(SEED_HEX)
+    assert api_key_signer(key).ss58_address == ss58_encode(key.account_id, 42)
+    assert api_key_signer(key, ss58_format=0).ss58_address == ss58_encode(key.account_id, 0)

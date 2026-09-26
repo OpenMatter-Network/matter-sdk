@@ -192,20 +192,11 @@ export function requiredScopes(
           return args.length > 1 && isNone(args[1])
             ? write(Scope.Deployments)
             : DEPLOY_WITH_SECRET;
-        case "cancel_deployment":
-        case "set_deployment_env":
-        case "set_deployment_image":
-        case "set_deployment_launch":
-        case "set_deployment_policy_root":
-        case "set_deployment_volumes":
-        case "set_deployment_restart_policy":
-          return write(Scope.Deployments);
-        case "register_wg_peer":
-        case "remove_wg_peer":
-          return write(Scope.Networking);
-        // update_deployment_status, set_deployment_network, report_tls_status:
-        // provider-signed.
         default:
+          if (JOBS_DEPLOYMENTS_WRITE.has(call)) return write(Scope.Deployments);
+          if (JOBS_NETWORKING_WRITE.has(call)) return write(Scope.Networking);
+          // update_deployment_status, set_deployment_network, report_tls_status:
+          // provider-signed.
           return null;
       }
     case "Collaborations":
@@ -233,6 +224,18 @@ export function requiredScopes(
       return null;
   }
 }
+
+const JOBS_DEPLOYMENTS_WRITE = new Set([
+  "cancel_deployment",
+  "set_deployment_env",
+  "set_deployment_image",
+  "set_deployment_launch",
+  "set_deployment_policy_root",
+  "set_deployment_volumes",
+  "set_deployment_restart_policy",
+]);
+
+const JOBS_NETWORKING_WRITE = new Set(["register_wg_peer", "remove_wg_peer"]);
 
 // `report_consumption`, `report_capacity`, `request_consumption_report` are
 // provider-signed; the SKU and stake setters are root.
@@ -273,6 +276,24 @@ const BILLING_WRITE = new Set([
   "set_member_gas_limit",
   "set_project_spend_cap",
 ]);
+
+/**
+ * Every `(pallet, call)` this module names explicitly, for the fixture replay's
+ * reverse direction: a name the runtime no longer has is drift. Not exported
+ * from the package.
+ *
+ * @internal
+ */
+export const LOCALLY_NAMED_CALLS: readonly (readonly [string, string])[] = [
+  ["Jobs", "request_deployment"],
+  ["Jobs", "set_deployment_secret_ref"],
+  ...[...JOBS_DEPLOYMENTS_WRITE, ...JOBS_NETWORKING_WRITE].map((c) => ["Jobs", c] as const),
+  ["Collaborations", "set_compute_node_image"],
+  ["Collaborations", "set_compute_node_sku_id"],
+  ...[...RESOURCES_WRITE].map((c) => ["Resources", c] as const),
+  ...[...ORGANIZATION_WRITE].map((c) => ["Organizations", c] as const),
+  ...[...BILLING_WRITE].map((c) => ["Budgets", c] as const),
+];
 
 /**
  * Whether `value` is definitely an absent `Option`: `null`, `undefined`, or

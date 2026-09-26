@@ -172,6 +172,9 @@ func Decrypt(transport Transport, signer Signer, p DecryptParams) ([]byte, error
 				BlockHash:     toHex(p.BlockHash[:]),
 				Signature:     auth.Signature,
 				Auth:          auth.Auth,
+				EthAddress:    auth.EthAddress,
+				ValidUntil:    auth.ValidUntil,
+				EthSignature:  auth.EthSignature,
 			}
 			resp, err := transport.PartialDecrypt(node.Endpoint, req)
 			if err != nil {

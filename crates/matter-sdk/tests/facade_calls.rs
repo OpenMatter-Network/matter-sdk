@@ -315,7 +315,7 @@ fn runtime_api_rows_name_a_state_call() {
 
 #[test]
 fn the_curated_facades_are_the_six_documented_ones() {
-    // Documented in README and docs/parity.md; a new façade must update those too.
+    // Documented in README and docs/parity.md (asserted below); a new façade needs a guide.
     let facades: BTreeSet<&str> = FACADE_CALLS
         .iter()
         .map(|(f, ..)| *f)
@@ -332,6 +332,50 @@ fn the_curated_facades_are_the_six_documented_ones() {
             "keys",
         ]),
     );
+}
+
+/// The guide that documents each façade, as `(façade, doc)`.
+const FACADE_GUIDES: &[(&str, &str)] = &[
+    ("secrets", include_str!("../../../docs/secrets.md")),
+    ("deployments", include_str!("../../../docs/deployments.md")),
+    ("orgs", include_str!("../../../docs/organizations.md")),
+    ("resources", include_str!("../../../docs/resources.md")),
+    ("staking", include_str!("../../../docs/staking.md")),
+    ("keys", include_str!("../../../docs/keys-and-scopes.md")),
+];
+
+#[test]
+fn every_facade_method_is_documented_in_its_guide() {
+    let rows = FACADE_CALLS
+        .iter()
+        .map(|(f, m, ..)| (*f, *m))
+        .chain(FACADE_RUNTIME_API_CALLS.iter().map(|(f, m, ..)| (*f, *m)));
+    for (facade, method) in rows {
+        let (_, guide) = FACADE_GUIDES
+            .iter()
+            .find(|(f, _)| *f == facade)
+            .unwrap_or_else(|| panic!("façade {facade:?} has no guide in FACADE_GUIDES"));
+        assert!(
+            guide.contains(&format!("`{method}`")),
+            "the {facade} guide must document `{method}`"
+        );
+    }
+}
+
+#[test]
+fn the_readme_and_parity_name_every_facade() {
+    let docs = [
+        ("README.md", include_str!("../../../README.md")),
+        ("docs/parity.md", include_str!("../../../docs/parity.md")),
+    ];
+    for (facade, _) in FACADE_GUIDES {
+        for (path, doc) in docs {
+            assert!(
+                doc.contains(&format!("`{facade}`")),
+                "{path} must name the `{facade}` façade"
+            );
+        }
+    }
 }
 
 #[test]

@@ -26,6 +26,7 @@ from .errors import (
     WrongNetworkError,
 )
 from .chain import (
+    DEFAULT_FINALITY_TIMEOUT,
     ChainClient,
     TxReceipt,
     api_key_signer,
@@ -253,9 +254,11 @@ class MatterClient:
         keypair=None,
         confirm_mainnet: bool = False,
         network: str = Network.TESTNET,
+        finality_timeout: float = DEFAULT_FINALITY_TIMEOUT,
     ) -> None:
         # Private: use the connect_* constructors, which enforce the guards.
         self._chain = chain
+        self._finality_timeout = finality_timeout
         self._properties = properties
         self._api_key = api_key
         self._keypair = keypair
@@ -284,21 +287,25 @@ class MatterClient:
         network: str = Network.TESTNET,
         rpc_url: Optional[str] = None,
         confirm_mainnet: bool = False,
+        finality_timeout: float = DEFAULT_FINALITY_TIMEOUT,
     ) -> "MatterClient":
         """Connect with an API key string or :class:`ApiKey`.
 
         Signing goes through :class:`~matter_sdk.chain.ApiKeySigner`, so the
-        reported and signing accounts come from one derivation.
+        reported and signing accounts come from one derivation. Each write waits
+        at most ``finality_timeout`` seconds for finalization.
         """
         api_key = key if isinstance(key, ApiKey) else ApiKey(key)
         chain = ChainClient(cls._resolve_url(network, rpc_url))
+        properties = cls._read_properties(chain)
         return cls(
             chain,
-            cls._read_properties(chain),
+            properties,
             api_key=api_key,
-            keypair=api_key_signer(api_key),
+            keypair=api_key_signer(api_key, properties.ss58_prefix),
             confirm_mainnet=confirm_mainnet,
             network=network,
+            finality_timeout=finality_timeout,
         )
 
     @classmethod
@@ -309,9 +316,12 @@ class MatterClient:
         network: str = Network.TESTNET,
         rpc_url: Optional[str] = None,
         confirm_mainnet: bool = False,
+        finality_timeout: float = DEFAULT_FINALITY_TIMEOUT,
     ) -> "MatterClient":
         """Connect with a ``substrate-interface`` keypair you built yourself — from
-        a keystore, an unwrapped KMS blob, or your own derivation."""
+        a keystore, an unwrapped KMS blob, or your own derivation. Any object with
+        ``crypto_type``, ``public_key``, ``ss58_address`` and ``sign()`` works, so
+        ``sign()`` may call an HSM or remote signer."""
         chain = ChainClient(cls._resolve_url(network, rpc_url))
         return cls(
             chain,
@@ -319,6 +329,7 @@ class MatterClient:
             keypair=keypair,
             confirm_mainnet=confirm_mainnet,
             network=network,
+            finality_timeout=finality_timeout,
         )
 
     @classmethod
@@ -403,13 +414,21 @@ class MatterClient:
     def tx(self, pallet: str, call: str, params: dict) -> TxReceipt:
         """Sign and submit any call, waiting for finalization.
 
+        Raises :class:`~matter_sdk.errors.FinalityTimeoutError` if it does not
+        finalize within the client's ``finality_timeout``; it may still land.
+
         Under a member-tied API key the call is wrapped in ``proxy.proxy`` and
         runs as the key's principal; otherwise it is submitted directly.
         """
         self._refuse_if_out_of_scope(pallet, call, params)
         try:
             return self._chain.submit(
-                self._require_keypair(), pallet, call, params, principal=self.principal
+                self._require_keypair(),
+                pallet,
+                call,
+                params,
+                principal=self.principal,
+                finality_timeout=self._finality_timeout,
             )
         except PoolRejectedError as exc:
             raise self._explain_pool_rejection(pallet, call, params, exc) from exc

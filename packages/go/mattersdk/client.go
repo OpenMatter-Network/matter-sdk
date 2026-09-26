@@ -137,6 +137,9 @@ type MatterClient struct {
 	// project-tied key, or any key on a runtime before spec 322. Read it through
 	// delegated(). A revocation never resets it to nil; see afterRefresh.
 	delegation *Delegation
+	// submitCall, when set, receives each façade call instead of TxAndWait. Tests
+	// only: it lets façade encoding be checked against metadata offline.
+	submitCall func(types.Call) (TxReceipt, error)
 }
 
 // delegated returns the grant this client acts under, or nil when it acts as

@@ -27,9 +27,14 @@
       "name": "reserved ethereum scheme"
     },
     {
-      "error": "unsupported_scheme",
+      "error": "malformed",
       "key": "banana:whatever",
-      "name": "unknown scheme"
+      "name": "unknown scheme prefix"
+    },
+    {
+      "error": "malformed",
+      "key": "fac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e:x",
+      "name": "unprefixed hex before a colon is never echoed"
     },
     {
       "error": "malformed",
@@ -72,6 +77,16 @@
       "account_id_hex": "7444f9dafb81e391ef90714f58b662f4197d982fd47be8ed1f2ed2fea44e2d79",
       "key": "bottom drive obey lake curtain smoke basket hold race lonely fit walk//hard",
       "name": "mnemonic with hard junction"
+    },
+    {
+      "account_id_hex": "2a9f43e14a74aba4e3e0ec62371ac709dd3e08a67c0cf8eaa2193ae325ad1d16",
+      "key": "bottom drive obey lake curtain smoke basket hold race lonely fit walk///pa:ss",
+      "name": "colon inside a password is not a scheme"
+    },
+    {
+      "account_id_hex": "244371e2b15e465ae6ec59e82fcc766b0a1d5147eabe0481b6a7b2042d9ef475",
+      "key": "sr25519:0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e//a:b",
+      "name": "colon inside a junction is not a scheme"
     }
   ]
 }

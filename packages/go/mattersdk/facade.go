@@ -29,9 +29,16 @@ func (c *MatterClient) Call(pallet, method string, args ...any) (TxReceipt, erro
 	return c.TxAndWait(built)
 }
 
-// call is Call for the façades.
+// call is Call for the façades. Tests set submitCall to capture the built call.
 func (c *MatterClient) call(pallet, method string, args ...any) (TxReceipt, error) {
-	return c.Call(pallet, method, args...)
+	if c.submitCall == nil {
+		return c.Call(pallet, method, args...)
+	}
+	built, err := types.NewCall(c.chain.meta, pallet+"."+method, args...)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return c.submitCall(built)
 }
 
 // SecretsFacade covers pallet-secrets: store, rotate, share, and delete.
@@ -129,8 +136,12 @@ func (c *MatterClient) Resources() ResourcesFacade { return ResourcesFacade{c} }
 
 // Register registers a resource you operate.
 func (f ResourcesFacade) Register(resourceID []byte, ownershipProof any, name string) (TxReceipt, error) {
+	resource, err := accountArg("resource id", resourceID)
+	if err != nil {
+		return TxReceipt{}, err
+	}
 	return f.client.call("Resources", "register_resource",
-		resourceID, ownershipProof, types.NewBytes([]byte(name)))
+		resource, ownershipProof, types.NewBytes([]byte(name)))
 }
 
 // UpdateSku publishes or updates a SKU's pricing.
@@ -145,17 +156,33 @@ func (f ResourcesFacade) ReportCapacity(capacity any) (TxReceipt, error) {
 
 // SetPrivacy makes a resource private (whitelist-only) or public.
 func (f ResourcesFacade) SetPrivacy(resourceID []byte, isPrivate bool) (TxReceipt, error) {
-	return f.client.call("Resources", "set_resource_privacy", resourceID, types.NewBool(isPrivate))
+	resource, err := accountArg("resource id", resourceID)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return f.client.call("Resources", "set_resource_privacy", resource, types.NewBool(isPrivate))
 }
 
 // Allow permits an account to use a private resource.
 func (f ResourcesFacade) Allow(resourceID, user []byte) (TxReceipt, error) {
-	return f.client.call("Resources", "add_to_whitelist", resourceID, user)
+	return f.whitelist("add_to_whitelist", resourceID, user)
 }
 
 // Disallow withdraws a private resource's whitelist entry.
 func (f ResourcesFacade) Disallow(resourceID, user []byte) (TxReceipt, error) {
-	return f.client.call("Resources", "remove_from_whitelist", resourceID, user)
+	return f.whitelist("remove_from_whitelist", resourceID, user)
+}
+
+func (f ResourcesFacade) whitelist(method string, resourceID, user []byte) (TxReceipt, error) {
+	resource, err := accountArg("resource id", resourceID)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	account, err := accountArg("user", user)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return f.client.call("Resources", method, resource, account)
 }
 
 // StakingFacade covers the standard FRAME staking surface. Amounts are plancks;
@@ -229,28 +256,54 @@ func (f OrgsFacade) Create() (TxReceipt, error) {
 
 // AddMember adds a member with a role.
 func (f OrgsFacade) AddMember(org [32]byte, who []byte, role any) (TxReceipt, error) {
-	return f.client.call("Organizations", "add_member", org, who, role)
+	member, err := accountArg("member", who)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return f.client.call("Organizations", "add_member", org, member, role)
 }
 
 // RemoveMember removes a member.
 func (f OrgsFacade) RemoveMember(org [32]byte, who []byte) (TxReceipt, error) {
-	return f.client.call("Organizations", "remove_member", org, who)
+	member, err := accountArg("member", who)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return f.client.call("Organizations", "remove_member", org, member)
 }
 
 // Allot allots budget from an org treasury to a project, in plancks.
 func (f OrgsFacade) Allot(org, project [32]byte, amount *big.Int) (TxReceipt, error) {
-	return f.client.call("Budgets", "allot", org, project, types.NewUCompact(amount))
+	return f.client.call("Budgets", "allot", org, project, types.NewU128(*amount))
 }
 
 // AuthorizeSecretsAgent authorizes an account to decrypt a project's secrets — the
 // org-scoped analogue of secrets.grant_access.
 func (f OrgsFacade) AuthorizeSecretsAgent(org, project [32]byte, who []byte) (TxReceipt, error) {
-	return f.client.call("Budgets", "authorize_project_secrets_agent", org, project, who)
+	return f.secretsAgent("authorize_project_secrets_agent", org, project, who)
 }
 
 // RevokeSecretsAgent withdraws a project secrets-agent authorization.
 func (f OrgsFacade) RevokeSecretsAgent(org, project [32]byte, who []byte) (TxReceipt, error) {
-	return f.client.call("Budgets", "revoke_project_secrets_agent", org, project, who)
+	return f.secretsAgent("revoke_project_secrets_agent", org, project, who)
+}
+
+func (f OrgsFacade) secretsAgent(method string, org, project [32]byte, who []byte) (TxReceipt, error) {
+	agent, err := accountArg("secrets agent", who)
+	if err != nil {
+		return TxReceipt{}, err
+	}
+	return f.client.call("Budgets", method, org, project, agent)
+}
+
+// accountArg encodes a 32-byte account id as the runtime's AccountId32. A bare
+// []byte would be SCALE-encoded with a length prefix, which the runtime rejects.
+func accountArg(field string, id []byte) (types.AccountID, error) {
+	account, err := types.NewAccountID(id)
+	if err != nil {
+		return types.AccountID{}, fmt.Errorf("%s: %w", field, err)
+	}
+	return *account, nil
 }
 
 // optionU128 renders an optional u128 as the runtime's Option enum.

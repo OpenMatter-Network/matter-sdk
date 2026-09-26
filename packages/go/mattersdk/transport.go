@@ -26,6 +26,10 @@ type PartialDecryptRequest struct {
 	BlockHash     string   `json:"block_hash"`
 	Signature     string   `json:"signature"`
 	Auth          string   `json:"auth"`
+	// The Ethereum-auth fields, omitted on the Substrate path.
+	EthAddress   *string `json:"eth_address,omitempty"`
+	ValidUntil   *uint64 `json:"valid_until,omitempty"`
+	EthSignature *string `json:"eth_signature,omitempty"`
 }
 
 // PartialDecryptResponse is the /partial-decrypt response body.

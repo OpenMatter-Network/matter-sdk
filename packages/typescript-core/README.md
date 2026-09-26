@@ -1,16 +1,18 @@
 # @openmatter-network/matter-sdk-core
 
-Seal secrets under the matter-kgc committee and recover them through a signed, threshold
-`/partial-decrypt` quorum.
+The zero-dependency core of MatterSDK for OpenMatter: seal secrets under the matter-kgc
+committee's joint key, and recover them through a signed, threshold `/partial-decrypt`
+quorum. Runs in Node and in the browser.
 
-Cryptography and API-key derivation run in the shared wasm core (the same core as the
-Rust SDK); this package adds the committee client, quorum orchestration, the signer seam,
-and on-chain call builders.
+Cryptography and API-key derivation run in the shared WebAssembly core, which is the same
+Rust core every MatterSDK language uses. This package adds the committee client, quorum
+orchestration, the signer seam, and argument builders for the `Secrets` pallet calls.
 
-**Zero runtime dependencies** (CI asserts it), so it fits a browser bundle. For the chain
-client install
-[`@openmatter-network/matter-sdk`](https://www.npmjs.com/package/@openmatter-network/matter-sdk),
-which re-exports everything here.
+**Core or client?** This package has no runtime dependencies (CI asserts it), so it fits a
+browser bundle or any service that only seals and recovers. To read chain state and submit
+calls, install
+[`@openmatter-network/matter-sdk`](https://github.com/OpenMatter-Network/matter-sdk/blob/main/packages/typescript/README.md)
+instead. It re-exports everything here.
 
 ## Install
 
@@ -18,56 +20,86 @@ which re-exports everything here.
 npm install @openmatter-network/matter-sdk-core
 ```
 
+Needs Node 22+ or a bundler. ESM only. Bundlers resolve the `browser` build of the core
+automatically.
+
 ## Quick start
 
 ```ts
 import {
-  encrypt, decrypt, FetchTransport, substrateSigner, Aad, storeSecret, wipe,
+  Aad, decrypt, encrypt, FetchTransport, storeSecret, substrateSigner, wipe,
 } from "@openmatter-network/matter-sdk-core";
 
-// jointPk, epoch, sharedA, threshold and nodes are chain state; the chain client
-// (@openmatter-network/matter-sdk) reads them for you.
+// jointPk, epoch, sharedA, blockHash, threshold and nodes are chain state.
+// @openmatter-network/matter-sdk reads them for you.
 
-// 1. Seal (pure, no network).
+// 1. Seal. Pure computation, no network.
 const env = encrypt(jointPk, epoch, new TextEncoder().encode("API_KEY=swordfish"), Aad.EnvV1);
 
-// 2. Store: submit these args with your own @polkadot/api client.
+// 2. Store: submit these arguments with your own @polkadot/api client.
 const call = storeSecret(env, epoch, "prod-env", Aad.EnvV1);
-// api.tx.secrets.storeSecret(call.payload, call.epoch, call.label, call.aad) ...
+// api.tx.secrets.storeSecret(call.payload, call.epoch, call.label, call.aad)
 
-// 3. Recover. Your key stays in the signing callback — never in the SDK.
+// 3. Recover. The key stays behind your sign callback and never enters the SDK.
 const signer = substrateSigner(accountId, (payload) => pair.sign(payload));
 const plaintext = await decrypt(new FetchTransport(), signer, {
   secretId, epoch, bindingId: env.bindingId, aad: Aad.EnvV1,
   capsule: env.capsule, ct: env.ct, sharedA, blockHash, threshold, nodes,
 });
-// …use it, then:
+// ...use it, then:
 wipe(plaintext);
 ```
 
-## Secure signing
+## What's in the package
 
-`decrypt` takes a `Signer`:
+| Area | Exports |
+|---|---|
+| Seal and open | `encrypt`, `openSecret`, `verifyPlaintextProof`, `signingPayload`, `lagrangeFor`, `cryptoProtocolVersion`, `maxCommitteeResponseBytes` |
+| Committee | `decrypt`, `FetchTransport`, `Transport`, `CommitteeNode`, `DecryptParams`, `DecryptError` (`kind`: `quorum` / `epoch` / `transport` / `crypto`, plus per-node `faults`) |
+| Keys and signing | `ApiKey`, `keySigner`, `substrateSigner`, `partialDecryptAuth`, `Signer`, `KeySigner` |
+| AAD registry | `Aad`: `EnvV1`, `TlsV1`, `StorageCredsV1`, `VolumeDekV1`, `DatasetSourceCredsV1`, `QuantumGuardPolicyDekV1`. Also `aadBytes` |
+| Call builders | `storeSecret`, `rotateSecret`, `grantAccess`, `grantToUser`, `grantToDeployment`, `revokeAccess`, `deleteSecret` |
+| Utilities | `toHex`, `fromHex`, `secretIdToHex`, `wipe` |
 
-- `keySigner({ accountId, sign })` or `substrateSigner(accountId, sign)` wrap a callback
-  you control (a `@polkadot/keyring` pair, a browser wallet, an HSM/KMS adapter), so the
-  key never enters the SDK. Recommended for production.
-- `new ApiKey(process.env.MATTER_API_KEY!)` holds the key in-process, redacted through
-  `toString`/`toJSON`/`inspect`, with no accessor for the material. It is a `KeySigner`;
-  `keySigner(key)` turns it into a `Signer`.
+`FetchTransport` streams every committee response and enforces a size cap. Its default
+timeout is 30 s.
 
-See [`docs/secure-signing.md`](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/secure-signing.md)
-for the trade. The core wipes its own copy of recovered plaintext; never log the one you
-get back, and `wipe` it when done.
+## Keys and signing
+
+`decrypt` takes a `Signer`. You can build one in two ways:
+
+- **`substrateSigner(accountId, sign)` or `keySigner({ accountId, sign })`.** Wraps a
+  callback you control: a `@polkadot/keyring` pair, a browser wallet, or an HSM or KMS
+  adapter. The key never enters the SDK. This is the way to go in production.
+- **`new ApiKey(process.env.MATTER_API_KEY!)`.** Holds the key in-process.
+  `toString`, `toJSON` and `inspect` all redact it, nothing exposes the key material, and
+  `free()` releases it. An `ApiKey` is a `KeySigner`; `keySigner(key)` turns it into a
+  `Signer`.
+
+The core wipes its own copy of a recovered plaintext. Never log the copy you get back,
+and `wipe` it when you're done.
+
+## Guides
+
+- [Threshold secrets](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/secrets.md)
+- [Keys and scopes](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/keys-and-scopes.md)
+- [Secure signing](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/secure-signing.md)
+- [Errors](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/errors.md)
+- [Language parity](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/parity.md)
+- [All documentation](https://github.com/OpenMatter-Network/matter-sdk/blob/main/docs/README.md)
 
 ## Building from source (this repository)
 
-Needs read access to the private cryptographic core.
+Building from source needs read access to the private cryptographic core.
 
 ```bash
-npm run build       # builds the wasm core, then tsc
-npm test            # builds wasm, runs the conformance + orchestration tests
+npm ci
+npm run build       # wasm-pack builds the Node and browser cores, then tsc
+npm test            # rebuilds the Node core, then replays the conformance vectors
 ```
 
-`npm test` replays the Rust-generated `testvectors/` fixtures, which must match
-byte-for-byte.
+`npm test` replays the Rust-generated
+[`testvectors/`](https://github.com/OpenMatter-Network/matter-sdk/blob/main/testvectors/README.md)
+fixtures, which must match byte for byte. Never publish from this directory
+(`prepublishOnly` refuses). See
+[RELEASING.md](https://github.com/OpenMatter-Network/matter-sdk/blob/main/RELEASING.md).

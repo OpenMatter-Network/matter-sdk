@@ -1,6 +1,6 @@
 {
   "name": "@openmatter-network/matter-sdk-core",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "MatterSDK core, with zero runtime dependencies: seal secrets under the matter-kgc committee and recover them via a signed, threshold partial-decrypt quorum.",
   "keywords": [
     "openmatter",

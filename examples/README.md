@@ -1,91 +1,107 @@
 # Examples
 
+Runnable programs for every language. Start with a `client-*` example. It is read-only
+by default and covers the surface most integrations use.
+
 | Example | Network | Costs gas | What it shows |
 |---|---|---|---|
-| [`rust`](rust) · [`typescript/demo.ts`](typescript) | none | no | seal and recover against an in-process committee |
-| [`client-rust`](client-rust) · [`client-typescript`](client-typescript) · [`client-python`](client-python) · [`client-go`](client-go) | testnet | **no**, unless `MATTER_SUBMIT=yes` | connect from an `apiKey`, read any pallet, preview a submission |
-| [`delegated-e2e`](delegated-e2e) | testnet | **no**, unless `MATTER_SUBMIT=yes` | a member-tied scoped key: its resolved grant, a write wrapped as its member, and two local refusals |
-| [`rust-e2e`](rust-e2e) · [`e2e`](e2e) (TypeScript) · [`python-e2e`](python-e2e) · [`go-e2e`](go-e2e) | testnet | **yes** | full round trip: seal → `secrets.storeSecret` → read back → threshold-decrypt |
-
-Start with a `client-*` example: it is read-only by default and covers the surface most
-integrations use.
+| [`client-rust`](client-rust) · [`client-typescript`](client-typescript) · [`client-python`](client-python) · [`client-go`](client-go) | testnet | **no**, unless `MATTER_SUBMIT=yes` | Connecting from an `apiKey` (or read-only), chain properties, `query` / `runtimeApi` / `constant`, lossless amounts, and a façade write (`staking.chill`) behind the submit gate |
+| [`delegated-e2e`](delegated-e2e) (Rust) | testnet | **no**, unless `MATTER_SUBMIT=yes` | A member-tied scoped key: the resolved `Mode`, a local `NeverAdmitted` refusal, a local `NotPermitted` refusal, and a write wrapped as the member |
+| [`rust`](rust) · [`typescript`](typescript) | none | no | Seal and recover against an in-process committee. The TypeScript demo replays `testvectors/open_secret.json` |
+| [`rust-e2e`](rust-e2e) · [`e2e`](e2e) (TypeScript) · [`python-e2e`](python-e2e) · [`go-e2e`](go-e2e) | testnet | **yes** | A full Secrets round trip: seal → `Secrets.store_secret` → read back → threshold-decrypt → compare |
 
 ## Environment
 
-**Keys come from the environment, never from argv** — argv lands in shell history and
-`ps` output.
+**Keys come from the environment, never from argv.** Anything passed in argv ends up in
+shell history and in `ps` output.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `MATTER_API_KEY` | — | `client-*`: a `0x` 32-byte mini-secret, a BIP39 mnemonic, or an sr25519 SURI; falls back to `MATTER_SIGNER_SEED`, then `TEST_KEY`; unset means a read-only client. `delegated-e2e`: required, the scoped key as the dashboard shows it (no fallback). |
-| `MATTER_SIGNER_SEED` | — | `*-e2e`: the **funded** account that pays gas and decrypts. Falls back to `TEST_KEY`. |
-| `MATTER_RPC_URL` | the network's default | endpoint override |
-| `MATTER_NETWORK` | `testnet` | `testnet` or `mainnet` |
-| `MATTER_CONFIRM` | — | must be `yes` before a **signing** client touches mainnet |
-| `MATTER_SUBMIT` | — | must be `yes` before a `client-*` or `delegated-e2e` example submits anything |
-| `MATTER_SECRET` | a sample env line | plaintext to seal (`*-e2e` only) |
-| `MATTER_SECRET_ID` | — | act on an existing secret instead of storing a new one |
-| `MATTER_PRINCIPAL` | — | force the member a key acts for when the chain's pointer is stale; disables the local scope check, leaving the runtime to decide |
-| `MATTER_AAD` | `env` | AAD registry tag to seal under (TypeScript `e2e` only) |
+The SDK's own variables are documented in
+[Connecting → Environment variables](../docs/connecting.md#environment-variables):
+`MATTER_API_KEY`, `MATTER_SIGNER_SEED`, `MATTER_NETWORK`, `MATTER_RPC_URL`,
+`MATTER_CONFIRM` and `MATTER_PRINCIPAL`. The examples add these:
 
-Guards:
+| Variable | Used by | Default | Meaning |
+|---|---|---|---|
+| `MATTER_API_KEY` | `client-*` | — | The key to act as. It falls back to `MATTER_SIGNER_SEED`, then `TEST_KEY`. If none is set, the client connects read-only. |
+| `MATTER_API_KEY` | `delegated-e2e` | — | **Required**, with no fallback. The scoped key exactly as the dashboard shows it. |
+| `MATTER_SIGNER_SEED` | `*-e2e` | — | A **funded** sr25519 account (`0x` seed or BIP39 mnemonic). It pays gas and signs the decrypt requests. Falls back to `TEST_KEY`. |
+| `TEST_KEY` | all but `delegated-e2e` | — | The last-resort key, the same as in CI. |
+| `MATTER_SUBMIT` | `client-*`, `delegated-e2e` | — | Must be `yes` before the example submits anything. |
+| `MATTER_SECRET` | `rust-e2e`, `e2e`, `python-e2e`, `go-e2e` | a sample env file | The plaintext to seal. |
+| `MATTER_SECRET_ID` | `e2e`, `python-e2e`, `go-e2e` | — | Decrypt an existing secret instead of storing a new one. |
+| `MATTER_AAD` | `e2e` | `env` | The AAD tag to seal under: `env`, `tls`, `storage`, `dek` or `dataset`. |
 
-- **The `client-*` examples check what the endpoint serves, not the flag.** The SDK's
-  guard reads the chain's genesis hash, so `MATTER_NETWORK=testnet` pointed at a
-  mainnet URL still fails. The `*-e2e` harnesses require `MATTER_CONFIRM=yes` whenever
+Two independent guards:
+
+- **`MATTER_SUBMIT` means "spend gas at all". `MATTER_CONFIRM` means "spend gas on
+  mainnet".** An accidental production submit takes two mistakes.
+- **Network detection reads the endpoint, not the flag.** The SDK checks the chain's
+  genesis hash and token symbol, so `MATTER_NETWORK=testnet` pointed at a mainnet URL
+  still fails. Every `*-e2e` harness also requires `MATTER_CONFIRM=yes` whenever
   the network or the URL names mainnet.
-- **`MATTER_SUBMIT` ("spend gas at all") is separate from `MATTER_CONFIRM` ("spend gas
-  on mainnet").** An accidental production submit takes two mistakes.
 
 ## Running
 
+Every command runs from the repository root. Building anything from source needs read
+access to the private cryptographic core.
+
 ```bash
-# Rust — read-only against testnet
+# Rust: read-only against testnet
 MATTER_API_KEY=$TEST_KEY cargo run -p matter-sdk-client-example
 
 # A member-tied scoped key: what it acts as, and what it is refused
 MATTER_API_KEY=$MATTER_DELEGATED_KEY cargo run -p matter-delegated-e2e
 
-# TypeScript — the examples use the packages in this repository, so build them first
+# TypeScript: the examples use the packages in this repository, so build them first
 npm --prefix packages/typescript-core ci && npm --prefix packages/typescript-core run build
 npm --prefix packages/typescript ci && npm --prefix packages/typescript run build
-cd examples/client-typescript && npm install && MATTER_API_KEY=$TEST_KEY npm start
+(cd examples/client-typescript && npm install && MATTER_API_KEY=$TEST_KEY npm start)
 
-# Python — needs the wheel built (see bindings/python/README.md)
-MATTER_API_KEY=$TEST_KEY ./bindings/python/.venv/bin/python examples/client-python/run.py
+# Python: needs the wheel built and installed (see bindings/python/README.md)
+MATTER_API_KEY=$TEST_KEY python examples/client-python/run.py
 
-# Go — links the core statically; in this repo that means building the archive first
+# Go: links the core statically, which in this repository means building the archive first.
+# examples/go.work points the examples at packages/go/mattersdk.
 cargo build -p matter-sdk-ffi --release
-cd examples/client-go && MATTER_API_KEY=$TEST_KEY go run .
+(cd examples/client-go && MATTER_API_KEY=$TEST_KEY go run .)
 ```
 
 The in-process demos need no network:
 
 ```bash
-cargo run -p matter-sdk-example                       # Rust
-cd examples/typescript && npm install && npm run demo # TypeScript (after the build above)
+cargo run -p matter-sdk-example                          # Rust
+(cd examples/typescript && npm install && npm run demo)  # TypeScript, after the core build above
 ```
 
 The round trips spend gas, so they need a **funded** testnet account:
 
 ```bash
 export MATTER_SIGNER_SEED='<funded 0x-seed or mnemonic>'
-cargo run -p matter-sdk-e2e                                          # Rust
-cd examples/e2e && npm install && npm start                           # TypeScript (see its README)
-./bindings/python/.venv/bin/python examples/python-e2e/run.py         # Python
-cd examples/go-e2e && go run .                                        # Go (after the FFI build above)
+cargo run -p matter-sdk-e2e                          # Rust
+(cd examples/e2e && npm install && npm start)        # TypeScript, see e2e/README.md
+python examples/python-e2e/run.py                    # Python
+(cd examples/go-e2e && go run .)                     # Go, after the FFI build above
 ```
 
 Each round trip compares the recovered plaintext in process and prints only its size.
+To prove the languages agree, re-decrypt one harness's secret from another: pass the
+printed id as `MATTER_SECRET_ID` to the TypeScript, Python or Go harness.
 
 ## What the client examples prove
 
-Run with the same key, all four print the **same account id** and chain facts: one key
-format (`testvectors/api_keys.json`), one set of chain properties, and the same
-`tx` / `query` / `runtimeApi` / `constant` surface in every language. They also show:
+Run all four with the same key and they print the **same account id** and the same chain
+facts. That is one key format, one set of chain properties, and one `tx` / `query` /
+`runtimeApi` / `constant` surface across four languages. They also show:
 
-- **Amounts are integer plancks**, never floats; an over-precise amount is *rejected*,
-  not rounded. Decimals come from the runtime (`Balances.ExistentialDeposit`), not the
-  node's chain spec, because the two can disagree.
+- **Amounts are integer plancks, never floats.** An amount with too many decimal places
+  is *rejected*, not rounded. The decimals come from the runtime
+  (`Balances.ExistentialDeposit`), not from the node's chain spec.
 - **An `ApiKey` never prints.** Logging the key object shows the account and
   `<redacted>`.
+
+## Moving to production
+
+- Keep the key out of the process: connect with a signer over your HSM, KMS or wallet.
+  See [Secure signing](../docs/secure-signing.md).
+- Use a scoped key that grants only what the workload needs. See
+  [Keys and scopes](../docs/keys-and-scopes.md).

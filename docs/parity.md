@@ -1,77 +1,82 @@
 # Language parity
 
-Bindings share the Rust cores ([architecture](architecture.md)).
+All four languages share one Rust core for cryptography and key handling
+([architecture](architecture.md)). The chain client, the committee client and the
+façades are written natively in each language, and Rust-emitted
+[conformance vectors](../testvectors/README.md) hold them to the same bytes. This page
+is the single list of where the languages differ.
 
-All four bindings implement the full crypto core (`encrypt`, `signingPayload`, `lagrangeFor`,
-`verifyPlaintextProof`, `openSecret`), committee orchestration and call builders, `ApiKey`
-ingestion, signed-extrinsic assembly, the generic `tx`/`query`/`runtimeApi` surface with the
-mainnet guard, the six façades, and the full scoped-key contract (mode resolution,
-`proxy.proxy` wrapping and `ProxyExecuted` unwrapping, local scope table incl.
-argument-sensitive rows, `KeyRevoked`/`Unsponsored` mapping). Each is pinned by a fixture or
-tested per binding. Differences are listed below.
+## What every language has
 
-The bring-your-own-signer seam differs: Rust and TypeScript take a `KeySigner` (account id +
-`sign`), Go an `ExtrinsicSigner` (account id + `SignExtrinsic`), and Python an in-process
-keypair.
+- **The crypto core:** `encrypt`, `signing_payload`, `lagrange_for`,
+  `verify_plaintext_proof`, `open_secret`, and the protocol constants.
+- **Keys:** `ApiKey` in every format, with the same guardrails, and scope parsing.
+- **Committee:** threshold `decrypt` with health probing, a random quorum, per-node
+  faults, Ethereum-auth fields forwarded from a custom `Signer`, and the offline call
+  builders.
+- **The chain client:**
+  - generic `tx` / `query` / runtime API / `constant`
+  - the mainnet guard and effective decimals
+  - lossless amounts
+  - scoped-key delegation, including `MATTER_PRINCIPAL` and the
+    `KeyRevoked` / `Unsponsored` / `Dispatch` classification
+- **All six façades:** `secrets`, `deployments`, `resources`, `staking`, `orgs`, `keys`.
+  Every method is pinned by `testvectors/facade_calls.json` in both directions.
 
-## How conformance is guaranteed
+## Where they differ
 
-Every cross-language contract is a fixture emitted by Rust and replayed by every binding;
-bindings may differ in ergonomics, never in bytes. What each fixture pins, which direction
-it is checked, and how to regenerate:
-[`testvectors/README.md`](../testvectors/README.md#regenerate).
+| Capability | Rust | TypeScript | Python | Go |
+|---|---|---|---|---|
+| Package | `matter-sdk` (git tag; `chain` feature) | `@openmatter-network/matter-sdk` (+ `-core`) | `matter-sdk` (`[sdk]` extra) | `mattersdk` (cgo) |
+| Chain signer seam | `KeySigner` | `KeySigner` (sync or async `sign`) | `connect_with_keypair` (keypair-shaped object) | `ExtrinsicSigner` |
+| `tx` arguments | `Vec<Value>` | positional array | `dict` of named params | `Call(pallet, method, args...)` |
+| Submit without waiting | — | — | — | `Tx(types.Call)` |
+| Finality timeout | `finality_timeout` | `finalityTimeoutMs` | `finality_timeout=` (seconds) | `FinalityTimeout` |
+| Runtime API call | `runtime_api(trait, method, args)` | `runtimeApi(stateCallName, argsHex)` → hex | `runtime_api(name, args, return_type)` → decoded | `RuntimeAPI(name, args)` → bytes |
+| Receipt events | names | names | names + attributes, `require_event` | names + decoded `Fields`, block-level helpers |
+| Secret recovery | one call: `secrets().recover(id, aad)` | `decrypt` + your reads | `decrypt` + `chain.committee_at(epoch)` | `Decrypt` + `Chain().CommitteeAt(epoch)` |
+| Offline extrinsic signing | via `subxt()` | via @polkadot | via substrate-interface | `PrepareExtrinsic` |
+| Committee transport timeout | 30 s | 30 s | 15 s | 20 s |
+| Browser build | — | `-core` (`wasm-web`) | — | — |
+| Logging | `tracing` | `MatterConfig.logger` | stdlib `logging` | `*slog.Logger` |
+| Error model | `SdkError` enum | `ClientError.kind` | exception classes | `ChainError.Kind` |
 
-## Per-binding implementation notes
+"—" means the language does not offer it; [errors](errors.md) maps the error models to
+one another.
 
-**Wrapping writes in `proxy.proxy`.** Rust nests via subxt's
-`DefaultPayload::into_value`; TypeScript passes the inner call object to
-`api.tx.proxy.proxy`; Python nests one `compose_call` in another; Go passes the inner
-`types.Call` as an argument. Go's encoding relies on GSRPC's reflection encoder emitting
-`pallet ++ call ++ args`, so `scopes_test.go` pins the bytes.
+## Implementation notes
 
-**Detecting a wrapped failure.** substrate-interface's `receipt.is_success` is **true**
-when the wrapped call failed, so Python scans `triggered_events` itself. @polkadot's
-`result.dispatchError` likewise sees only the outer extrinsic. Go decodes the
-`ProxyExecuted` result from SCALE bytes: GSRPC's rendered event field discards variant
-names, so `Ok(())` and `Err(Other)` are indistinguishable there.
+These are for contributors. Users never need them.
 
-**Python mode resolution.** `connect_with_keypair` resolves delegation like
-`connect_with_api_key`, since it is Python's only bring-your-own-key path.
+- **Signed extrinsics.** Rust uses subxt, TypeScript @polkadot/api, and Python
+  substrate-interface. Go assembles extrinsics itself, because GSRPC's signer does not
+  cover every extension the runtime declares. It walks the extensions in the metadata
+  and refuses to sign one it cannot account for. Synthetic-metadata unit tests pin its
+  layout.
+- **Delegated writes.** Each language nests the inner call in `Proxy.proxy` natively.
+  Go's encoding relies on GSRPC emitting `pallet ++ call ++ args`, and `scopes_test.go`
+  pins the bytes.
+- **Detecting a failed delegated call.** The outer extrinsic succeeds even when the
+  wrapped call fails, so every language reads the `ProxyExecuted` event:
+  - Python scans the triggered events itself, because substrate-interface's
+    `is_success` is true in this case.
+  - Go decodes the result from SCALE bytes, because GSRPC's rendered field cannot
+    tell `Ok(())` from `Err(Other)`.
+- **Scope checks from Go's `Tx`.** A prebuilt call arrives encoded, so Go decodes it
+  against metadata. It narrows the requirement only when an optional field decodes to
+  exactly `None`.
+- **Python key derivation.** substrate-interface cannot derive a hex seed with
+  junctions, so `ApiKeySigner` adapts an `ApiKey` into a keypair-shaped object that
+  delegates to the core. There is one derivation, not two.
+- **Metadata versions.** Go and Python read V14 metadata; Rust and TypeScript read V15.
+  Scoped-key support is detected from the `BudgetsApi_agent_key` runtime API in Rust
+  and TypeScript, and from the `Budgets.authorize_agent_key` call in Python and Go.
+  Both ship in the same runtime, and a Rust test pins that.
 
-**Go finality.** Every façade write, `Call`, and `TxAndWait` follow the extrinsic to
-finalization, locating it by the exact submitted bytes, and return a wrapped failure as
-`KindDispatch`. `Tx` (prebuilt call) is fire-and-forget. Because `Tx` receives an encoded
-call, the argument-sensitive scope rows decode it against metadata, narrowing **only**
-when the field decodes to exactly `Option::None` and taking the wider set otherwise.
+## Roadmap
 
-**Signed-extrinsic assembly.** Rust uses subxt, TypeScript `@polkadot/api`, Python
-`substrate-interface`. Go hand-assembles, because GSRPC's default signer does not cover
-`CheckMetadataHash` / `WeightReclaim`; it walks the extensions the metadata declares and
-**refuses to sign** one it cannot account for. Its layout is pinned by synthetic-metadata
-unit tests.
-
-**Python key derivation.** `substrate-interface`'s `create_from_uri` cannot derive a hex
-phrase with junctions, so `ApiKeySigner` adapts an `ApiKey` into a keypair-shaped object
-that delegates to the shared core: one derivation. `ChainClient.keypair_from_seed`
-remains for callers needing a real `Keypair` and raises on junctions it cannot apply.
-
-**`Secrets::recover` is Rust-only.** It composes the chain reads a decrypt needs (the
-secret's payload and epoch, and `KgcApi`'s committee at that epoch) with
-`recover_secret`, returning zeroizing plaintext. Other bindings expose the primitives
-(`open_secret` / `recover_secret`) and the reads. It is not in `facade_calls.json`
-because it submits nothing.
-
-Live e2e harnesses: see [README](../README.md#live-end-to-end-test).
-
-## Notes & remaining work
-
-- **Ethereum / EIP-712 signing** is reserved, not implemented. `ApiKey` carries a scheme
-  discriminant (a `secp256k1:` key reports "unsupported scheme") and the wire types carry
-  the Ethereum fields, so adding it (porting the dashboard's EIP-712 typed-data builder)
-  is non-breaking. `pallet-eth-signing` and `pallet-staking-gateway` stay out of the
-  façades until then.
-- **Mainnet genesis hash** is unpinned, so the mainnet guard falls back to the token
-  symbol. Pin it from `chain_getBlockHash(0)` once the endpoint answers.
-- **Python remote-signer seam.** Python takes an in-process keypair
-  (`connect_with_keypair`), not a `connect_with_signer` callback, so the
-  key-never-in-process posture is not yet reachable from Python.
+- **Ethereum (EIP-712) keys.** `ApiKey` reserves the `secp256k1:` scheme, and the
+  request types carry the Ethereum fields, so adding it is non-breaking.
+  `EthSigning` and `StakingGateway` join the façades then.
+- **A mainnet genesis pin** joins the testnet pin in the mainnet guard once the mainnet
+  endpoint serves it.

@@ -57,6 +57,9 @@ def _speaks_our_protocol(reported: Optional[int]) -> bool:
 
 _SYSTEM_RANDOM = random.SystemRandom()
 
+#: Auth fields an Ethereum (EIP-712) signer adds to a partial-decrypt request.
+_ETHEREUM_AUTH_FIELDS = ("eth_address", "valid_until", "eth_signature")
+
 
 def choose_quorum(
     available: Sequence[CommitteeNode], threshold: int, rng: random.Random = _SYSTEM_RANDOM
@@ -161,6 +164,10 @@ def decrypt(transport: Transport, signer: Signer, params: DecryptParams) -> byte
                 "signature": auth["signature"],
                 "auth": auth["auth"],
             }
+            # A custom Ethereum-auth signer supplies these; a substrate one omits them.
+            for field in _ETHEREUM_AUTH_FIELDS:
+                if auth.get(field) is not None:
+                    req[field] = auth[field]
             try:
                 resp = transport.partial_decrypt(node.endpoint, req)
             except DecryptError as e:

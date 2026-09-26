@@ -56,9 +56,10 @@ impl ApiKey {
     /// # Errors
     ///
     /// * [`KeyError::Empty`] — empty or whitespace-only.
-    /// * [`KeyError::UnsupportedScheme`] — a `scheme:` prefix this build cannot
-    ///   use (including reserved `secp256k1`).
-    /// * [`KeyError::Malformed`] — not a recognised encoding.
+    /// * [`KeyError::UnsupportedScheme`] — a reserved `scheme:` prefix this
+    ///   build cannot use (`secp256k1`, `ecdsa`, `ed25519`).
+    /// * [`KeyError::Malformed`] — not a recognised encoding, or an unknown
+    ///   `scheme:` prefix.
     /// * [`KeyError::Derivation`] — recognised, but rejected while deriving.
     ///
     /// No error carries any part of the input.
@@ -170,24 +171,40 @@ impl ApiKey {
     }
 }
 
-/// Split an optional `"<scheme>:"` prefix off the key. Splitting on the first
-/// `:` is safe because no sr25519 encoding contains one.
+/// Split an optional `"<scheme>:"` prefix off the key.
+///
+/// Only a bare identifier before the first `:` is a scheme: a password or
+/// junction may itself contain `:`, and a phrase or hex seed is never a bare
+/// identifier with `0x`. Anything else is the key, whole.
 fn split_scheme(input: &str) -> Result<(KeyScheme, &str)> {
-    let Some((token, body)) = input.split_once(':') else {
+    let Some((token, body)) = input
+        .split_once(':')
+        .filter(|(token, _)| is_scheme_token(token))
+    else {
         return Ok((KeyScheme::Sr25519, input));
     };
 
-    if RESERVED_SCHEMES
+    if let Some(reserved) = RESERVED_SCHEMES
         .iter()
-        .any(|r| token.eq_ignore_ascii_case(r))
+        .find(|r| token.eq_ignore_ascii_case(r))
     {
         return Err(KeyError::UnsupportedScheme {
-            scheme: token.to_ascii_lowercase(),
+            scheme: (*reserved).to_owned(),
             supported: SUPPORTED_SCHEMES,
         });
     }
 
     Ok((KeyScheme::from_token(token)?, body))
+}
+
+/// Whether `token` has the shape of a scheme name: ASCII alphanumerics, `_` or
+/// `-`, not starting `0x`. Shape only; the token may still be unknown.
+fn is_scheme_token(token: &str) -> bool {
+    !token.is_empty()
+        && !token.starts_with("0x")
+        && token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
 /// Redacted: scheme and public account id only, never the key.

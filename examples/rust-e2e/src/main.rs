@@ -1,6 +1,6 @@
 // Live Secrets round trip against a chain + committee: seal -> secrets.storeSecret
-// (pays a fee) -> read back -> threshold-decrypt -> verify. Writes
-// examples/golden.json for the other languages to re-decrypt.
+// (pays a fee) -> read back -> threshold-decrypt -> verify. The other languages'
+// harnesses can re-decrypt the stored secret with MATTER_SECRET_ID.
 //
 // Needs a FUNDED account. The key never leaves this process: subxt signs the
 // extrinsic, `Sr25519Signer` signs the /partial-decrypt requests. Environment
@@ -22,7 +22,8 @@ const DEFAULT_SECRET: &str = "API_KEY=swordfish\nDATABASE_URL=postgres://prod";
 const RT_JOINT_PK: &str = "KgcApi_joint_pk";
 const RT_DKG_EPOCH: &str = "KgcApi_dkg_epoch";
 const RT_KGC_NODES: &str = "KgcApi_kgc_nodes";
-const RT_SHARED_A: &str = "KgcApi_shared_a";
+const RT_DKG_OUTPUT_AT_EPOCH: &str = "KgcApi_dkg_output_at_epoch";
+const RT_COMMITTEE_AT_EPOCH: &str = "KgcApi_committee_at_epoch";
 const RT_THRESHOLD: &str = "KgcApi_threshold_params_at_epoch";
 const RT_SHARE_COMMITMENT: &str = "KgcApi_share_commitment";
 const RT_SECRET_PAYLOAD: &str = "SecretsApi_secret_payload";
@@ -30,10 +31,12 @@ const RT_SECRET_EPOCH: &str = "SecretsApi_secret_epoch";
 
 type AccountId32Bytes = [u8; 32];
 
-/// `KgcNodeInfo` from `KgcApi_kgc_nodes`; field order must match the chain.
+/// `KgcNodeInfo` from `KgcApi_kgc_nodes`; field order must match the chain. The
+/// epoch's committee snapshot, not this index, is the authority on DKG indices.
 #[derive(Decode)]
 struct KgcNodeInfo {
     endpoint: Vec<u8>,
+    #[allow(dead_code)]
     dkg_index: u64,
 }
 
@@ -156,7 +159,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         vec![
             payload,
             Value::u128(epoch as u128),
-            Value::from_bytes(Vec::<u8>::new()), // label (empty)
+            Value::from_bytes("matter-sdk e2e"),      // label
             Value::from_bytes(Aad::EnvV1.as_bytes()), // aad
         ],
     );
@@ -178,29 +181,37 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let wire: EncSecretWire = decode_opt(&call(&legacy, RT_SECRET_PAYLOAD, Some(&sid_arg)).await?)?
         .ok_or("stored secret not found on chain")?;
 
-    // Gather committee state for the secret's epoch.
-    let shared_a = decode_opt_bytes(&call(&legacy, RT_SHARED_A, None).await?)
-        .ok_or("KGC shared_a unavailable (DKG not finalised)")?;
-    let (_, threshold): (u64, u64) =
-        decode(&call(&legacy, RT_THRESHOLD, Some(&secret_epoch.encode())).await?)?;
-    let nodes_raw: Vec<(AccountId32Bytes, KgcNodeInfo)> =
+    // Gather committee state for the secret's epoch: shared_a, threshold, members and
+    // commitments must all belong to the epoch the secret was sealed under.
+    let epoch_arg = secret_epoch.encode();
+    let (_joint_pk, shared_a): (Vec<u8>, Vec<u8>) =
+        decode_opt(&call(&legacy, RT_DKG_OUTPUT_AT_EPOCH, Some(&epoch_arg)).await?)?
+            .ok_or("no DKG output at the secret's epoch")?;
+    let (_, threshold): (u64, u64) = decode(&call(&legacy, RT_THRESHOLD, Some(&epoch_arg)).await?)?;
+    let committee: Vec<(AccountId32Bytes, u64)> =
+        decode(&call(&legacy, RT_COMMITTEE_AT_EPOCH, Some(&epoch_arg)).await?)?;
+    let registry: Vec<(AccountId32Bytes, KgcNodeInfo)> =
         decode(&call(&legacy, RT_KGC_NODES, None).await?)?;
     println!(
-        "Committee: {} nodes, threshold t={threshold}",
-        nodes_raw.len()
+        "Committee at epoch {secret_epoch}: {} members, threshold t={threshold}",
+        committee.len()
     );
 
-    let mut nodes = Vec::with_capacity(nodes_raw.len());
-    for (account, info) in &nodes_raw {
+    let mut nodes = Vec::with_capacity(committee.len());
+    for (account, dkg_index) in &committee {
+        let Some((_, info)) = registry.iter().find(|(id, _)| id == account) else {
+            continue; // not reachable; the quorum tolerates n - t missing
+        };
         let arg = (secret_epoch, account).encode();
         let commitment = decode_opt_bytes(&call(&legacy, RT_SHARE_COMMITMENT, Some(&arg)).await?)
-            .ok_or("missing share commitment for a node")?;
+            .ok_or("missing share commitment for a committee member")?;
         nodes.push(CommitteeNode {
-            index: info.dkg_index,
+            index: *dkg_index,
             endpoint: normalize_endpoint(&String::from_utf8_lossy(&info.endpoint)),
             share_commitment: commitment,
         });
     }
+    nodes.sort_by_key(|n| n.index);
 
     // Threshold-decrypt.
     let block_hash = legacy.chain_get_finalized_head().await?.0;
@@ -228,20 +239,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if recovered.expose() != secret.as_bytes() {
         return Err("MISMATCH: recovered plaintext != original".into());
     }
-    println!("Round trip verified ✔");
-
-    // The demo secret is public, so writing it to the golden sample leaks nothing.
-    let golden = serde_json::json!({
-        "secret_id": secret_id.to_string(),
-        "address": account_id.to_string(),
-        "epoch": secret_epoch,
-        "aad": "env",
-        "plaintext": secret,
-        "rpc_url": rpc_url,
-    });
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../golden.json");
-    std::fs::write(path, serde_json::to_string_pretty(&golden)? + "\n")?;
-    println!("Golden sample written to examples/golden.json");
+    println!("Round trip verified ✔ (re-decrypt from another language with MATTER_SECRET_ID={secret_id})");
     Ok(())
 }
 

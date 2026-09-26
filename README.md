@@ -1,70 +1,56 @@
 # MatterSDK
 
-**Client SDKs for [OpenMatter](https://openmatter.network): one `apiKey` reaches every pallet
-on MatterChain, plus threshold secret management on the matter-kgc committee.**
+**The client SDK for [OpenMatter](https://openmatter.network), in Rust, TypeScript,
+Python and Go.** One key, or a signer you control, reaches everything your account can do
+on MatterChain: deploy workloads, run compute resources, stake, manage organizations and
+budgets, hand out narrowly scoped API keys, and keep secrets that no single party can
+decrypt.
 
-- **Chain client.** Every pallet the runtime exposes, resolved from live metadata rather
-  than vendored types: deployments, resources, staking, org budgets, governance.
-- **Secrets.** Seal a secret under a committee's joint public key, store the ciphertext
-  on-chain, and recover it only with a `t`-of-`n` quorum. No single party, operators
-  included, can decrypt alone.
+```ts
+import { ApiKey, MatterClient } from "@openmatter-network/matter-sdk";
 
-| Term | Meaning |
-|---|---|
-| **MatterChain** | OpenMatter's Substrate-based blockchain; testnet is the default everywhere. |
-| **Pallet** | A runtime module (e.g. `Secrets`, `Jobs`, `Staking`), reached by name. |
-| **KGC committee** | The `n` independent `matter-kgc` nodes that jointly hold the decryption key as shares. |
-| **Threshold decryption** | Any `t` of the `n` nodes can decrypt together; fewer than `t` learn nothing. |
-| **API key** | A dashboard-minted key (hex seed, mnemonic, or sr25519 SURI) that acts for the member who minted it. |
-| **Planck** | The chain's smallest unit; every SDK amount is an integer number of plancks. |
+const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
+await client.staking.bond(client.parseAmount("10"), { Staked: null }); // a typed façade
+await client.tx("Communities", "vote_proposal", [community, proposal, vote]); // any pallet
+```
 
-> Status: **early access.** Rust, TypeScript, Python, and Go all work end-to-end against
-> the live testnet. See [Language support](#language-support) and
-> [`docs/parity.md`](docs/parity.md).
+## What you can do
 
-<p align="center">
-  <img src="docs/assets/integration-flow.svg" alt="Your app calls MatterSDK to encrypt a secret and store the ciphertext on the matter chain, then to decrypt by requesting partial decryptions from a t-of-n matter-kgc committee and aggregating them locally" width="880">
-</p>
+| Capability | What it gives you | Guide |
+|---|---|---|
+| **Any pallet, by name** | `tx`, `query`, runtime APIs and constants for all 60+ pallets, resolved from live metadata, so a runtime upgrade needs no SDK release. Writes wait for finality and return a receipt. | [Chain surface](docs/chain-surface.md) |
+| **Deployments** | the `deployments` façade: request and cancel workloads, attach sealed env and TLS secrets, set env, register post-quantum WireGuard peers, run QuantumGuard-guarded deployments | [Deployments](docs/deployments.md) |
+| **Compute resources** | the `resources` façade: register machines, manage privacy and allow-lists | [Resources](docs/resources.md) |
+| **Staking** | the `staking` façade: bond, nominate, unbond, and nomination pools | [Staking](docs/staking.md) |
+| **Organizations and budgets** | the `orgs` façade: create organizations, manage members and roles, allot project budgets | [Organizations](docs/organizations.md) |
+| **Scoped API keys** | the `keys` façade: mint keys that act as a member with only the scopes you grant (`deployments:w`, `secrets:r`…), checked locally and enforced by the runtime | [Keys and scopes](docs/keys-and-scopes.md) |
+| **Threshold secrets** | the `secrets` façade: seal a secret under a `t`-of-`n` committee's key, store it on chain, grant it to users or deployments, and recover it only with a quorum. Post-quantum lattice cryptography; no master key exists anywhere. | [Threshold secrets](docs/secrets.md) |
+| **Keys that never enter your process** | sign through an HSM, KMS, wallet or remote signer; or hold an `ApiKey` that zeroizes, redacts itself and refuses mainnet until you confirm | [Secure signing](docs/secure-signing.md) |
 
-## Why a committee?
-
-There is **no master key**. The decryption key exists only as Shamir shares across `n`
-committee nodes; recovering a secret needs `t` of them to each return a *partial
-decryption*, which your client verifies and aggregates locally. The cryptography is
-RLWE/BGV threshold decryption with zero-knowledge proofs at every step, implemented in
-`matter-crypto` (a private OpenMatter repository).
-
-<p align="center">
-  <img src="docs/assets/quorum.svg" alt="Five committee nodes each hold one piece of the private key; any three pieces reconstruct the secret while any two reveal nothing — no single node ever holds the full key" width="760">
-</p>
-
-## Architecture
-
-The cryptography lives in one audited Rust crate (`crates/matter-sdk-core`, plus
-`crates/matter-sdk-key` for API keys), shared by every binding over FFI/wasm/PyO3 and never
-re-implemented. Networking, the quorum loop, and signing are idiomatic per language;
-[conformance vectors](testvectors/) keep the bindings byte-for-byte identical. Crate map
-and data flow: [`docs/architecture.md`](docs/architecture.md).
+Also included: lossless token amounts, typed errors, a mainnet guard that checks the
+endpoint rather than your config, and identical behaviour across languages, pinned by
+shared test vectors. Start with [concepts](docs/concepts.md) or the
+[documentation index](docs/README.md).
 
 ## Install
 
-All bindings release together from one tag at one version ([`CHANGELOG.md`](CHANGELOG.md)).
+Every package ships from one tag at one version ([changelog](CHANGELOG.md)).
 
 ```bash
-# TypeScript / JavaScript (Node 22+). The client re-exports the core; install the core
-# alone for a browser bundle or anything that only seals and recovers.
+# TypeScript (Node 22+). The client re-exports the core; the core alone suits a browser
+# bundle or code that only seals and recovers secrets.
 npm install @openmatter-network/matter-sdk
 npm install @openmatter-network/matter-sdk-core
 
 # Python 3.9+. The [sdk] extra adds the chain client.
 pip install "matter-sdk[sdk]"
 
-# Go 1.22+, with cgo (CGO_ENABLED=1 and a C compiler). On Alpine/musl add -tags musl.
+# Go 1.22+ with cgo (CGO_ENABLED=1 and a C compiler). On Alpine/musl, build with -tags musl.
 go get github.com/openmatter-network/matter-sdk-go/v2
 ```
 
-The Python wheel and the Go module carry the Rust core prebuilt, so neither needs a Rust
-toolchain and a Go binary has no run-time dependency on the core. Supported platforms:
+The Python wheels and the Go module include the Rust core prebuilt: you need no Rust
+toolchain, and a Go binary has no run-time dependency on it. Supported platforms:
 
 <!-- platforms:begin -->
 | OS | Architecture | C library | Python wheel | Go build |
@@ -77,24 +63,23 @@ toolchain and a Go binary has no run-time dependency on the core. Supported plat
 | macOS | arm64 | — | `macosx_11_0_arm64` | `go build` |
 <!-- platforms:end -->
 
-**Windows is not supported.** There is no Python sdist (the core is not public), so on
-any other platform (Windows, PyPy, free-threaded CPython, 32-bit) `pip` reports *"No
-matching distribution found"*. In Go, an unsupported platform or a missing or misplaced
+Windows is not supported yet. There is no Python sdist, so on other platforms `pip`
+reports *"No matching distribution found"*. In Go, an unsupported platform or a missing
 `musl` tag is a compile error. The npm packages are WebAssembly and run anywhere Node 22+
 or a bundler does.
 
-**Rust** is not on crates.io, because the crate depends on the private core. Depend on the
-release tag, which requires read access to the `openmatter-network` core repositories:
+**Rust** depends on the release tag. That requires read access to OpenMatter's private
+cryptography repositories, which the published packages ship compiled:
 
 ```toml
 [dependencies]
-matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.3.0" }
+matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.3.1" }
 # features = ["chain"] adds the chain client and façades (subxt + tokio); default is off.
 ```
 
 ```toml
-# .cargo/config.toml, in your project: a dependency's cargo config is never read, and
-# the core is pinned by ssh:// URL, which only the git CLI can authenticate.
+# .cargo/config.toml in your project: the core is fetched over ssh://, which only the
+# git CLI can authenticate, and a dependency's own cargo config is never read.
 [net]
 git-fetch-with-cli = true
 ```
@@ -103,35 +88,7 @@ MSRV is Rust 1.90.
 
 ## Quickstart
 
-Connect read-only (no key, no gas) and read live chain state:
-
-```ts
-import { MatterClient } from "@openmatter-network/matter-sdk";
-
-const client = await MatterClient.connect();                  // read-only, testnet
-console.log(client.properties.chainName, client.properties.specVersion);
-console.log(await client.query("Secrets", "NextSecretId"));
-await client.disconnect();
-```
-
-```python
-from matter_sdk import MatterClient
-
-client = MatterClient.connect()                               # read-only, testnet
-print(client.properties.chain_name, client.properties.spec_version)
-print(client.query("Secrets", "NextSecretId"))
-client.close()
-```
-
-```go
-client, err := mattersdk.Connect(mattersdk.Config{}) // read-only, testnet
-if err != nil {
-	return err
-}
-defer client.Close()
-fmt.Println(client.Properties().ChainName, client.Properties().SpecVersion)
-next, err := client.QueryRaw("Secrets", "NextSecretId")
-```
+Connect read-only, with no key and no fees, and read live chain state:
 
 ```rust
 async fn quickstart() -> matter_sdk::Result<()> {
@@ -146,124 +103,86 @@ async fn quickstart() -> matter_sdk::Result<()> {
 }
 ```
 
-(Go imports `mattersdk "github.com/openmatter-network/matter-sdk-go/v2"`; Rust needs
-`matter_sdk::chain::{MatterClient, MatterConfig, Network}` and the `chain` feature.)
-
-**To write, bring a key.** Set `MATTER_API_KEY` and connect with `connectWithApiKey` /
-`connect_with_api_key` / `ConnectWithApiKey`, or `from_env` / `ConnectFromEnv`. Read the
-key from the environment, never argv or source. The key acts as the member who minted it,
-bounded by the scopes they granted; the member pays. See
-[Keys and scopes](docs/client-guide.md#keys-and-scopes).
-
 ```ts
-import { MatterClient, ApiKey } from "@openmatter-network/matter-sdk";
+import { MatterClient } from "@openmatter-network/matter-sdk";
 
-const client = await MatterClient.connectWithApiKey(new ApiKey(process.env.MATTER_API_KEY!));
-
-// Any pallet the runtime exposes, resolved from live metadata; resolves at finalization.
-const receipt = await client.tx("Staking", "bond", [client.parseAmount("10"), { Staked: null }]);
+const client = await MatterClient.connect(); // read-only, testnet
+console.log(client.properties.chainName, client.properties.specVersion);
+console.log(await client.query("Secrets", "NextSecretId"));
+await client.disconnect();
 ```
 
-Secrets: seal with `encrypt()`, store with `client.secrets.store(...)`, recover with the
-threshold `decrypt()`. See the [client guide](docs/client-guide.md) and the
-[examples](examples/README.md).
+```python
+from matter_sdk import MatterClient
 
-A *signing* client refuses mainnet without explicit confirmation. See
-[Secure signing](#secure-signing) and [`docs/`](docs/README.md).
+with MatterClient.connect() as client:  # read-only, testnet
+    print(client.properties.chain_name, client.properties.spec_version)
+    print(client.query("Secrets", "NextSecretId"))
+```
 
-## What the SDK does and does not do
+```go
+client, err := mattersdk.Connect(mattersdk.Config{}) // read-only, testnet
+if err != nil {
+	return err
+}
+defer client.Close()
+fmt.Println(client.Properties().ChainName, client.Properties().SpecVersion)
+next, err := client.QueryRaw("Secrets", "NextSecretId")
+```
 
-- **Does:** call any pallet via `tx` / `query` / `runtimeApi` / `constant`, so a pallet
-  added by a forkless upgrade needs no SDK release; sign, submit, and track extrinsics to
-  finalization.
-- **Does:** the whole Secrets path (seal; health-probe → random quorum → signed
-  `/partial-decrypt` → verify + aggregate + open), and builds `store` / `rotate` / `grant`
-  call data if you submit with your own Substrate client.
-- **Does not:** decide where your key lives. Use a signer over an HSM, KMS, or wallet
-  (recommended for production), or an `apiKey` the SDK holds under documented guardrails.
-- **Does not:** hold state, cache secrets, or phone home. Recovered plaintext is returned
-  to you and written nowhere.
+Rust needs `matter_sdk::chain::{MatterClient, MatterConfig, Network}` and the `chain`
+feature. Go imports `mattersdk "github.com/openmatter-network/matter-sdk-go/v2"`.
 
-## How it works
+**To write, bring a key.** Set `MATTER_API_KEY` and connect with `from_env`
+(`fromEnv`, `ConnectFromEnv`), or pass a signer backed by your HSM or KMS. Testnet is the
+default. A signing client refuses mainnet unless you set `MATTER_CONFIRM=yes`. See
+[connecting](docs/connecting.md).
 
-<p align="center">
-  <img src="docs/assets/lifecycle.svg" alt="Six-step lifecycle: Seal, Store, Authorize, Request, Partial-decrypt, Deploy. Any t of the n committee nodes suffice to decrypt; fewer than t learn nothing" width="900">
-</p>
+## Languages
 
-## Language support
+| | Rust | TypeScript | Python | Go |
+|---|:--:|:--:|:--:|:--:|
+| Generic chain surface and the six façades | ✅ | ✅ | ✅ | ✅ |
+| `ApiKey`, scoped keys, mainnet guard | ✅ | ✅ | ✅ | ✅ |
+| Threshold secrets (seal, store, grant, recover) | ✅ | ✅ | ✅ | ✅ |
+| Signer that keeps the key out of the process | ✅ | ✅ | ✅ (keypair-shaped) | ✅ |
+| Browser build | — | ✅ | — | — |
 
-| Language | Seal & recover | `apiKey` | Chain client | Façades | Chain client enabled by |
-|---|:--:|:--:|:--:|:--:|---|
-| Rust (`matter-sdk`, git tag; needs core access) | ✅ | ✅ | ✅ | ✅ | `chain` cargo feature (default off) |
-| TypeScript (`@openmatter-network/matter-sdk-core`) | ✅ | ✅ | ✅ | ✅ | `@openmatter-network/matter-sdk` |
-| Python (`matter-sdk`) | ✅ | ✅ | ✅ | ✅ | `pip install "matter-sdk[sdk]"` |
-| Go (`mattersdk`) | ✅ | ✅ | ✅ | ✅ | always (cgo already binds the core) |
+Per-language guides: [TypeScript](packages/typescript/README.md) ·
+[TypeScript core](packages/typescript-core/README.md) · [Python](bindings/python/README.md) ·
+[Go](packages/go/mattersdk/README.md) · [examples](examples/README.md). Every difference
+is listed in [parity](docs/parity.md).
 
-Python takes an in-process keypair (`connect_with_keypair`); see
-[parity](docs/parity.md#notes--remaining-work).
+## Security
 
-Per-language guides: [Rust](examples/rust/README.md) ·
-[TypeScript](packages/typescript/README.md) · [Python](bindings/python/README.md) ·
-[Go](packages/go/mattersdk/README.md) · [all examples](examples/README.md).
+- **No key in your process, if you choose.** Every signature goes through a seam you can
+  back with an HSM, KMS, wallet or remote signer.
+- **In-process keys are contained.** An `ApiKey` is zeroized, redacted, not
+  serializable, and never echoed in errors.
+- **No single point of decryption.** A sealed secret opens only with `t` of `n`
+  independent committee nodes. No node, operator included, can decrypt alone, and
+  plaintext exists only in your process.
+- **Post-quantum.** The secret encryption is lattice-based (RLWE), the family NIST chose
+  for post-quantum standards, so data recorded today cannot be decrypted by a future
+  quantum computer. Deployment WireGuard tunnels take an ML-KEM-768 preshared key.
+- **Committee rotation is invisible to your data.** The committee reshares its key each
+  epoch; the joint public key stays the same, stored ciphertext keeps decrypting, and
+  old shares become useless.
 
-## Secure signing
-
-Production keys belong in an HSM, KMS, wallet, or remote signer behind a `KeySigner`; the
-key never enters the SDK. An `apiKey` held in-process is zeroizing, redacted,
-non-serializable, and refuses mainnet unconfirmed, but anything that can read the process
-can read it ([the trade](docs/secure-signing.md#what-you-are-trading)). Recovered plaintext
-is never logged. The `..._insecure_dev_only` helpers must never ship. Read
-[`SECURITY.md`](SECURITY.md) and [`docs/secure-signing.md`](docs/secure-signing.md) before
-integrating.
-
-## Security FAQ
-
-**Does committee rotation affect my data?** No. The committee is a dynamic `t`-of-`n`
-group whose joint public key is stable across membership changes, so stored ciphertext
-keeps decrypting, and each rotation makes old shares useless. See
-[Key rotation](docs/architecture.md#key-rotation).
-
-**Is it quantum-safe?** The encryption is lattice-based, the family NIST chose for
-post-quantum standards (ML-KEM / FIPS 203 is a close relative), targeting the ~128-bit
-post-quantum security range. Data recorded today cannot be unsealed by a future quantum
-computer ("harvest now, decrypt later"). The same construction gives both the post-quantum
-and the no-single-key guarantee. See [`SECURITY.md`](SECURITY.md) for assumptions.
-
-**How does it differ from a KMS or HSM?**
-
-| | Key in your app | KMS / HSM | MatterSDK |
-|---|---|---|---|
-| Where the decryption key lives | one place | one box / one provider | split across `n` nodes; never assembled |
-| Single point of compromise | yes | yes | **no** — need `t` nodes at once |
-| Who sees plaintext at decrypt time | whoever holds the key | the KMS / HSM | **no one** — nodes return verified partials; your client combines them |
-| Survives key-holder rotation without re-encrypting | n/a | usually re-key | **yes** — the public key is stable across membership changes |
-| Quantum-safe | depends on cipher | usually classical (RSA / ECC) | **yes** — lattice / post-quantum |
+The threat model and how to report a vulnerability are in [`SECURITY.md`](SECURITY.md).
 
 ## Building from source
 
-The private core crates are git-tag dependencies (see the workspace `Cargo.toml`) fetched
-over SSH, so you need a GitHub SSH key with access to the `openmatter-network` repos.
-`.cargo/config.toml` sets `net.git-fetch-with-cli`; CI uses an HTTPS token
-(`.github/actions/fetch-core-crates`).
+Building needs read access to the private cryptography repositories over SSH
+([contributing](CONTRIBUTING.md)):
 
 ```bash
-cargo test -p matter-sdk-core   # crypto core + roundtrip
-cargo test -p matter-sdk        # Rust SDK
+cargo test -p matter-sdk-core                 # crypto core
+cargo test -p matter-sdk --features chain     # Rust SDK and chain client
 ```
 
-### Live end-to-end test
-
-Each binding has a live harness (encrypt → `secrets.storeSecret` → read back →
-threshold-decrypt) that proves the committee accepts the SDK's signature on-chain:
-[Rust](examples/rust-e2e) · [TypeScript](examples/e2e) ([README](examples/e2e/README.md)) ·
-[Python](examples/python-e2e) · [Go](examples/go-e2e). Env vars: `MATTER_RPC_URL`
-(default testnet) and `MATTER_SIGNER_SEED` (a funded sr25519 key as `0x`-hex seed or
-BIP39 mnemonic; `TEST_KEY` also accepted). [`preflight.ts`](examples/e2e/preflight.ts)
-checks funding and committee health without gas.
-
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Each language also has a live end-to-end harness against testnet: it seals, stores,
+reads back, and threshold-decrypts. See [examples](examples/README.md).
 
 ## License
 

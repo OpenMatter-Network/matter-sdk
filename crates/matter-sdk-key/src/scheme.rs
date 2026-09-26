@@ -26,15 +26,14 @@ impl KeyScheme {
         }
     }
 
-    /// Resolve a scheme token, case-insensitively. The token is never key
-    /// material, so the error may echo it.
+    /// Resolve a scheme token, case-insensitively. An unknown token is never
+    /// echoed: an unprefixed hex seed followed by `:` has the same shape.
     pub(crate) fn from_token(token: &str) -> Result<Self> {
         if token.eq_ignore_ascii_case(KeyScheme::Sr25519.as_str()) {
             return Ok(KeyScheme::Sr25519);
         }
-        Err(KeyError::UnsupportedScheme {
-            scheme: token.to_ascii_lowercase(),
-            supported: SUPPORTED_SCHEMES,
+        Err(KeyError::Malformed {
+            detail: "unrecognised api key scheme prefix; this build supports sr25519",
         })
     }
 }

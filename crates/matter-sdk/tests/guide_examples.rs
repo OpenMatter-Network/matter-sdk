@@ -93,10 +93,10 @@ fn the_guide_shows_exactly_this_code() {
     let start = "// guide:quantum-guard-request:start\n";
     let end = "// guide:quantum-guard-request:end";
     let body = &source[source.find(start).unwrap() + start.len()..source.find(end).unwrap()];
-    let guide = include_str!("../../../docs/client-guide.md");
+    let guide = include_str!("../../../docs/deployments.md");
     assert!(
         guide.contains(body.trim_end()),
-        "docs/client-guide.md must show the QuantumGuard request exactly as \
+        "docs/deployments.md must show the QuantumGuard request exactly as \
          tests/guide_examples.rs builds it"
     );
 }

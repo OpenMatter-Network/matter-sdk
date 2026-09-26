@@ -48,6 +48,12 @@ const ACCEPTED: &[&str] = &[
     "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e//hard/soft",
     "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e///ignored",
     "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    // A `:` is legal inside a junction or password; it must not read as a scheme prefix.
+    "bottom drive obey lake curtain smoke basket hold race lonely fit walk///pa:ss",
+    "bottom drive obey lake curtain smoke basket hold race lonely fit walk//a:b",
+    "bottom drive obey lake curtain smoke basket hold race lonely fit walk//hard/so:ft///p:w",
+    "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e///p:w",
+    "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e//a:b",
 ];
 
 const REJECTED_BY_BOTH: &[&str] = &[

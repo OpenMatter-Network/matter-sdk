@@ -107,7 +107,7 @@ func run() error {
 		}
 		fmt.Printf("Sealed %dB -> capsule %dB, proof %dB, ct %dB\n", len(secret), len(env.Capsule), len(env.Proof), len(env.CT))
 		fmt.Println("Submitting secrets.storeSecret ...")
-		secretID, err = chain.StoreSecret(kp, *env, epoch, aad)
+		secretID, err = chain.StoreSecret(mattersdk.KeyringSigner{Pair: kp}, *env, epoch, "go-e2e", aad)
 		if err != nil {
 			return err
 		}
@@ -122,33 +122,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	threshold, err := chain.ThresholdAtEpoch(secretEpoch)
+	// The committee of the epoch the secret was sealed under, not the current one.
+	committee, err := chain.CommitteeAt(secretEpoch)
 	if err != nil {
 		return err
 	}
-	sharedA, err := chain.SharedA()
-	if err != nil {
-		return err
-	}
-	nodes, err := chain.Nodes()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Committee: %d nodes, threshold t=%d.\n", len(nodes), threshold)
+	fmt.Printf("Committee at epoch %d: %d reachable nodes, threshold t=%d.\n",
+		secretEpoch, len(committee.Nodes), committee.Threshold)
 
-	committee := make([]mattersdk.CommitteeNode, 0, len(nodes))
-	for _, n := range nodes {
-		sc, err := chain.ShareCommitment(secretEpoch, n.Account)
-		if err != nil {
-			return err
-		}
-		committee = append(committee, mattersdk.CommitteeNode{Index: n.Index, Endpoint: n.Endpoint, ShareCommitment: sc})
-	}
-
-	blockHash, err := chain.FinalizedHead()
-	if err != nil {
-		return err
-	}
 	signer, err := mattersdk.SubstrateSigner(kp.PublicKey, func(p []byte) ([]byte, error) {
 		return signature.Sign(p, kp.URI)
 	})
@@ -164,10 +145,10 @@ func run() error {
 		Aad:       aad,
 		Capsule:   wire.Capsule,
 		CT:        wire.CT,
-		SharedA:   sharedA,
-		BlockHash: blockHash,
-		Threshold: threshold,
-		Nodes:     committee,
+		SharedA:   committee.SharedA,
+		BlockHash: committee.BlockHash,
+		Threshold: committee.Threshold,
+		Nodes:     committee.Nodes,
 	})
 	if err != nil {
 		return err

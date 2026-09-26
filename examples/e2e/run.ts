@@ -48,9 +48,12 @@ function readConfig(): Config | null {
     throw new Error(`MATTER_NETWORK must be testnet or mainnet, got ${network}`);
   }
   const rpcUrl = process.env.MATTER_RPC_URL ?? defaultRpcUrl(network)!;
-  if (network === "mainnet" && process.env.MATTER_CONFIRM !== "yes") {
+  // The URL counts too, so MATTER_NETWORK=testnet pointed at a mainnet node is caught.
+  const looksLikeMainnet = network === Network.Mainnet || rpcUrl.includes("mainnet");
+  if (looksLikeMainnet && process.env.MATTER_CONFIRM !== "yes") {
     throw new Error(
-      "Refusing to run against mainnet without MATTER_CONFIRM=yes (this posts on-chain and spends fees).",
+      `Refusing to run against mainnet (${rpcUrl}) without MATTER_CONFIRM=yes ` +
+        "(this posts on-chain and spends fees).",
     );
   }
   const aadTag = (process.env.MATTER_AAD ?? "env").toLowerCase();

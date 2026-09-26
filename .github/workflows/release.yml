@@ -65,6 +65,7 @@ jobs:
           VERSION: ${{ steps.plan.outputs.version }}
         run: |
           scripts/check-versions.sh --expect "$VERSION"
+          scripts/changelog-section.sh "$VERSION" > /dev/null
           scripts/check-license-copies.sh
       - name: Read the platform table
         id: targets

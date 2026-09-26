@@ -81,6 +81,13 @@ class ConfigError(ChainError, ValueError):
     :class:`ValueError`."""
 
 
+class FinalityTimeoutError(ChainError):
+    """A submitted extrinsic did not finalize within the client's budget.
+
+    It may still land: check the chain before resubmitting.
+    """
+
+
 class WrongNetworkError(ChainError):
     """The endpoint serves a different network than the configuration selected."""
 

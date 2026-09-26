@@ -202,3 +202,50 @@ def test_transport_refuses_a_body_over_the_cap(monkeypatch):
 
 def test_transport_defaults_to_the_core_cap():
     assert UrllibTransport()._max_response_bytes == MAX_COMMITTEE_RESPONSE_BYTES
+
+
+class _RecordingTransport(_FakeTransport):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.requests = []
+
+    def partial_decrypt(self, endpoint, req):
+        self.requests.append(dict(req))
+        return super().partial_decrypt(endpoint, req)
+
+
+class _EthereumSigner:
+    """A custom Ethereum-auth signer: no substrate account, EIP-712 fields instead."""
+
+    def auth_scheme(self):
+        return "ethereum"
+
+    def authorize(self, secret_id, subset, recipient_index, block_hash):
+        return {
+            "auth": "ethereum",
+            "requester": "",
+            "signature": "",
+            "eth_address": "0x" + "ab" * 20,
+            "valid_until": 1234,
+            "eth_signature": "0x" + "cd" * 65,
+        }
+
+
+def test_an_ethereum_signers_fields_reach_every_request():
+    by_endpoint, params, expected = _fixture_params()
+    transport = _RecordingTransport(by_endpoint)
+    assert decrypt(transport, _EthereumSigner(), params).hex() == expected
+    assert transport.requests
+    for req in transport.requests:
+        assert req["auth"] == "ethereum"
+        assert req["eth_address"] == "0x" + "ab" * 20
+        assert req["valid_until"] == 1234
+        assert req["eth_signature"] == "0x" + "cd" * 65
+
+
+def test_a_substrate_request_carries_no_ethereum_fields():
+    by_endpoint, params, _ = _fixture_params()
+    transport = _RecordingTransport(by_endpoint)
+    decrypt(transport, _FakeSigner(), params)
+    for req in transport.requests:
+        assert not {"eth_address", "valid_until", "eth_signature"} & set(req)

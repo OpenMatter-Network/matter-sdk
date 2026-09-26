@@ -138,6 +138,12 @@ func (c *ChainClient) FindStoredSecret(blockHash types.Hash, owner []byte) (Secr
 	if err != nil {
 		return SecretID{}, false, err
 	}
+	return storedSecretID(events, owner)
+}
+
+// storedSecretID reads the id from owner's `Secrets.SecretStored` among events,
+// skipping stores by other accounts in the same block.
+func storedSecretID(events []Event, owner []byte) (SecretID, bool, error) {
 	for _, e := range events {
 		if e.Pallet != "Secrets" || e.Name != "SecretStored" {
 			continue

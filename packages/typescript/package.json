@@ -1,6 +1,6 @@
 {
   "name": "@openmatter-network/matter-sdk",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "TypeScript SDK for MatterChain and the OpenMatter platform: one apiKey, every pallet. A metadata-driven chain client (tx / query / runtimeApi) plus threshold Secrets, re-exporting @openmatter-network/matter-sdk-core.",
   "keywords": [
     "openmatter",
@@ -48,7 +48,7 @@
     "prepublishOnly": "echo 'Publish the CI-built, checked tarball (npm publish <file>.tgz), never this directory; see RELEASING.md.' >&2 && exit 1"
   },
   "dependencies": {
-    "@openmatter-network/matter-sdk-core": "^2.3.0",
+    "@openmatter-network/matter-sdk-core": "^2.3.1",
     "@polkadot/api": "^16.5.4"
   },
   "devDependencies": {

@@ -113,12 +113,45 @@ fn reserved_schemes_report_as_unsupported_not_malformed() {
 }
 
 #[test]
-fn unknown_schemes_and_bad_encodings_are_malformed_or_unsupported() {
-    assert!(matches!(
-        ApiKey::parse("banana:whatever"),
-        Err(KeyError::UnsupportedScheme { .. })
-    ));
+fn a_colon_inside_a_suri_is_not_a_scheme_prefix() {
+    // Only a bare identifier before the first `:` is a scheme; a password or
+    // junction may contain `:`.
+    for (suri, prefixed) in [
+        (
+            format!("{VECTOR_MNEMONIC}///pa:ss"),
+            format!("sr25519:{VECTOR_MNEMONIC}///pa:ss"),
+        ),
+        (
+            format!("{VECTOR_SEED_HEX}//a:b"),
+            format!("SR25519:{VECTOR_SEED_HEX}//a:b"),
+        ),
+    ] {
+        let bare = ApiKey::parse(&suri).expect("a colon in a SURI must parse");
+        let with_scheme = ApiKey::parse(&prefixed).expect("a prefixed colon SURI must parse");
+        assert_eq!(bare.account_id(), with_scheme.account_id(), "{suri:?}");
+    }
+}
 
+#[test]
+fn an_unknown_prefix_is_malformed_and_never_echoed() {
+    // An unrecognised token before `:` may be key material (hex without `0x`),
+    // so it is reported as malformed without repeating it.
+    for input in ["banana:whatever", "fac7959dbfe72f052e5a0c3c8d6530f2:x"] {
+        let err = ApiKey::parse(input).expect_err("unknown prefix must be rejected");
+        assert!(
+            matches!(err, KeyError::Malformed { .. }),
+            "{input:?} gave {err:?}"
+        );
+        let token = input.split(':').next().unwrap();
+        assert!(
+            !format!("{err} {err:?}").contains(token),
+            "{input:?} echoed: {err}"
+        );
+    }
+}
+
+#[test]
+fn unknown_schemes_and_bad_encodings_are_malformed_or_unsupported() {
     for input in [
         // Too short / too long / non-hex.
         "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb779747",
@@ -166,21 +199,28 @@ fn errors_never_echo_the_input() {
         format!("secp256k1:0x{secret_body}"),
         format!("{VECTOR_MNEMONIC} zoo"),
         format!("//{secret_body}"),
+        // A `:` after the phrase must not turn the phrase into a "scheme".
+        format!("{VECTOR_MNEMONIC} zoo///pa:ss"),
+        format!("{VECTOR_MNEMONIC} zoo//a:b"),
+        format!("{secret_body}:x"),
+        format!("{secret_body}///p:w"),
     ];
 
     for input in inputs {
         let Err(err) = ApiKey::parse(&input) else {
             panic!("expected {input:?} to be rejected");
         };
-        let message = err.to_string().to_ascii_lowercase();
+        let message = format!("{err} {err:?}").to_ascii_lowercase();
         assert!(
             !message.contains(secret_body),
             "error leaked the key for {input:?}: {message}"
         );
-        assert!(
-            !message.contains("bottom drive"),
-            "error leaked the mnemonic for {input:?}: {message}"
-        );
+        for word in VECTOR_MNEMONIC.split(' ') {
+            assert!(
+                !message.contains(word),
+                "error leaked mnemonic word {word:?} for {input:?}: {message}"
+            );
+        }
     }
 }
 
@@ -230,6 +270,12 @@ fn emit_api_key_vectors() {
               "account_id_hex": account_hex(&ApiKey::parse(&format!("{VECTOR_SEED_HEX}//hard")).unwrap()) },
             { "name": "mnemonic with hard junction", "key": format!("{VECTOR_MNEMONIC}//hard"),
               "account_id_hex": account_hex(&ApiKey::parse(&format!("{VECTOR_MNEMONIC}//hard")).unwrap()) },
+            { "name": "colon inside a password is not a scheme",
+              "key": format!("{VECTOR_MNEMONIC}///pa:ss"),
+              "account_id_hex": account_hex(&ApiKey::parse(&format!("{VECTOR_MNEMONIC}///pa:ss")).unwrap()) },
+            { "name": "colon inside a junction is not a scheme",
+              "key": format!("sr25519:{VECTOR_SEED_HEX}//a:b"),
+              "account_id_hex": account_hex(&ApiKey::parse(&format!("{VECTOR_SEED_HEX}//a:b")).unwrap()) },
         ],
         "invalid": [
             { "name": "empty", "key": "", "error": "empty" },
@@ -239,7 +285,9 @@ fn emit_api_key_vectors() {
               "key": "//Alice", "error": "malformed" },
             { "name": "reserved ethereum scheme", "error": "unsupported_scheme",
               "key": "secp256k1:0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e" },
-            { "name": "unknown scheme", "key": "banana:whatever", "error": "unsupported_scheme" },
+            { "name": "unknown scheme prefix", "key": "banana:whatever", "error": "malformed" },
+            { "name": "unprefixed hex before a colon is never echoed", "error": "malformed",
+              "key": "fac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb7797479e:x" },
             { "name": "hex too short", "error": "malformed",
               "key": "0xfac7959dbfe72f052e5a0c3c8d6530f202b02fd8f9f5ca3580ec8deb779747" },
             { "name": "hex non-hex character", "error": "malformed",

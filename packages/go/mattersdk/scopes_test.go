@@ -427,3 +427,59 @@ func (o optionSomeU128) Encode(encoder scale.Encoder) error {
 	}
 	return encoder.Encode(types.NewU128(*big.NewInt(int64(o))))
 }
+
+// scopedCallNames lists every call of `pallet` in the metadata, or nil if the
+// pallet has no calls.
+func scopedCallNames(t *testing.T, meta *types.Metadata, pallet string) []string {
+	t.Helper()
+	for _, p := range meta.AsMetadataV14.Pallets {
+		if string(p.Name) != pallet || !p.HasCalls {
+			continue
+		}
+		for _, portable := range meta.AsMetadataV14.Lookup.Types {
+			if portable.ID.Int64() != p.Calls.Type.Int64() {
+				continue
+			}
+			var names []string
+			for _, v := range portable.Type.Def.Variant.Variants {
+				names = append(names, string(v.Name))
+			}
+			return names
+		}
+	}
+	return nil
+}
+
+func TestEveryLocallyClassifiedCallHasAFixtureRow(t *testing.T) {
+	// The reverse of TestRequiredScopesMatchTheFixture, as the fixture demands: a
+	// call the Go table admits, or any call of a pallet it scopes, with no row is
+	// drift.
+	meta := loadSpec322Metadata(t)
+	rows := map[string]bool{}
+	for _, row := range loadRequiredScopes(t).Calls {
+		rows[row.Pallet+"."+row.Call] = true
+	}
+	scopedPallets := 0
+	for _, p := range meta.AsMetadataV14.Pallets {
+		pallet := string(p.Name)
+		calls := scopedCallNames(t, meta, pallet)
+		scoped := false
+		for _, call := range calls {
+			if _, admitted := RequiredScopes(pallet, call); admitted {
+				scoped = true
+			}
+		}
+		if !scoped {
+			continue
+		}
+		scopedPallets++
+		for _, call := range calls {
+			if !rows[pallet+"."+call] {
+				t.Errorf("%s.%s is classified locally but has no row in required_scopes.json", pallet, call)
+			}
+		}
+	}
+	if want := 10; scopedPallets != want {
+		t.Errorf("checked %d scoped pallets, want %d: the walk over the metadata is broken", scopedPallets, want)
+	}
+}

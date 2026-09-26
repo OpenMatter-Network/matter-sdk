@@ -41,6 +41,7 @@ class _FakeChain:
         # A failed lookup, distinct from "no delegation".
         self._agent_key_error = agent_key_error
         self.agent_key_calls = []
+        self.finality_timeouts = []
 
     def agent_key(self, key):
         self.agent_key_calls.append(bytes(key))
@@ -61,8 +62,9 @@ class _FakeChain:
         """Change what the chain would now answer, as a re-scope or a revoke."""
         self._agent_key = value
 
-    def submit(self, keypair, pallet, call, params, principal=None):
+    def submit(self, keypair, pallet, call, params, principal=None, finality_timeout=None):
         self.submitted.append((keypair, pallet, call, params, principal))
+        self.finality_timeouts.append(finality_timeout)
         if self.submit_error is not None:
             raise self.submit_error
         return "receipt"
@@ -378,3 +380,29 @@ def test_a_call_no_key_may_make_is_told_apart_from_a_missing_scope():
     with pytest.raises(NotPermittedError) as excinfo:
         client.tx("Volumes", "retire_volume", {})
     assert not isinstance(excinfo.value, NeverAdmittedError)
+
+
+def test_a_write_carries_the_clients_finality_budget():
+    chain = _FakeChain()
+    client = _client(chain=chain, finality_timeout=5)
+    client.tx("System", "remark", {"remark": "0x00"})
+    assert chain.finality_timeouts == [5]
+
+
+def test_the_default_finality_budget_is_two_minutes():
+    chain = _FakeChain()
+    _client(chain=chain).tx("System", "remark", {"remark": "0x00"})
+    assert chain.finality_timeouts == [120]
+
+
+def test_connecting_with_an_api_key_uses_the_chains_address_format(monkeypatch):
+    from substrateinterface.utils.ss58 import ss58_encode
+
+    import matter_sdk.client as client_module
+
+    props = _properties()
+    props.ss58_prefix = 0
+    monkeypatch.setattr(client_module, "ChainClient", lambda url: _FakeChain())
+    monkeypatch.setattr(MatterClient, "_read_properties", staticmethod(lambda chain: props))
+    client = MatterClient.connect_with_api_key(SEED_HEX)
+    assert client.address == ss58_encode(ApiKey(SEED_HEX).account_id, 0)

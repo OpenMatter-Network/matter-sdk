@@ -6,14 +6,23 @@ any pallet, resolved by name from live metadata. Most callers want
 """
 
 import re
+import time
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from scalecodec.base import ScaleBytes
-from substrateinterface import Keypair, KeypairType, SubstrateInterface
-from substrateinterface.exceptions import SubstrateRequestException
+from substrateinterface import ExtrinsicReceipt, Keypair, KeypairType, SubstrateInterface
+from substrateinterface.exceptions import StorageFunctionNotFound, SubstrateRequestException
 from substrateinterface.utils.ss58 import ss58_decode, ss58_encode
 
-from .errors import ChainError, DispatchError, OuterDispatchError, PoolRejectedError
+from .committee import CommitteeNode
+from .errors import (
+    ChainError,
+    DispatchError,
+    FinalityTimeoutError,
+    OuterDispatchError,
+    PoolRejectedError,
+)
 
 # A bare 32-byte hex mini-secret. Anything else (e.g. ``0x…//hard``) must not reach
 # ``create_from_seed``, which silently drops junctions.
@@ -28,6 +37,24 @@ _SCHEME_PREFIX = "sr25519:"
 _AGENT_KEY_PALLET = "Budgets"
 _AGENT_KEY_CALL = "authorize_agent_key"
 _AGENT_KEY_API = "BudgetsApi_agent_key"
+
+#: SS58 address format when the chain reports none (Substrate's generic prefix).
+_SS58_FORMAT = 42
+
+#: Seconds a write waits for finalization before :class:`FinalityTimeoutError`;
+#: the same two minutes as every other binding.
+DEFAULT_FINALITY_TIMEOUT = 120
+
+#: Seconds between finalized-head polls while waiting for a write to finalize.
+_FINALITY_POLL_SECONDS = 1.0
+
+_KGC_PALLET = "KgcApi"
+_DKG_OUTPUT_AT_EPOCH = "KgcApi_dkg_output_at_epoch"
+_THRESHOLD_AT_EPOCH = "KgcApi_threshold_params_at_epoch"
+_COMMITTEE_AT_EPOCH = "KgcApi_committee_at_epoch"
+_KGC_NODES = "KgcApi_kgc_nodes"
+_SHARE_COMMITMENT = "KgcApi_share_commitment"
+_HTTP_SCHEMES = ("https://", "http://")
 
 
 def _strip_scheme(text: str) -> str:
@@ -46,10 +73,10 @@ class ApiKeySigner:
 
     __slots__ = ("_key", "public_key", "ss58_address", "crypto_type")
 
-    def __init__(self, key) -> None:
+    def __init__(self, key, ss58_format: int = _SS58_FORMAT) -> None:
         self._key = key
         self.public_key = key.account_id
-        self.ss58_address = ss58_encode(key.account_id, _SS58_FORMAT)
+        self.ss58_address = ss58_encode(key.account_id, ss58_format)
         self.crypto_type = KeypairType.SR25519
 
     def sign(self, data) -> bytes:
@@ -70,10 +97,11 @@ def _as_bytes_to_sign(data) -> bytes:
     return bytes(data)
 
 
-def api_key_signer(key) -> ApiKeySigner:
+def api_key_signer(key, ss58_format: int = _SS58_FORMAT) -> ApiKeySigner:
     """Adapt an :class:`~matter_sdk.apikey.ApiKey` for extrinsic signing; the
-    recommended signer."""
-    return ApiKeySigner(key)
+    recommended signer. ``ss58_format`` is the chain's address format;
+    :class:`~matter_sdk.client.MatterClient` passes the one the chain reports."""
+    return ApiKeySigner(key, ss58_format)
 
 # Custom return types the runtime APIs use (scalecodec needs them registered).
 _CUSTOM_TYPES = {
@@ -88,7 +116,6 @@ _CUSTOM_TYPES = {
         ],
     },
 }
-_SS58_FORMAT = 42
 
 
 def _bytes_field(v) -> bytes:
@@ -164,7 +191,7 @@ class ChainClient:
         self.close()
 
     @staticmethod
-    def keypair_from_seed(seed: str) -> Keypair:
+    def keypair_from_seed(seed: str, ss58_format: int = _SS58_FORMAT) -> Keypair:
         """An sr25519 ``substrate-interface`` keypair from a bare ``0x`` hex
         mini-secret or a BIP39 mnemonic / SURI; an ``sr25519:`` prefix is stripped.
 
@@ -175,7 +202,7 @@ class ChainClient:
         text = _strip_scheme(seed.strip())
         if _BARE_MINI_SECRET.fullmatch(text):
             return Keypair.create_from_seed(
-                text, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519
+                text, ss58_format=ss58_format, crypto_type=KeypairType.SR25519
             )
         if text.startswith("0x"):
             raise ValueError(
@@ -184,7 +211,7 @@ class ChainClient:
                 "derives in the shared core"
             )
         return Keypair.create_from_uri(
-            text, ss58_format=_SS58_FORMAT, crypto_type=KeypairType.SR25519
+            text, ss58_format=ss58_format, crypto_type=KeypairType.SR25519
         )
 
     def _call(self, method: str, args: bytes = b"") -> bytes:
@@ -249,18 +276,102 @@ class ChainClient:
         return int(self.substrate.query("System", "Account", [address]).value["data"]["free"])
 
     def query(self, pallet: str, entry: str, keys: Optional[List] = None):
-        """Read any storage entry. ``None`` means the entry is absent (not an error)."""
-        result = self.substrate.query(pallet, entry, keys or [])
-        return None if result is None else result.value
+        """Read any storage entry. ``None`` means nothing is stored under it (not an
+        error), even for an entry with a storage default such as ``System.Account``.
+
+        An entry the runtime does not have raises :class:`ChainError`.
+        """
+        try:
+            result = self.substrate.query(pallet, entry, keys or [])
+        except StorageFunctionNotFound as exc:
+            raise _unknown_name(pallet, entry, exc) from exc
+        if result is None or not getattr(result, "meta_info", {}).get("result_found", True):
+            return None
+        return result.value
 
     def runtime_api(self, method: str, args: bytes = b"", return_type: str = "Bytes"):
         """Call any runtime API by its ``state_call`` name, e.g.
-        ``runtime_api("KgcApi_dkg_epoch", return_type="Option<u32>")``."""
-        return self._decode(return_type, self._call(method, args))
+        ``runtime_api("KgcApi_dkg_epoch", return_type="Option<u32>")``.
+
+        A method the runtime does not have raises :class:`ChainError`.
+        """
+        try:
+            raw = self._call(method, args)
+        except SubstrateRequestException as exc:
+            raise ChainError(
+                f"{method} failed: {exc}", pallet=method.split("_", 1)[0], call=method
+            ) from exc
+        return self._decode(return_type, raw)
 
     def constant(self, pallet: str, name: str):
-        """Read any pallet constant from the live metadata."""
-        return self.substrate.get_constant(pallet, name).value
+        """Read any pallet constant from the live metadata. A constant the runtime
+        does not have raises :class:`ChainError`."""
+        constant = self.substrate.get_constant(pallet, name)
+        if constant is None:
+            raise _unknown_name(pallet, name)
+        return constant.value
+
+    def committee_at(self, epoch: int) -> "CommitteeState":
+        """The committee state a decrypt needs for a secret sealed at ``epoch``.
+
+        Reads that epoch's ``shared_a``, threshold, seated committee and each
+        member's share commitment, not the current epoch's, so a secret sealed
+        before a rotation still recovers. Members without an absolute ``http(s)``
+        endpoint are dropped (the quorum tolerates ``n - t`` missing); a kept
+        member without a share commitment, or fewer reachable members than the
+        threshold, raises :class:`ChainError`.
+        """
+        arg = int(epoch).to_bytes(4, "little")
+        output = self._decode("Option<(Bytes, Bytes)>", self._call(_DKG_OUTPUT_AT_EPOCH, arg))
+        if not output:
+            raise _committee_error(_DKG_OUTPUT_AT_EPOCH, f"no DKG output at epoch {epoch}")
+        shared_a = _bytes_field(output[1])
+
+        threshold = int(self._decode("(u64, u64)", self._call(_THRESHOLD_AT_EPOCH, arg))[1])
+        committee = self._decode("Vec<([u8; 32], u64)>", self._call(_COMMITTEE_AT_EPOCH, arg))
+        if not committee:
+            raise _committee_error(_COMMITTEE_AT_EPOCH, f"no committee seated at epoch {epoch}")
+
+        registry = self._decode("Vec<([u8; 32], KgcNodeInfo)>", self._call(_KGC_NODES))
+        endpoints = {
+            _account_bytes(account): _absolute_http_endpoint(info["endpoint"])
+            for account, info in registry
+        }
+
+        nodes = []
+        for account, dkg_index in committee:
+            member = _account_bytes(account)
+            endpoint = endpoints.get(member)
+            if endpoint is None:
+                continue
+            commitment = self._decode(
+                "Option<Bytes>", self._call(_SHARE_COMMITMENT, arg + member)
+            )
+            if not commitment:
+                raise _committee_error(
+                    _SHARE_COMMITMENT,
+                    f"share commitment missing for reachable node {int(dkg_index)} at epoch {epoch}",
+                )
+            nodes.append(
+                CommitteeNode(
+                    index=int(dkg_index),
+                    endpoint=endpoint,
+                    share_commitment=_bytes_field(commitment),
+                )
+            )
+        nodes.sort(key=lambda node: node.index)
+        if len(nodes) < threshold:
+            raise _committee_error(
+                _KGC_NODES,
+                f"only {len(nodes)} of epoch {epoch}'s committee is reachable; need {threshold}",
+            )
+        return CommitteeState(
+            epoch=int(epoch),
+            threshold=threshold,
+            shared_a=shared_a,
+            nodes=nodes,
+            block_hash=self.finalized_head(),
+        )
 
     def supports_agent_keys(self) -> bool:
         """Whether this runtime has scoped API keys (spec >= 322), read from the
@@ -302,6 +413,7 @@ class ChainClient:
         call: str,
         params: dict,
         principal: Optional[bytes] = None,
+        finality_timeout: float = DEFAULT_FINALITY_TIMEOUT,
     ) -> "TxReceipt":
         """Sign and submit any call, resolved by name from live metadata, and wait
         for finalization.
@@ -312,10 +424,15 @@ class ChainClient:
         With ``principal`` set the call is wrapped in ``proxy.proxy`` and runs as
         that member, which is how a member-tied API key acts.
 
-        Raises :class:`PoolRejectedError` if the node refuses it at validation,
-        :class:`OuterDispatchError` if the extrinsic fails, :class:`DispatchError` if
-        the proxied call fails, and :class:`ChainError` if it cannot be submitted.
+        Raises :class:`ChainError` for a call the runtime does not have (before
+        signing), :class:`PoolRejectedError` if the node refuses it at validation,
+        :class:`FinalityTimeoutError` if it does not finalize within
+        ``finality_timeout`` seconds (it may still land), :class:`OuterDispatchError`
+        if the extrinsic fails, :class:`DispatchError` if the proxied call fails, and
+        :class:`ChainError` if it cannot be submitted.
         """
+        if self.substrate.get_metadata_call_function(pallet, call) is None:
+            raise _unknown_name(pallet, call)
         composed = self.substrate.compose_call(pallet, call, params)
         if principal is not None:
             composed = self.substrate.compose_call(
@@ -334,10 +451,13 @@ class ChainClient:
         extrinsic = self.substrate.create_signed_extrinsic(
             call=composed, keypair=keypair, nonce=nonce
         )
+        # Watch finalized blocks ourselves: substrate-interface's own watch has no
+        # deadline. Anything finalized before submission cannot hold this extrinsic.
+        finalized_before = self.substrate.get_block_number(
+            self.substrate.get_chain_finalised_head()
+        )
         try:
-            receipt = self.substrate.submit_extrinsic(
-                extrinsic, wait_for_inclusion=True, wait_for_finalization=True
-            )
+            self.substrate.submit_extrinsic(extrinsic)
         except SubstrateRequestException as exc:
             if _is_pool_rejection(exc):
                 raise PoolRejectedError(
@@ -348,6 +468,17 @@ class ChainClient:
             raise ChainError(
                 f"{pallet}.{call} could not be submitted: {exc}", pallet=pallet, call=call
             ) from exc
+
+        block_hash, index = self._await_finalized(
+            str(extrinsic.data), finalized_before, f"{pallet}.{call}", finality_timeout
+        )
+        receipt = ExtrinsicReceipt(
+            substrate=self.substrate,
+            extrinsic_hash="0x" + bytes(extrinsic.extrinsic_hash).hex(),
+            block_hash=block_hash,
+            extrinsic_idx=index,
+            finalized=True,
+        )
 
         if not receipt.is_success:
             detail = receipt.error_message
@@ -384,6 +515,41 @@ class ChainClient:
             events=events,
         )
 
+    #: Injectable for tests; production uses the monotonic clock.
+    _clock = staticmethod(time.monotonic)
+    _sleep = staticmethod(time.sleep)
+
+    def _await_finalized(
+        self, data_hex: str, finalized_before: int, target: str, timeout: float
+    ) -> Tuple[str, int]:
+        """``(block_hash, extrinsic_index)`` of the finalized block holding exactly
+        ``data_hex``, scanning each newly finalized block once.
+
+        Raises :class:`FinalityTimeoutError` once ``timeout`` seconds pass.
+        """
+        wanted = data_hex.lower()
+        deadline = self._clock() + timeout
+        next_number = finalized_before + 1
+        while True:
+            head = self.substrate.get_block_number(self.substrate.get_chain_finalised_head())
+            while next_number <= head:
+                block_hash = self.substrate.get_block_hash(next_number)
+                block = self.substrate.rpc_request("chain_getBlock", [block_hash])["result"]["block"]
+                for index, extrinsic in enumerate(block["extrinsics"]):
+                    if extrinsic.lower() == wanted:
+                        return block_hash, index
+                next_number += 1
+            remaining = deadline - self._clock()
+            if remaining <= 0:
+                pallet, _, call = target.partition(".")
+                raise FinalityTimeoutError(
+                    f"{target} did not finalize within {timeout:g}s; it may still land, "
+                    "so check the chain before resubmitting",
+                    pallet=pallet,
+                    call=call,
+                )
+            self._sleep(min(_FINALITY_POLL_SECONDS, remaining))
+
     def _wrapped_failure(self, receipt) -> Optional[str]:
         """The wrapped call's own error from ``Proxy.ProxyExecuted``, or ``None``,
         rendered like a direct ``ExtrinsicFailed``."""
@@ -412,6 +578,41 @@ class ChainClient:
         receipt = self.submit(keypair, "Secrets", "store_secret", call_params)
         attributes = receipt.require_event("Secrets", "SecretStored")
         return _secret_id_from_attributes(attributes)
+
+
+@dataclass(frozen=True)
+class CommitteeState:
+    """The committee a decrypt needs, read for one epoch by
+    :meth:`ChainClient.committee_at`. Its fields feed :class:`DecryptParams`."""
+
+    epoch: int
+    threshold: int
+    shared_a: bytes
+    nodes: List[CommitteeNode]
+    #: The finalized head: the committee authorizes against finalized state.
+    block_hash: bytes
+
+
+def _unknown_name(pallet: str, name: str, cause: Optional[BaseException] = None) -> ChainError:
+    """A name the runtime's metadata does not have, reported like the other bindings."""
+    detail = f": {cause}" if cause is not None else ""
+    return ChainError(
+        f"{pallet}.{name} is not in this runtime's metadata{detail}", pallet=pallet, call=name
+    )
+
+
+def _committee_error(method: str, detail: str) -> ChainError:
+    return ChainError(f"{method}: {detail}", pallet=_KGC_PALLET, call=method)
+
+
+def _absolute_http_endpoint(raw) -> Optional[str]:
+    """A registry endpoint as an absolute ``http(s)`` URL without a trailing slash,
+    or ``None`` if it is not one (as Rust's ``recover`` reads it)."""
+    try:
+        text = _bytes_field(raw).decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return None
+    return text.rstrip("/") if text.startswith(_HTTP_SCHEMES) else None
 
 
 class TxReceipt:

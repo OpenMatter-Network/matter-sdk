@@ -8,11 +8,19 @@ const multisignatureSr25519 = 0x01
 // Length of a raw sr25519 signature, before MultiSignature framing.
 const sr25519SignatureBytes = 64
 
-// RequestAuth is the auth fields attached to a /partial-decrypt request.
+// RequestAuth is the auth fields attached to a /partial-decrypt request. The
+// Ethereum fields are set only by an Ethereum-auth (EIP-712) Signer; the
+// Substrate path leaves them nil.
 type RequestAuth struct {
 	Auth      string `json:"auth"`
 	Requester string `json:"requester"`
 	Signature string `json:"signature"`
+	// EthAddress is the 0x-prefixed Ethereum address that signed.
+	EthAddress *string `json:"eth_address,omitempty"`
+	// ValidUntil is the unix time after which the signature is refused.
+	ValidUntil *uint64 `json:"valid_until,omitempty"`
+	// EthSignature is the 0x-prefixed EIP-712 signature.
+	EthSignature *string `json:"eth_signature,omitempty"`
 }
 
 // Signer authorizes a /partial-decrypt request without exposing its key.

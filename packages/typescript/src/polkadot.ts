@@ -1,6 +1,7 @@
 // The @polkadot/api ChainBackend. Imported lazily by MatterClient.
 
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import type { Metadata } from "@polkadot/types";
 import type { KeySigner } from "@openmatter-network/matter-sdk-core";
 
 import { decimalsFromExistentialDeposit } from "./amount.js";
@@ -30,11 +31,14 @@ const PRINCIPAL_ENV = "MATTER_PRINCIPAL";
 export class PolkadotBackend implements ChainBackend {
   readonly #api: ApiPromise;
   readonly #signer: KeySigner | undefined;
+  /** Pallet index -> name as metadata spells it, for receipts. */
+  readonly #palletNames: ReadonlyMap<number, string>;
   #mode: Mode = { kind: "direct" };
 
   private constructor(api: ApiPromise, signer: KeySigner | undefined) {
     this.#api = api;
     this.#signer = signer;
+    this.#palletNames = palletNamesByIndex(api.runtimeMetadata);
   }
 
   static async connect(
@@ -184,9 +188,7 @@ export class PolkadotBackend implements ChainBackend {
           resolve({
             txHash: extrinsic.hash.toHex(),
             blockHash: result.status.asFinalized.toHex(),
-            events: result.events.map(
-              ({ event }) => [event.section, event.method] as const,
-            ),
+            events: receiptEvents(result.events, this.#palletNames),
           });
         })
         .catch((cause: unknown) => {
@@ -270,11 +272,7 @@ export class PolkadotBackend implements ChainBackend {
     if (item === undefined) {
       throw ClientError.chain(target, "no such storage entry in the live runtime metadata");
     }
-    const value = await item(...(keys as never[]));
-    // Absent -> undefined, not an empty-but-truthy codec.
-    const maybe = value as unknown as { isNone?: boolean; isEmpty?: boolean };
-    if (maybe.isNone === true || maybe.isEmpty === true) return undefined;
-    return value;
+    return storedValue(await item(...(keys as never[])));
   }
 
   async runtimeApi(method: string, argsHex: string): Promise<string> {
@@ -365,6 +363,39 @@ function readPrincipalOverride(api: ApiPromise): Uint8Array | undefined {
         (cause instanceof Error ? cause.message : String(cause)),
     );
   }
+}
+
+/** Pallet index -> pallet name as the runtime metadata spells it (`NominationPools`). */
+export function palletNamesByIndex(metadata: Metadata): Map<number, string> {
+  return new Map(
+    metadata.asLatest.pallets.map((pallet) => [pallet.index.toNumber(), pallet.name.toString()]),
+  );
+}
+
+/**
+ * A receipt's `[pallet, event]` names. @polkadot's `event.section` is
+ * lowerCamel (`secrets`); receipts use the metadata name (`Secrets`), as every
+ * other binding does, resolved from the event's pallet index.
+ */
+export function receiptEvents(
+  events: readonly { event: { index: Uint8Array; section: string; method: string } }[],
+  palletNames: ReadonlyMap<number, string>,
+): (readonly [string, string])[] {
+  return events.map(({ event }) => [
+    palletNames.get(event.index[0]!) ?? event.section,
+    event.method,
+  ] as const);
+}
+
+/**
+ * A storage read's value, or `undefined` when the key holds nothing: an absent
+ * optional entry, or the storage default @polkadot substitutes for an absent
+ * entry. A stored zero or empty value is returned, matching the other bindings.
+ */
+export function storedValue<T>(value: T): T | undefined {
+  const codec = value as unknown as { isNone?: boolean; isStorageFallback?: boolean };
+  if (codec.isNone === true || codec.isStorageFallback === true) return undefined;
+  return value;
 }
 
 /** The wrapped call's error from `Proxy.ProxyExecuted`, or `undefined` if it succeeded. */

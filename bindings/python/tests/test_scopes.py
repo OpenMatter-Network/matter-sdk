@@ -143,3 +143,30 @@ def test_demands_the_wider_set_when_the_argument_cannot_be_read():
     for params in ({}, {"request": 42}, {"request": {"secret_ref": None}}, {"request": [1, 2]}):
         assert required_scopes("Jobs", "request_deployment", params) == with_secret, params
     assert required_scopes("Jobs", "set_deployment_secret_ref", {"deployment": 1}) == with_secret
+
+
+def test_every_call_named_locally_has_a_fixture_row():
+    # The other direction: a call this binding classifies by name but the fixture
+    # does not list is drift, even if the pallet's catch-all would hide it.
+    from matter_sdk import scopes as local
+
+    pinned = {(row["pallet"], row["call"]) for row in TABLE["calls"]}
+    named = {
+        "Jobs": local._DEPLOYMENTS_WRITE
+        | {"request_deployment", "set_deployment_secret_ref", "register_wg_peer", "remove_wg_peer"},
+        "Collaborations": {"set_compute_node_image", "set_compute_node_sku_id"},
+        "Resources": local._RESOURCES_WRITE,
+        "Organizations": local._ORGANIZATION_WRITE,
+        "Budgets": local._BILLING_WRITE,
+    }
+    for pallet, calls in named.items():
+        for call in calls:
+            assert (pallet, call) in pinned, f"{pallet}.{call} is classified locally but has no fixture row"
+
+
+def test_every_pallet_scoped_locally_is_a_fixture_pallet():
+    # A pallet whose catch-all admits an unknown call must be one the fixture pins.
+    pinned_pallets = {row["pallet"] for row in TABLE["calls"]}
+    candidates = pinned_pallets | {"Balances", "Staking", "Sudo", "Proxy", "Utility", "System"}
+    locally_scoped = {p for p in candidates if required_scopes(p, "anything_else") is not None}
+    assert locally_scoped <= pinned_pallets
