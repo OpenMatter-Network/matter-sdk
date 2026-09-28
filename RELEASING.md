@@ -5,6 +5,11 @@ module and the C-ABI archives attached to the GitHub Release. Rust consumers dep
 tag itself, because the crates depend on the private core and cannot go to crates.io. The
 workflow is [`.github/workflows/release.yml`](.github/workflows/release.yml):
 
+> **PyPI and Go publishing are paused.** The wheels and the Go module are still built and
+> verified on every tag, but `publish-pypi`, `publish-go` and `postflight-native` are not
+> in the workflow. Restore them from git history (`git log -S publish-pypi -- .github/workflows/release.yml`)
+> together with their one-time setup below.
+
 ```
 gate -> build -> verify ---+
 gate -> ci ----------------+-> [approval] -> publish -> github-release -> postflight
@@ -20,9 +25,9 @@ without rebuilding them, and needs a person's approval.
 | ci | `ci` | The full CI suite, because a tag can point at a commit CI never saw. Runs alongside the builds; publishing waits for it. |
 | build | `build-npm`, `build-wheels`, `build-ffi`, `assemble-go` | Builds every artifact exactly once. These jobs have no publish rights. |
 | verify | `verify-npm`, `check-wheels`, `verify-wheels`, `verify-go` | Installs each artifact from outside the repository on every platform it claims to support. |
-| publish | `publish-npm`, `publish-pypi`, `publish-go` | Waits on the `release` environment's approval, then uploads the verified bytes. |
+| publish | `publish-npm` (PyPI and Go paused) | Waits on the `release` environment's approval, then uploads the verified bytes. |
 | github-release | `github-release` | Creates the Release, with generated notes and the C-ABI archives attached. |
-| postflight | `postflight-npm`, `postflight-native` | Runs the verify tests again against the real registries. |
+| postflight | `postflight-npm` | Runs the verify tests again against the real registries. |
 
 ## Cutting a release
 
@@ -87,15 +92,19 @@ These live outside the repository and must exist before the first tag.
 **npm**
 - The organisation `openmatter-network` owns the `@openmatter-network` scope.
 - After the first publish ([bootstrap](#the-first-release-bootstrap)), configure a trusted
-  publisher on **each** package under Settings → Trusted publisher → GitHub Actions:
-
-  | Field | Value |
-  |---|---|
-  | Organisation | `OpenMatter-Network` |
-  | Repository | `matter-sdk` |
-  | Workflow | `release.yml` |
-  | Environment | `release` |
-
+  publisher on **each** package, logged in as a maintainer (npm ≥ 11.15, the first with `--allow-publish`):
+  ```bash
+  for p in @openmatter-network/matter-sdk-core @openmatter-network/matter-sdk; do
+    npm trust github "$p" --file release.yml --repo OpenMatter-Network/matter-sdk \
+      --env release --allow-publish
+  done
+  ```
+  Then check it with `npm trust list <package>`: repository `OpenMatter-Network/matter-sdk`,
+  file `release.yml`, environment `release`, and publishing allowed. Without
+  `--allow-publish` the relationship exists but cannot publish.
+- If this is missing or wrong, `publish-npm` fails with `ENEEDAUTH` and prints npm's
+  `oidc` log lines, which carry the registry's reason. npm never fails on a refused OIDC
+  exchange by itself; it carries on without credentials.
 - The organisation name is case-sensitive. npm's provenance check and
   `scripts/check-npm-tarball.sh`'s `repository.url` check both compare it exactly.
 
@@ -161,8 +170,9 @@ step 5.
    - `publish-npm` finds both packages `SAME` and skips them.
    - PyPI converts its pending publisher.
    - The Go module gets its first tag.
-5. Push `vX.Y.Z-rc.2` to prove the token-less path end to end. If it fails, nothing is
-   published.
+5. Push `vX.Y.Z-rc.2` to prove the token-less path end to end. The three publish jobs run
+   independently, so a failure in one does not stop the others: fix the cause, then
+   *Re-run failed jobs*.
 6. Release `vX.Y.Z`. Then set both npm packages to *require two-factor authentication and
    disallow tokens*.
 
