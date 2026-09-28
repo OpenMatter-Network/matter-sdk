@@ -16,21 +16,18 @@ without rebuilding them, and needs a person's approval.
 
 | Stage | Jobs | Does |
 |---|---|---|
-| gate | `gate` | Works out the version (`scripts/release-plan.sh`). Refuses the run unless the manifests match it (`check-versions.sh --expect`), `CHANGELOG.md` has a non-empty section for it (`changelog-section.sh`), and the licence copies agree. |
+| gate | `gate` | Works out the version (`scripts/release-plan.sh`). Refuses the run unless the manifests match it (`check-versions.sh --expect`) and the licence copies agree. |
 | ci | `ci` | The full CI suite, because a tag can point at a commit CI never saw. Runs alongside the builds; publishing waits for it. |
 | build | `build-npm`, `build-wheels`, `build-ffi`, `assemble-go` | Builds every artifact exactly once. These jobs have no publish rights. |
 | verify | `verify-npm`, `check-wheels`, `verify-wheels`, `verify-go` | Installs each artifact from outside the repository on every platform it claims to support. |
 | publish | `publish-npm`, `publish-pypi`, `publish-go` | Waits on the `release` environment's approval, then uploads the verified bytes. |
-| github-release | `github-release` | Creates the Release, with the changelog section as its notes and the C-ABI archives attached. |
+| github-release | `github-release` | Creates the Release, with generated notes and the C-ABI archives attached. |
 | postflight | `postflight-npm`, `postflight-native` | Runs the verify tests again against the real registries. |
 
 ## Cutting a release
 
 1. **Describe it.** In [`CHANGELOG.md`](CHANGELOG.md), rename `## [Unreleased]` to
    `## [X.Y.Z] - YYYY-MM-DD`, then start a new empty `## [Unreleased]` above it.
-   - The gate refuses a version whose section is missing or empty.
-   - A release candidate uses its final version's section: `2.4.0-rc.1` reads `[2.4.0]`,
-     and there is no `-rc` heading.
 2. **Set the version.** This is the only supported way to change it:
    ```bash
    scripts/set-version.sh X.Y.Z        # or X.Y.Z-rc.N; no other shape is accepted
