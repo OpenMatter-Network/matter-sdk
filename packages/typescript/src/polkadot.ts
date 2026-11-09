@@ -2,10 +2,13 @@
 
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import type { Metadata } from "@polkadot/types";
+import type { Signer as PolkadotSigner, SignerPayloadJSON } from "@polkadot/types/types";
+import { u8aToHex } from "@polkadot/util";
+import { blake2AsU8a } from "@polkadot/util-crypto";
 import type { KeySigner } from "@openmatter-network/matter-sdk-core";
 
 import { decimalsFromExistentialDeposit } from "./amount.js";
-import type { ChainBackend, Mode, TxReceipt } from "./backend.js";
+import type { ChainBackend, Mode, ReceiptEvent, TxReceipt } from "./backend.js";
 import { defaultLogger, type ClientLogger } from "./logger.js";
 import { afterRefresh, isPoolRejection } from "./delegation.js";
 import { ClientError } from "./errors.js";
@@ -14,6 +17,14 @@ import { requiredScopes, ScopeSet } from "./scopes.js";
 
 /** SCALE enum index of `MultiSignature::Sr25519`. */
 const MULTISIGNATURE_SR25519 = 1;
+
+/**
+ * Substrate signs an extrinsic payload verbatim up to this length and its
+ * blake2b-256 digest beyond it. The runtime verifies the same way, so the SDK
+ * applies the rule before a `KeySigner` sees the bytes: a signer signs exactly
+ * what it is given, in every language.
+ */
+export const MAX_UNHASHED_SIGNING_PAYLOAD_BYTES = 256;
 
 /** SS58 prefix when the node reports none. */
 const DEFAULT_SS58_PREFIX = 42;
@@ -27,6 +38,9 @@ const AGENT_KEY_METHOD = "agent_key";
 
 /** Overrides the principal a key acts for when the chain's pointer is stale. */
 const PRINCIPAL_ENV = "MATTER_PRINCIPAL";
+
+/** The RPC a finalized-head read fails at, for error targets. */
+const FINALIZED_HEAD_RPC = "chain_getFinalizedHead";
 
 export class PolkadotBackend implements ChainBackend {
   readonly #api: ApiPromise;
@@ -132,37 +146,29 @@ export class PolkadotBackend implements ChainBackend {
 
     // Delegated: never sign as the key itself; wrap in
     // `proxy.proxy(member, null, call)` so it runs as the member.
-    const inner = method(...(args as never[]));
-    let extrinsic = inner;
-    if (this.#mode.kind === "delegated") {
-      const wrap = this.#api.tx["proxy"]?.["proxy"];
-      if (wrap === undefined) {
-        throw ClientError.chain("Proxy.proxy", "this runtime exposes no proxy pallet");
-      }
-      extrinsic = wrap(
-        // Encoded as MultiAddress::Id.
-        this.#api.createType("AccountId32", this.#mode.principal),
-        null,
-        inner,
+    const principal = this.#mode.kind === "delegated" ? this.#mode.principal : undefined;
+    const wrap = principal === undefined ? undefined : this.#api.tx["proxy"]?.["proxy"];
+    if (principal !== undefined && wrap === undefined) {
+      throw ClientError.chain("Proxy.proxy", "this runtime exposes no proxy pallet");
+    }
+    let extrinsic;
+    try {
+      const inner = method(...(toChainArgs(args) as never[]));
+      extrinsic =
+        wrap === undefined
+          ? inner
+          : // Encoded as MultiAddress::Id.
+            wrap(this.#api.createType("AccountId32", principal), null, inner);
+    } catch (cause) {
+      throw ClientError.chain(
+        target,
+        `argument encoding: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
     }
     const address = this.#api.createType("AccountId32", signer.accountId).toString();
 
     // Sign via KeySigner, never a keyring pair: the key may live in an HSM.
-    await extrinsic.signAsync(address, {
-      signer: {
-        signPayload: async (payload) => {
-          const raw = this.#api.createType("ExtrinsicPayload", payload, {
-            version: payload.version,
-          });
-          const signature = await signer.sign(raw.toU8a({ method: true }));
-          const framed = new Uint8Array(1 + signature.length);
-          framed[0] = MULTISIGNATURE_SR25519;
-          framed.set(signature, 1);
-          return { id: 1, signature: u8aToHex(framed) };
-        },
-      },
-    });
+    await extrinsic.signAsync(address, { signer: keySignerAdapter(this.#api, signer) });
 
     // Resolve on finalization, not inclusion; see ChainBackend.submit.
     return new Promise<TxReceipt>((resolve, reject) => {
@@ -272,7 +278,7 @@ export class PolkadotBackend implements ChainBackend {
     if (item === undefined) {
       throw ClientError.chain(target, "no such storage entry in the live runtime metadata");
     }
-    return storedValue(await item(...(keys as never[])));
+    return storedValue(await item(...(toChainArgs(keys) as never[])));
   }
 
   async runtimeApi(method: string, argsHex: string): Promise<string> {
@@ -281,6 +287,17 @@ export class PolkadotBackend implements ChainBackend {
       return result.toHex();
     } catch (cause) {
       throw ClientError.chain(method, cause instanceof Error ? cause.message : String(cause));
+    }
+  }
+
+  async finalizedHead(): Promise<Uint8Array> {
+    try {
+      return (await this.#api.rpc.chain.getFinalizedHead()).toU8a();
+    } catch (cause) {
+      throw ClientError.chain(
+        FINALIZED_HEAD_RPC,
+        cause instanceof Error ? cause.message : String(cause),
+      );
     }
   }
 
@@ -372,19 +389,107 @@ export function palletNamesByIndex(metadata: Metadata): Map<number, string> {
   );
 }
 
+/** The slice of @polkadot's `GenericEvent` that a receipt reads. */
+interface EmittedEvent {
+  index: Uint8Array;
+  section: string;
+  method: string;
+  data: readonly { toPrimitive(): unknown }[];
+  meta: { fields: readonly { name: { isSome: boolean; unwrap(): { toString(): string } } }[] };
+}
+
 /**
- * A receipt's `[pallet, event]` names. @polkadot's `event.section` is
+ * A receipt's `[pallet, event, fields]` entries. @polkadot's `event.section` is
  * lowerCamel (`secrets`); receipts use the metadata name (`Secrets`), as every
- * other binding does, resolved from the event's pallet index.
+ * other binding does, resolved from the event's pallet index. Fields are keyed
+ * by the runtime's own names (`secret_id`, not @polkadot's `secretId`), as
+ * Python and Go key them, and positionally (`"0"`, `"1"`) for unnamed fields.
  */
 export function receiptEvents(
-  events: readonly { event: { index: Uint8Array; section: string; method: string } }[],
+  events: readonly { event: EmittedEvent }[],
   palletNames: ReadonlyMap<number, string>,
-): (readonly [string, string])[] {
+): ReceiptEvent[] {
   return events.map(({ event }) => [
     palletNames.get(event.index[0]!) ?? event.section,
     event.method,
+    eventFields(event),
   ] as const);
+}
+
+/**
+ * An event's fields as plain values: integers as numbers, or decimal strings
+ * beyond 2^53; accounts as SS58 strings; bytes as hex.
+ */
+function eventFields(event: EmittedEvent): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    event.data.map((value, i) => {
+      const name = event.meta.fields[i]?.name;
+      return [name?.isSome === true ? name.unwrap().toString() : String(i), value.toPrimitive()];
+    }),
+  );
+}
+
+/**
+ * `args` for @polkadot's `api.tx` / `api.query`: every `Uint8Array`, at any
+ * depth of plain arrays and objects, as `0x`-hex.
+ *
+ * @polkadot reads a raw `Uint8Array` given to a `Bytes` (`Vec<u8>`,
+ * `BoundedVec<u8>`) codec as SCALE that already carries its length prefix, so
+ * the first byte is taken for a compact length and the value is rejected or
+ * silently truncated. Hex is read as the value itself by every codec, including
+ * fixed-size ones (`AccountId32`, `H256`, `[u8; N]`). Anything that is not plain
+ * data (a @polkadot codec instance, for one) is passed through as is.
+ */
+export function toChainArgs(args: readonly unknown[]): unknown[] {
+  return args.map(toChainValue);
+}
+
+function toChainValue(value: unknown): unknown {
+  if (value instanceof Uint8Array) return u8aToHex(value);
+  if (Array.isArray(value)) return value.map(toChainValue);
+  if (isPlainObject(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, toChainValue(inner)]));
+  }
+  return value;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/** The bytes a `KeySigner` signs for an extrinsic payload: see {@link MAX_UNHASHED_SIGNING_PAYLOAD_BYTES}. */
+export function extrinsicSigningBytes(payload: Uint8Array): Uint8Array {
+  return payload.length > MAX_UNHASHED_SIGNING_PAYLOAD_BYTES ? blake2AsU8a(payload) : payload;
+}
+
+/** What {@link keySignerAdapter} needs from an `ApiPromise` or a `TypeRegistry`. */
+export interface PayloadTypes {
+  createType(
+    type: "ExtrinsicPayload",
+    value: SignerPayloadJSON,
+    options: { version: number },
+  ): { toU8a(isBare?: boolean | Record<string, boolean>): Uint8Array };
+}
+
+/**
+ * Adapt a {@link KeySigner} into the `Signer` @polkadot's `signAsync` takes.
+ * The SDK derives all framing: it rebuilds the canonical payload bytes, applies
+ * Substrate's hashing rule, and wraps the raw 64-byte signature as
+ * `MultiSignature::Sr25519`. The signer never sees a keyring pair.
+ */
+export function keySignerAdapter(types: PayloadTypes, signer: KeySigner): PolkadotSigner {
+  return {
+    signPayload: async (payload) => {
+      const raw = types.createType("ExtrinsicPayload", payload, { version: payload.version });
+      const signature = await signer.sign(extrinsicSigningBytes(raw.toU8a({ method: true })));
+      const framed = new Uint8Array(1 + signature.length);
+      framed[0] = MULTISIGNATURE_SR25519;
+      framed.set(signature, 1);
+      return { id: 1, signature: u8aToHex(framed) };
+    },
+  };
 }
 
 /**
@@ -424,10 +529,6 @@ function wrappedFailure(api: ApiPromise, events: readonly { event: unknown }[]):
 function toMemberName(text: string): string {
   const camel = text.replace(/_([a-z0-9])/g, (_all, ch: string) => ch.toUpperCase());
   return camel.charAt(0).toLowerCase() + camel.slice(1);
-}
-
-function u8aToHex(bytes: Uint8Array): `0x${string}` {
-  return `0x${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /** Render a `DispatchError` as `section.Name: docs` where possible. */

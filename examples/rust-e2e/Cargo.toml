@@ -13,7 +13,8 @@ path = "src/main.rs"
 [dependencies]
 matter-sdk = { path = "../../crates/matter-sdk", features = ["chain"] }
 
-# Chain half (state calls + storeSecret); the SDK leaves submission to your own client.
+# subxt for the block-event read behind `client.subxt()`; subxt-signer holds the
+# keypair the custom `KeySigner` wraps; the codec decodes raw runtime-API results.
 subxt = { version = "0.44.0", default-features = false, features = ["native", "jsonrpsee"] }
 subxt-signer = { version = "0.44.0", features = ["sr25519"] }
 parity-scale-codec = { version = "3", features = ["derive"] }

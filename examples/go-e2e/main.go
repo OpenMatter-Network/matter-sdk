@@ -130,9 +130,8 @@ func run() error {
 	fmt.Printf("Committee at epoch %d: %d reachable nodes, threshold t=%d.\n",
 		secretEpoch, len(committee.Nodes), committee.Threshold)
 
-	signer, err := mattersdk.SubstrateSigner(kp.PublicKey, func(p []byte) ([]byte, error) {
-		return signature.Sign(p, kp.URI)
-	})
+	// The same signer as the store: it signs request bytes raw, as the node verifies them.
+	signer, err := mattersdk.SubstrateSigner(kp.PublicKey, mattersdk.KeyringSigner{Pair: kp}.SignExtrinsic)
 	if err != nil {
 		return err
 	}

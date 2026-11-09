@@ -32,8 +32,8 @@ export { ClientError } from "./errors.js";
 export { defaultLogger } from "./logger.js";
 export type { ClientLogger } from "./logger.js";
 export type { ClientErrorKind } from "./errors.js";
-export { emitted } from "./backend.js";
-export type { Mode } from "./backend.js";
+export { emitted, requireEvent } from "./backend.js";
+export type { Mode, ReceiptEvent } from "./backend.js";
 export { Access, Scope, ScopeSet, requiredScopes } from "./scopes.js";
 export type { ChainBackend, TxReceipt } from "./backend.js";
 export {
@@ -43,6 +43,7 @@ export {
   ResourcesFacade,
   SecretsFacade,
   StakingFacade,
+  secretIdFromReceipt,
 } from "./facade.js";
 export type { FacadeHost } from "./facade.js";
 export {

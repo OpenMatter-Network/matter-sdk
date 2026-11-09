@@ -339,9 +339,9 @@ func TestScopeRefusalsCarryABranchableKind(t *testing.T) {
 	}
 }
 
-// loadSpec322Metadata reads the spec-330 V14 metadata fixture: GSRPC has no V15 decoder,
+// loadSpec330Metadata reads the spec-330 V14 metadata fixture: GSRPC has no V15 decoder,
 // and V14 is what state_getMetadata returns.
-func loadSpec322Metadata(t *testing.T) *types.Metadata {
+func loadSpec330Metadata(t *testing.T) *types.Metadata {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(vectorsRel, "spec330_metadata_v14.scale"))
 	if err != nil {
@@ -357,7 +357,7 @@ func loadSpec322Metadata(t *testing.T) *types.Metadata {
 func TestTheSecretRefArgumentIsReadFromTheEncodedCall(t *testing.T) {
 	// A Deployments:Write key may clear a secret ref; judging by call name alone
 	// would falsely refuse it.
-	meta := loadSpec322Metadata(t)
+	meta := loadSpec330Metadata(t)
 	calls, err := registry.NewFactory().CreateCallRegistry(meta)
 	if err != nil {
 		t.Fatalf("build the call registry: %v", err)
@@ -389,7 +389,7 @@ func TestTheSecretRefArgumentIsReadFromTheEncodedCall(t *testing.T) {
 
 func TestAnUnreadableArgumentTakesTheWiderSet(t *testing.T) {
 	// Fail safe: an unreadable argument asks for more scope, never less.
-	meta := loadSpec322Metadata(t)
+	meta := loadSpec330Metadata(t)
 	calls, err := registry.NewFactory().CreateCallRegistry(meta)
 	if err != nil {
 		t.Fatalf("build the call registry: %v", err)
@@ -454,7 +454,7 @@ func TestEveryLocallyClassifiedCallHasAFixtureRow(t *testing.T) {
 	// The reverse of TestRequiredScopesMatchTheFixture, as the fixture demands: a
 	// call the Go table admits, or any call of a pallet it scopes, with no row is
 	// drift.
-	meta := loadSpec322Metadata(t)
+	meta := loadSpec330Metadata(t)
 	rows := map[string]bool{}
 	for _, row := range loadRequiredScopes(t).Calls {
 		rows[row.Pallet+"."+row.Call] = true

@@ -5,7 +5,8 @@
 import type { Aad, EncryptedSecret, GrantTarget, StoreSecret } from "@openmatter-network/matter-sdk-core";
 import { aadBytes } from "@openmatter-network/matter-sdk-core";
 
-import type { TxReceipt } from "./backend.js";
+import { requireEvent, type TxReceipt } from "./backend.js";
+import { ClientError } from "./errors.js";
 import type { ScopeSet } from "./scopes.js";
 
 /** What a façade needs from the client. */
@@ -22,6 +23,26 @@ function envelope(payload: EncryptedSecret): unknown {
     proof: payload.proof,
     ct: payload.ct,
   };
+}
+
+/** Field of `Secrets.SecretStored` that carries the chain-assigned id. */
+const SECRET_ID_FIELD = "secret_id";
+
+/**
+ * The id the chain assigned in a `secrets.store` receipt, from its
+ * `Secrets.SecretStored` event. Never predict it from a counter: two concurrent
+ * stores would each read the other's id.
+ */
+export function secretIdFromReceipt(receipt: TxReceipt): bigint {
+  const fields = requireEvent(receipt, "Secrets", "SecretStored");
+  const raw = fields[SECRET_ID_FIELD];
+  if (typeof raw !== "number" && typeof raw !== "string") {
+    throw ClientError.chain(
+      "Secrets.SecretStored",
+      `event carries no ${SECRET_ID_FIELD} (fields: ${Object.keys(fields).join(", ") || "none"})`,
+    );
+  }
+  return BigInt(raw);
 }
 
 /** Secrets: store, rotate, share, and delete secrets. */

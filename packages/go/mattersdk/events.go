@@ -117,7 +117,16 @@ func ownerFromEvent(e Event) []byte {
 	if len(e.Fields) < 2 {
 		return nil
 	}
-	switch v := e.Fields[1].Value.(type) {
+	return accountBytes(e.Fields[1].Value)
+}
+
+// accountBytes reads a 32-byte account id from a decoded event field.
+//
+// GSRPC's registry decodes `AccountId32` as it is declared: a composite with one
+// unnamed `[u8; 32]` field, which arrives as DecodedFields holding a slice of
+// U8 values. The direct forms are accepted too. Anything else is nil.
+func accountBytes(value interface{}) []byte {
+	switch v := value.(type) {
 	case types.AccountID:
 		return v[:]
 	case [32]byte:
@@ -126,6 +135,26 @@ func ownerFromEvent(e Event) []byte {
 		if len(v) == accountIDBytes {
 			return v
 		}
+	case registry.DecodedFields:
+		if len(v) == 1 {
+			return accountBytes(v[0].Value)
+		}
+	case []interface{}:
+		if len(v) != accountIDBytes {
+			return nil
+		}
+		out := make([]byte, accountIDBytes)
+		for i, elem := range v {
+			switch b := elem.(type) {
+			case types.U8:
+				out[i] = byte(b)
+			case uint8:
+				out[i] = b
+			default:
+				return nil
+			}
+		}
+		return out
 	}
 	return nil
 }

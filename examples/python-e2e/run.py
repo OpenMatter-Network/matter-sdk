@@ -79,7 +79,10 @@ def main() -> int:
 
     with ChainClient(rpc_url) as chain:
         balance = chain.free_balance(keypair.ss58_address)
-        print(f"Balance: {balance} planck (~{balance / 10**12} MTR)")
+        # Plancks, against the chain's own existential deposit: the testnet's token
+        # decimals are not 12, and MatterClient.format_amount owns that derivation.
+        existential_deposit = int(chain.constant("Balances", "ExistentialDeposit"))
+        print(f"Balance: {balance} planck (existential deposit {existential_deposit} planck)")
         if balance == 0:
             print(f"FAIL: account {keypair.ss58_address} has zero balance — fund it first.", file=sys.stderr)
             return 1

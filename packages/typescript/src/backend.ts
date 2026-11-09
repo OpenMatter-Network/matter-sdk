@@ -1,6 +1,7 @@
 // The seam between MatterClient and the chain library, so the client is
 // testable without a node and `@polkadot/api` stays swappable.
 
+import { ClientError } from "./errors.js";
 import type { ChainProperties } from "./network.js";
 import type { ScopeSet } from "./scopes.js";
 
@@ -21,19 +22,47 @@ export type Mode =
       readonly scopes: ScopeSet;
     };
 
+/**
+ * One event an extrinsic emitted: the pallet and event as the runtime metadata
+ * spells them (`Secrets`, `SecretStored`), then its fields keyed by the
+ * runtime's field names (`secret_id`, `owner`). Integers are numbers, or
+ * decimal strings beyond 2^53; accounts are SS58 strings; bytes are hex.
+ */
+export type ReceiptEvent = readonly [
+  pallet: string,
+  event: string,
+  fields: Readonly<Record<string, unknown>>,
+];
+
 /** The outcome of a submitted extrinsic, after finalization. */
 export interface TxReceipt {
   /** Hash of the extrinsic. */
   readonly txHash: string;
   /** Hash of the finalized block containing it. */
   readonly blockHash: string;
-  /** `[pallet, event]` names emitted by this extrinsic, in order. */
-  readonly events: ReadonlyArray<readonly [string, string]>;
+  /** What this extrinsic emitted, in order. */
+  readonly events: ReadonlyArray<ReceiptEvent>;
 }
 
 /** Whether `pallet.event` was emitted. */
 export function emitted(receipt: TxReceipt, pallet: string, event: string): boolean {
   return receipt.events.some(([p, e]) => p === pallet && e === event);
+}
+
+/**
+ * The fields of `pallet.event`, which the extrinsic must have emitted. Throws a
+ * `chain` `ClientError` naming what was emitted instead, as Python's
+ * `require_event` does.
+ */
+export function requireEvent(
+  receipt: TxReceipt,
+  pallet: string,
+  event: string,
+): Readonly<Record<string, unknown>> {
+  const match = receipt.events.find(([p, e]) => p === pallet && e === event);
+  if (match !== undefined) return match[2];
+  const seen = receipt.events.map(([p, e]) => `${p}.${e}`).join(", ") || "none";
+  throw ClientError.chain(`${pallet}.${event}`, `extrinsic finalized but emitted no ${pallet}.${event} (saw: ${seen})`);
 }
 
 /** What the client needs from a chain library. */
@@ -59,6 +88,12 @@ export interface ChainBackend {
 
   /** Call a runtime API by its `state_call` name. */
   runtimeApi(method: string, argsHex: string): Promise<string>;
+
+  /**
+   * The 32-byte hash of the latest finalized block: what a committee request
+   * is bound to. Absent means the backend cannot read it.
+   */
+  finalizedHead?(): Promise<Uint8Array>;
 
   /** Read a pallet constant from the live metadata. */
   constant(pallet: string, name: string): unknown;

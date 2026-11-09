@@ -1,55 +1,52 @@
-// Live Secrets round trip against a chain + committee: seal -> secrets.storeSecret
-// (pays a fee) -> read back -> threshold-decrypt -> verify. The other languages'
-// harnesses can re-decrypt the stored secret with MATTER_SECRET_ID.
+// Live Secrets round trip against a chain + committee, through `MatterClient`:
+// seal -> `secrets().store` (pays a fee) -> read the id from the block's events ->
+// `secrets().recover`. The other languages' harnesses can re-decrypt the stored
+// secret with MATTER_SECRET_ID, and this one re-decrypts theirs.
 //
-// Needs a FUNDED account. The key never leaves this process: subxt signs the
-// extrinsic, `Sr25519Signer` signs the /partial-decrypt requests. Environment
-// variables: examples/README.md.
+// Needs a FUNDED account. The key never leaves this process: it stays in a
+// subxt-signer keypair, and the SDK only receives `sign` calls through the same
+// `KeySigner` seam an HSM or KMS would implement. The SDK hashes the (far over
+// 256 bytes) extrinsic payload before `sign` sees it and signs committee requests
+// raw; the signer below does neither. Environment variables: examples/README.md.
 
 use std::str::FromStr;
+use std::sync::Arc;
 
-use matter_sdk::{decrypt, Aad, CommitteeNode, DecryptRequest, ReqwestTransport, Sr25519Signer};
-use parity_scale_codec::{Decode, Encode};
-use subxt::backend::legacy::LegacyRpcMethods;
-use subxt::backend::rpc::RpcClient;
-use subxt::dynamic::{At, Value};
-use subxt::{OnlineClient, PolkadotConfig};
+use matter_sdk::chain::{MatterClient, MatterConfig, Network};
+use matter_sdk::{Aad, AccountId, KeyError, KeyScheme, KeySigner, StoreSecret};
+use parity_scale_codec::Decode;
+use subxt::utils::H256;
 use subxt_signer::sr25519::Keypair;
 use subxt_signer::SecretUri;
 
 const DEFAULT_SECRET: &str = "API_KEY=swordfish\nDATABASE_URL=postgres://prod";
+/// The label the stored secret carries on chain.
+const SECRET_LABEL: &str = "rust-e2e";
 
 const RT_JOINT_PK: &str = "KgcApi_joint_pk";
 const RT_DKG_EPOCH: &str = "KgcApi_dkg_epoch";
-const RT_KGC_NODES: &str = "KgcApi_kgc_nodes";
-const RT_DKG_OUTPUT_AT_EPOCH: &str = "KgcApi_dkg_output_at_epoch";
-const RT_COMMITTEE_AT_EPOCH: &str = "KgcApi_committee_at_epoch";
-const RT_THRESHOLD: &str = "KgcApi_threshold_params_at_epoch";
-const RT_SHARE_COMMITMENT: &str = "KgcApi_share_commitment";
-const RT_SECRET_PAYLOAD: &str = "SecretsApi_secret_payload";
-const RT_SECRET_EPOCH: &str = "SecretsApi_secret_epoch";
 
-type AccountId32Bytes = [u8; 32];
+const SECRETS_PALLET: &str = "Secrets";
+const SECRET_STORED_EVENT: &str = "SecretStored";
 
-/// `KgcNodeInfo` from `KgcApi_kgc_nodes`; field order must match the chain. The
-/// epoch's committee snapshot, not this index, is the authority on DKG indices.
-#[derive(Decode)]
-struct KgcNodeInfo {
-    endpoint: Vec<u8>,
-    #[allow(dead_code)]
-    dkg_index: u64,
+/// The custom-signer seam, as an HSM or KMS would implement it: the SDK hands
+/// over bytes and gets a raw 64-byte sr25519 signature back.
+struct PairSigner {
+    pair: Keypair,
 }
 
-/// The on-chain `EncryptedSecret` envelope (four SCALE `Vec<u8>` blobs).
-///
-/// `proof` is unused on decrypt: the committee's per-partial proofs are verified instead.
-#[derive(Decode)]
-struct EncSecretWire {
-    binding_id: Vec<u8>,
-    capsule: Vec<u8>,
-    #[allow(dead_code)]
-    proof: Vec<u8>,
-    ct: Vec<u8>,
+impl KeySigner for PairSigner {
+    fn scheme(&self) -> KeyScheme {
+        KeyScheme::Sr25519
+    }
+
+    fn account_id(&self) -> AccountId {
+        AccountId(self.pair.public_key().0)
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<[u8; 64], KeyError> {
+        Ok(self.pair.sign(message).0)
+    }
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -63,7 +60,7 @@ async fn main() {
 /// Refuse mainnet without `MATTER_CONFIRM=yes`.
 ///
 /// Checks the URL as well as `MATTER_NETWORK`: a mistyped `MATTER_RPC_URL` is the
-/// likelier mistake.
+/// likelier mistake. The client checks the chain's own identity on connect too.
 fn guard_mainnet(rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let network = std::env::var("MATTER_NETWORK").unwrap_or_else(|_| "testnet".to_string());
     let looks_like_mainnet = network == "mainnet" || rpc_url.contains("mainnet");
@@ -84,205 +81,130 @@ fn guard_mainnet(rpc_url: &str) -> Result<(), Box<dyn std::error::Error>> {
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Default endpoint per network: testvectors/networks.json.
     let network = match std::env::var("MATTER_NETWORK").as_deref() {
-        Ok("mainnet") => matter_sdk::chain::Network::Mainnet,
-        Ok("testnet") | Err(_) => matter_sdk::chain::Network::Testnet,
+        Ok("mainnet") => Network::Mainnet,
+        Ok("testnet") | Err(_) => Network::Testnet,
         Ok(other) => {
             return Err(format!("MATTER_NETWORK must be testnet or mainnet, got {other}").into())
         }
     };
-    let default_rpc = network
-        .default_rpc_url()
-        .expect("named networks have a default endpoint");
-    let rpc_url = std::env::var("MATTER_RPC_URL").unwrap_or_else(|_| default_rpc.to_string());
+    let mut config = MatterConfig::for_network(network);
+    config.rpc_url = std::env::var("MATTER_RPC_URL").ok();
+    config.confirm_mainnet = std::env::var("MATTER_CONFIRM").is_ok_and(|v| v == "yes");
+    let rpc_url = config.rpc_url.clone().unwrap_or_else(|| {
+        network
+            .default_rpc_url()
+            .expect("named networks have a default endpoint")
+            .to_string()
+    });
     guard_mainnet(&rpc_url)?;
+
     let seed_str = std::env::var("MATTER_SIGNER_SEED")
         .or_else(|_| std::env::var("TEST_KEY"))
         .map_err(|_| "set MATTER_SIGNER_SEED or TEST_KEY (0x-hex seed or mnemonic / SURI)")?;
     let secret = std::env::var("MATTER_SECRET").unwrap_or_else(|_| DEFAULT_SECRET.to_string());
+    let existing_id = std::env::var("MATTER_SECRET_ID")
+        .ok()
+        .map(|id| u128::from_str(id.trim()))
+        .transpose()?;
 
-    // One secret URI drives both signers: chain extrinsic and committee auth.
-    let uri = SecretUri::from_str(seed_str.trim())?;
-    let keypair = Keypair::from_uri(&uri)?;
-    let committee_signer = Sr25519Signer::from_uri_insecure_dev_only(seed_str.trim())?;
-    let account_id = keypair.public_key().to_account_id();
-    println!("Account: {account_id}");
+    // One keypair drives both uses through one KeySigner: the extrinsic and the
+    // committee requests.
+    let pair = Keypair::from_uri(&SecretUri::from_str(seed_str.trim())?)?;
+    let client = MatterClient::connect_with_signer(config, Arc::new(PairSigner { pair })).await?;
+    println!(
+        "Connected to {rpc_url} as {}",
+        client.address().expect("a signing client has an address")
+    );
 
-    // One RPC connection shared by the typed client and legacy state calls.
-    let rpc = RpcClient::from_url(&rpc_url).await?;
-    let api = OnlineClient::<PolkadotConfig>::from_rpc_client(rpc.clone()).await?;
-    let legacy = LegacyRpcMethods::<PolkadotConfig>::new(rpc.clone());
-    println!("Connected to {rpc_url}");
-
-    // Best-effort; an unfunded account fails at the extrinsic below.
-    if let Ok(at) = api.storage().at_latest().await {
-        let addr =
-            subxt::dynamic::storage("System", "Account", vec![Value::from_bytes(account_id.0)]);
-        if let Ok(Some(v)) = at.fetch(&addr).await {
-            if let Ok(val) = v.to_value() {
-                if let Some(free) = val.at("data").and_then(|d| d.at("free")) {
-                    println!("Balance: {free:?}");
-                }
-            }
-        }
-    }
-
-    let joint_pk = decode_opt_bytes(&call(&legacy, RT_JOINT_PK, None).await?)
+    let joint_pk = decode_opt_bytes(&state_call(&client, RT_JOINT_PK).await?)
         .ok_or("KGC DKG not finalised on chain (joint_pk is None)")?;
-    let epoch: u32 = decode(&call(&legacy, RT_DKG_EPOCH, None).await?)?;
+    let epoch = u32::decode(&mut &state_call(&client, RT_DKG_EPOCH).await?[..])?;
     println!("Committee epoch={epoch}, joint_pk={}B", joint_pk.len());
 
-    // Seal locally, then publish (pays gas).
-    let env = matter_sdk::encrypt(
-        &joint_pk,
-        epoch,
-        secret.as_bytes(),
-        Aad::EnvV1.as_bytes(),
-        None,
-    )?;
-    println!(
-        "Sealed {}B -> capsule {}B, proof {}B, ct {}B",
-        secret.len(),
-        env.capsule.len(),
-        env.proof.len(),
-        env.ct.len()
-    );
+    let secret_id = match existing_id {
+        Some(id) => {
+            println!("Using existing secret {id}.");
+            id
+        }
+        None => {
+            // Seal locally, then publish (pays gas) through the façade.
+            let env = matter_sdk::encrypt(
+                &joint_pk,
+                epoch,
+                secret.as_bytes(),
+                Aad::EnvV1.as_bytes(),
+                None,
+            )?;
+            println!(
+                "Sealed {}B -> capsule {}B, proof {}B, ct {}B",
+                secret.len(),
+                env.capsule.len(),
+                env.proof.len(),
+                env.ct.len()
+            );
+            println!("Submitting Secrets.store_secret through MatterClient ...");
+            let receipt = client
+                .secrets()
+                .store(&StoreSecret::new(env, epoch, SECRET_LABEL, Aad::EnvV1))
+                .await?;
+            let id = secret_id_at(&client, receipt.block_hash).await?;
+            println!(
+                "Stored on chain: secret_id={id} in block {}",
+                receipt.block_hash_hex()
+            );
+            id
+        }
+    };
 
-    let payload = Value::named_composite([
-        ("binding_id", Value::from_bytes(&env.binding_id)),
-        ("capsule", Value::from_bytes(&env.capsule)),
-        ("proof", Value::from_bytes(&env.proof)),
-        ("ct", Value::from_bytes(&env.ct)),
-    ]);
-    let store = subxt::dynamic::tx(
-        "Secrets",
-        "store_secret",
-        vec![
-            payload,
-            Value::u128(epoch as u128),
-            Value::from_bytes("matter-sdk e2e"),      // label
-            Value::from_bytes(Aad::EnvV1.as_bytes()), // aad
-        ],
-    );
-
-    println!("Submitting secrets.storeSecret ...");
-    let events = api
-        .tx()
-        .sign_and_submit_then_watch_default(&store, &keypair)
-        .await?
-        .wait_for_finalized_success()
-        .await?;
-
-    let secret_id = secret_id_from_events(&events)?;
-    println!("Stored on chain: secret_id={secret_id}");
-
-    let sid_arg = secret_id.encode();
-    let secret_epoch: u32 = decode_opt(&call(&legacy, RT_SECRET_EPOCH, Some(&sid_arg)).await?)?
-        .ok_or("stored secret has no epoch")?;
-    let wire: EncSecretWire = decode_opt(&call(&legacy, RT_SECRET_PAYLOAD, Some(&sid_arg)).await?)?
-        .ok_or("stored secret not found on chain")?;
-
-    // Gather committee state for the secret's epoch: shared_a, threshold, members and
-    // commitments must all belong to the epoch the secret was sealed under.
-    let epoch_arg = secret_epoch.encode();
-    let (_joint_pk, shared_a): (Vec<u8>, Vec<u8>) =
-        decode_opt(&call(&legacy, RT_DKG_OUTPUT_AT_EPOCH, Some(&epoch_arg)).await?)?
-            .ok_or("no DKG output at the secret's epoch")?;
-    let (_, threshold): (u64, u64) = decode(&call(&legacy, RT_THRESHOLD, Some(&epoch_arg)).await?)?;
-    let committee: Vec<(AccountId32Bytes, u64)> =
-        decode(&call(&legacy, RT_COMMITTEE_AT_EPOCH, Some(&epoch_arg)).await?)?;
-    let registry: Vec<(AccountId32Bytes, KgcNodeInfo)> =
-        decode(&call(&legacy, RT_KGC_NODES, None).await?)?;
-    println!(
-        "Committee at epoch {secret_epoch}: {} members, threshold t={threshold}",
-        committee.len()
-    );
-
-    let mut nodes = Vec::with_capacity(committee.len());
-    for (account, dkg_index) in &committee {
-        let Some((_, info)) = registry.iter().find(|(id, _)| id == account) else {
-            continue; // not reachable; the quorum tolerates n - t missing
-        };
-        let arg = (secret_epoch, account).encode();
-        let commitment = decode_opt_bytes(&call(&legacy, RT_SHARE_COMMITMENT, Some(&arg)).await?)
-            .ok_or("missing share commitment for a committee member")?;
-        nodes.push(CommitteeNode {
-            index: *dkg_index,
-            endpoint: normalize_endpoint(&String::from_utf8_lossy(&info.endpoint)),
-            share_commitment: commitment,
-        });
-    }
-    nodes.sort_by_key(|n| n.index);
-
-    // Threshold-decrypt.
-    let block_hash = legacy.chain_get_finalized_head().await?.0;
-    println!("Collecting partial decryptions ...");
-    let recovered = decrypt(
-        &ReqwestTransport::new(),
-        &committee_signer,
-        &DecryptRequest {
-            secret_id,
-            epoch: secret_epoch,
-            binding_id: &wire.binding_id,
-            aad: Aad::EnvV1.as_bytes(),
-            capsule: &wire.capsule,
-            ct: &wire.ct,
-            shared_a: &shared_a,
-            block_hash,
-            threshold: threshold as usize,
-            nodes: &nodes,
-        },
-    )
-    .await?;
+    // Read the envelope, its epoch and that epoch's committee, then threshold-decrypt,
+    // all in one call authorized by the client's signer.
+    println!("Recovering through secrets().recover ...");
+    let recovered = client.secrets().recover(secret_id, Aad::EnvV1).await?;
 
     // Recovered plaintext is compared in process, never printed.
     println!("\nRecovered {} bytes", recovered.expose().len());
-    if recovered.expose() != secret.as_bytes() {
-        return Err("MISMATCH: recovered plaintext != original".into());
+    if existing_id.is_none() {
+        if recovered.expose() != secret.as_bytes() {
+            return Err("MISMATCH: recovered plaintext != original".into());
+        }
+        println!(
+            "Round trip verified ✔ (re-decrypt from another language with MATTER_SECRET_ID={secret_id})"
+        );
     }
-    println!("Round trip verified ✔ (re-decrypt from another language with MATTER_SECRET_ID={secret_id})");
     Ok(())
 }
 
-/// Runtime-API state call; returns the raw SCALE bytes.
-async fn call(
-    legacy: &LegacyRpcMethods<PolkadotConfig>,
+/// A runtime-API read as raw SCALE, through the client's RPC handle.
+async fn state_call(
+    client: &MatterClient,
     method: &str,
-    args: Option<&[u8]>,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Ok(legacy.state_call(method, args, None).await?)
-}
-
-fn decode<T: Decode>(bytes: &[u8]) -> Result<T, Box<dyn std::error::Error>> {
-    Ok(T::decode(&mut &bytes[..])?)
-}
-
-fn decode_opt<T: Decode>(bytes: &[u8]) -> Result<Option<T>, Box<dyn std::error::Error>> {
-    Ok(Option::<T>::decode(&mut &bytes[..])?)
+    Ok(client.rpc().state_call(method, None, None).await?)
 }
 
 fn decode_opt_bytes(bytes: &[u8]) -> Option<Vec<u8>> {
     Option::<Vec<u8>>::decode(&mut &bytes[..]).ok().flatten()
 }
 
-fn secret_id_from_events(
-    events: &subxt::blocks::ExtrinsicEvents<PolkadotConfig>,
+/// The id `Secrets.SecretStored` carries, read from the finalized block the receipt
+/// names through the underlying subxt client, as docs/secrets.md describes.
+async fn secret_id_at(
+    client: &MatterClient,
+    block_hash: [u8; 32],
 ) -> Result<u128, Box<dyn std::error::Error>> {
+    let events = client
+        .subxt()
+        .blocks()
+        .at(H256(block_hash))
+        .await?
+        .events()
+        .await?;
     for ev in events.iter() {
         let ev = ev?;
-        if ev.pallet_name() == "Secrets" && ev.variant_name() == "SecretStored" {
+        if ev.pallet_name() == SECRETS_PALLET && ev.variant_name() == SECRET_STORED_EVENT {
             // Field 0: secret_id, u128 SCALE (little-endian).
             return Ok(u128::decode(&mut ev.field_bytes())?);
         }
     }
-    Err("storeSecret landed but emitted no Secrets.SecretStored event".into())
-}
-
-fn normalize_endpoint(raw: &str) -> String {
-    let s = raw.trim();
-    let with_scheme = if s.contains("://") {
-        s.to_string()
-    } else {
-        format!("https://{s}")
-    };
-    with_scheme.trim_end_matches('/').to_string()
+    Err("store_secret finalized but its block has no Secrets.SecretStored event".into())
 }

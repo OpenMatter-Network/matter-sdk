@@ -43,6 +43,11 @@ export interface Signer {
 /**
  * An on-chain identity plus raw-byte signing: all an HSM, KMS, or remote signer
  * must provide. The SDK derives all framing. {@link ApiKey} implements this.
+ *
+ * `sign` signs exactly the bytes it is given and never hashes them: the SDK has
+ * already applied Substrate's rule (an extrinsic payload over 256 bytes arrives
+ * as its 32-byte blake2b-256 digest), and committee request bytes are verified
+ * raw by the node. It returns the raw 64-byte sr25519 signature, unframed.
  */
 export interface KeySigner {
   readonly accountId: Uint8Array;

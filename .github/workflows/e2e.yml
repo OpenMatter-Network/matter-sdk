@@ -86,6 +86,7 @@ jobs:
         run: |
           npm --prefix ../../packages/typescript-core ci
           npm --prefix ../../packages/typescript-core run build
+          npm --prefix ../../packages/typescript ci
           npm install
           npm start
 

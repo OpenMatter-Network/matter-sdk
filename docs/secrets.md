@@ -34,7 +34,9 @@ shares ([architecture](architecture.md)). Networking and signing are native to e
 The joint public key and current epoch come from the runtime APIs `KgcApi.joint_pk` and
 `KgcApi.dkg_epoch`. Python and Go read them with `ChainClient.joint_pk()` / `dkg_epoch()`
 (`JointPk()` / `DkgEpoch()`); Rust and TypeScript use the generic
-[`runtime_api`](chain-surface.md).
+[`runtime_api`](chain-surface.md), which returns SCALE bytes to decode: in TypeScript,
+`Option<Bytes>` for the key and a little-endian `u32` for the epoch, for example
+`Number(new DataView(hexToU8a(await client.runtimeApi("KgcApi_dkg_epoch")).buffer).getUint32(0, true))`.
 
 ```rust
 use matter_sdk::{encrypt, Aad};
@@ -66,7 +68,9 @@ Guarantees:
 
 - Empty plaintext is refused.
 - Every output field is checked against its on-chain size limit before you submit, so an
-  oversized envelope fails locally.
+  oversized envelope fails locally. The label and AAD bounds (`MaxSecretLabelSize`,
+  `MaxSecretAadSize`) are not published by the runtime, so an oversized label is refused
+  by the chain at dispatch, not before submit.
 - The seal binds the AAD and the epoch. Opening must present exactly the same values.
 
 ## AAD registry
@@ -130,9 +134,10 @@ let receipt = client
 ```
 
 ```ts
-import { storeSecret, Aad } from "@openmatter-network/matter-sdk";
+import { storeSecret, secretIdFromReceipt, Aad } from "@openmatter-network/matter-sdk";
 
 const receipt = await client.secrets.store(storeSecret(sealed, epoch, "db-url", Aad.EnvV1));
+const secretId = secretIdFromReceipt(receipt); // from Secrets.SecretStored on the receipt
 ```
 
 ```python
@@ -149,10 +154,11 @@ for _, e := range receipt.Events {
 }
 ```
 
-Only Python and Go receipts carry event fields. In Rust and TypeScript, read the
-`SecretStored` event at `receipt.block_hash` through the underlying client
-([parity](parity.md)). Never predict the id from a counter: two concurrent stores would
-each read the other's id.
+TypeScript, Python and Go receipts carry each event's fields under the runtime's field
+names (`secret_id`, `owner`); TypeScript's `requireEvent(receipt, "Secrets",
+"SecretStored")` is the general form. In Rust, read the `SecretStored` event at
+`receipt.block_hash` through `client.subxt()` ([parity](parity.md)). Never predict the id
+from a counter: two concurrent stores would each read the other's id.
 
 ### Granting and revoking
 
@@ -227,6 +233,7 @@ own Substrate client use `recover_secret` with a `CommitteeInfo`.
 ```ts
 import { decrypt, FetchTransport, keySigner } from "@openmatter-network/matter-sdk";
 
+const blockHash = await client.finalizedHead(); // a recent finalized block, as the committee requires
 const plaintext = await decrypt(new FetchTransport(), keySigner(client.signer!), {
   secretId, epoch, bindingId, aad: Aad.EnvV1, capsule, ct, sharedA, blockHash, threshold, nodes,
 });

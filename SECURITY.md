@@ -66,9 +66,11 @@ What it does **not** protect against, by design:
 
 ## Key-holding paths
 
-**`KeySigner`: recommended.** You implement it. The SDK hands it canonical bytes and gets
-back a signature, so the key stays in an HSM, cloud KMS, hardware wallet or remote signer
-and never enters the SDK's address space. See [secure signing](docs/secure-signing.md)
+**`KeySigner`: recommended.** You implement it. The SDK hands it the exact bytes to sign
+(an extrinsic payload, or its blake2b-256 digest once the payload exceeds 256 bytes, as
+Substrate verifies; a committee request raw) and gets back a signature, so the key stays
+in an HSM, cloud KMS, hardware wallet or remote signer and never enters the SDK's address
+space. The signer never hashes on its own. See [secure signing](docs/secure-signing.md)
 for patterns.
 
 **`ApiKey`: supported and hardened.** Use it for CI jobs, agents and workers that build a

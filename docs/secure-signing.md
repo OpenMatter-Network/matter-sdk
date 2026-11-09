@@ -25,8 +25,14 @@ flowchart LR
 
 The committee request bytes come from the shared Rust core, and extrinsic payloads from
 each language's chain library, so every language signs exactly what the committee and the
-chain verify. One signer covers both uses. Go hands the signer a 32-byte blake2b digest
-for extrinsic payloads over 256 bytes, as Substrate specifies.
+chain verify. One signer covers both uses.
+
+**Your signer signs exactly the bytes it is given, and never hashes.** Substrate verifies
+an extrinsic signature over the payload itself up to 256 bytes and over its 32-byte
+blake2b-256 digest beyond that; the SDK applies that rule in every language before your
+signer sees the bytes, so a `store_secret` payload (hundreds of kilobytes) arrives as a
+32-byte digest. Committee request bytes are verified raw by the node and are never
+hashed. A signer that hashes on its own breaks one of the two.
 
 ## Implementing a signer
 
@@ -99,6 +105,9 @@ client, err := mattersdk.ConnectWithSigner(mattersdk.Config{}, hsmSigner{publicK
 
 - **Your signer returns only the 64-byte sr25519 signature.** The SDK adds the SCALE
   `MultiSignature` framing and the account id.
+- **Your signer receives at most 256 bytes for an extrinsic**, or exactly 32 when the
+  payload was hashed, and the raw request bytes for the committee. It signs them as
+  given ([the seam](#the-seam-signatures-not-keys)).
 - **`sign` may fail**, and the failure propagates as an error. In Rust, `sign` is
   synchronous so the trait stays object-safe; a signer that does network I/O blocks.
 - **Committee requests have their own lower-level seam**, `Signer` (`authorize` returns

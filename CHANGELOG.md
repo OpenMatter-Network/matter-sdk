@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- TypeScript receipts carry each event's fields under the runtime's field names
+  (`["Secrets", "SecretStored", { secret_id, owner }]`), with `requireEvent` and
+  `secretIdFromReceipt`, so the id of a stored secret is read from the receipt as in
+  Python and Go.
+- TypeScript `client.finalizedHead()`: the finalized block hash a `decrypt` request is
+  bound to, so recovering a secret needs no second chain connection.
+
 - Python and Go read a secret's epoch committee in one call: `ChainClient.committee_at(epoch)`
   returns a `CommitteeState`, and `ChainClient.CommitteeAt(epoch)` an `EpochCommittee`, with
   everything `decrypt` needs, mirroring Rust's `recover`.
@@ -40,6 +47,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **TypeScript could not submit `Secrets.store_secret`, `rotate_secret` or any call with a
+  variable-length byte argument.** The façades and `tx` handed @polkadot raw `Uint8Array`s,
+  which it reads as length-prefixed SCALE: the call was rejected while encoding
+  (`Bytes: required length less than remainder`, `Bytes length … exceeds`) or, when the
+  first byte happened to decode as a small length, silently truncated
+  (`deployments.registerWgPeer`'s ciphertext). The @polkadot backend now converts every
+  `Uint8Array` argument for `tx` and `query`, and an encoding failure is a `chain`
+  `ClientError`.
+- **TypeScript signed extrinsic payloads over 256 bytes unhashed**, so the chain rejected
+  every such extrinsic (`store_secret` is hundreds of kilobytes) as a bad signature, with an
+  `ApiKey` and with a custom `KeySigner` alike. The backend now hands the signer the
+  blake2b-256 digest beyond 256 bytes, as Substrate verifies and as the other three
+  languages already did. A `KeySigner` signs exactly the bytes it is given.
+- Go `ChainClient.StoreSecret` and `FindStoredSecret` find the signer's `SecretStored`
+  event again. GSRPC decodes the event's `AccountId32` owner as a one-field composite,
+  which the owner match did not unwrap, so a finalized, successful store was reported as
+  "finalized without a SecretStored event for this account".
+- Go's `KeyringSigner` signs the bytes it is given verbatim. It called GSRPC's
+  `signature.Sign`, which hashes anything over 256 bytes a second time; as the committee
+  signer that would have broken a quorum of 21 or more nodes.
+- The TypeScript and Rust live harnesses (`examples/e2e`, `examples/rust-e2e`) store and
+  sign through `MatterClient` with a custom `KeySigner`, so the SDK's own write path is
+  what runs against testnet; Rust recovers through `secrets().recover`. They previously
+  built the extrinsic with @polkadot and subxt directly, which is how the two faults above
+  shipped.
 - A SURI whose password or junction contains `:` is parsed as a key. It was mistaken for a
   scheme prefix and rejected with an error that repeated the phrase.
 - Go façades `Resources.{Register,SetPrivacy,Allow,Disallow}` and

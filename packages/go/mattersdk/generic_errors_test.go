@@ -6,7 +6,7 @@ import (
 )
 
 func TestReadFailuresAreTypedChainErrors(t *testing.T) {
-	chain := &ChainClient{meta: loadSpec322Metadata(t)}
+	chain := &ChainClient{meta: loadSpec330Metadata(t)}
 
 	reads := map[string]func() error{
 		"Nope.Entry": func() error {

@@ -345,6 +345,18 @@ export class MatterClient {
     return this.#backend.constant(pallet, name);
   }
 
+  /**
+   * The hash of the latest finalized block, as `decrypt` needs it for
+   * `blockHash`: the committee checks a request against a recent finalized
+   * block, and it must be one the chain has finalized, not merely included.
+   */
+  async finalizedHead(): Promise<Uint8Array> {
+    if (this.#backend.finalizedHead === undefined) {
+      throw ClientError.chain("chain_getFinalizedHead", "this backend cannot read the finalized head");
+    }
+    return this.#backend.finalizedHead();
+  }
+
   /** Secrets: store, rotate, share, and delete secrets. */
   get secrets(): SecretsFacade {
     return new SecretsFacade(this);

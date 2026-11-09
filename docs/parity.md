@@ -33,8 +33,9 @@ is the single list of where the languages differ.
 | Submit without waiting | — | — | — | `Tx(types.Call)` |
 | Finality timeout | `finality_timeout` | `finalityTimeoutMs` | `finality_timeout=` (seconds) | `FinalityTimeout` |
 | Runtime API call | `runtime_api(trait, method, args)` | `runtimeApi(stateCallName, argsHex)` → hex | `runtime_api(name, args, return_type)` → decoded | `RuntimeAPI(name, args)` → bytes |
-| Receipt events | names | names | names + attributes, `require_event` | names + decoded `Fields`, block-level helpers |
+| Receipt events | names | names + fields, `requireEvent`, `secretIdFromReceipt` | names + attributes, `require_event` | names + decoded `Fields`, block-level helpers |
 | Secret recovery | one call: `secrets().recover(id, aad)` | `decrypt` + your reads | `decrypt` + `chain.committee_at(epoch)` | `Decrypt` + `Chain().CommitteeAt(epoch)` |
+| Finalized head for `decrypt` | inside `recover`; else `rpc()` | `finalizedHead()` | `committee_at(epoch).block_hash` | `CommitteeAt(epoch).BlockHash` |
 | Offline extrinsic signing | via `subxt()` | via @polkadot | via substrate-interface | `PrepareExtrinsic` |
 | Committee transport timeout | 30 s | 30 s | 15 s | 20 s |
 | Browser build | — | `-core` (`wasm-web`) | — | — |

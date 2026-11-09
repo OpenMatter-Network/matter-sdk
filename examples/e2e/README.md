@@ -1,28 +1,33 @@
 # End-to-end: TypeScript, live chain and committee
 
 This harness runs the full Secrets path against a live chain and the matter-kgc
-committee:
+committee, through `MatterClient` with a custom `KeySigner`:
 
-1. Read the committee context.
+1. Read the committee context (`client.runtimeApi`).
 2. `encrypt`.
-3. `secrets.storeSecret`.
+3. `client.secrets.store` → the SDK encodes the call against live metadata, hashes the
+   signing payload (far over 256 bytes) before the signer sees it, and waits for
+   finality; `secretIdFromReceipt` reads the id from the receipt.
 4. Read the secret back.
-5. Threshold-decrypt.
+5. Threshold-decrypt with `keySigner(client.signer)`: the same signer authorizes the
+   committee requests.
 6. Compare the result.
 
-It proves something no offline test can: the committee **accepts the SDK's Substrate
-signature** from a real, authorized account.
+It proves what no offline test can: the chain **accepts the SDK's extrinsic encoding and
+signature**, and the committee **accepts the SDK's request signature**, both from a real,
+authorized account, through the same seam an HSM or KMS would use.
 
-The account must be **funded**, because `storeSecret` pays a fee and the same account
+The account must be **funded**, because `store_secret` pays a fee and the same account
 signs the partial-decrypt requests. The key stays in this process as a `@polkadot`
 keyring pair, and the SDK only receives a sign callback. Prefer a throwaway account.
 
 ## Run
 
 ```bash
-# From the repository root. The harness imports the core package in this repository,
-# so build it first:
+# From the repository root. The harness imports both packages in this repository from
+# source, so build the core and install the client's dependencies first:
 npm --prefix packages/typescript-core ci && npm --prefix packages/typescript-core run build
+npm --prefix packages/typescript ci
 
 cd examples/e2e
 npm install

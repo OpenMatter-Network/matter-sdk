@@ -24,7 +24,7 @@ passes arguments in its chain library's native form:
 | | Arguments are | Example |
 |---|---|---|
 | Rust | `Vec<Value>` (subxt's dynamic `Value`), positional | `vec![Value::u128(id)]` |
-| TypeScript | an array in @polkadot/api's JS form, positional | `[id]` |
+| TypeScript | an array, positional: `bigint`/`number` for integers, `Uint8Array` for any bytes (the SDK converts them for @polkadot), objects for composites and enums | `[id]`, `[accountBytes, { Staked: null }]` |
 | Python | a `dict` of named params in substrate-interface's form | `{"deployment": id}` |
 | Go | `Call(pallet, method, args...)` with GSRPC-encodable values | `types.NewU128(*id.BigInt())` |
 
@@ -89,6 +89,7 @@ let deposit = client.constant("Balances", "ExistentialDeposit")?;
 ```ts
 const account = await client.query("System", "Account", [client.accountId]); // undefined if absent
 const epoch = await client.runtimeApi("KgcApi_dkg_epoch"); // SCALE result as 0x-hex
+const blockHash = await client.finalizedHead(); // the finalized head, for decrypt
 const deposit = client.constant("Balances", "ExistentialDeposit");
 ```
 
@@ -122,7 +123,7 @@ Every write resolves to a receipt for the finalized block:
 | | Receipt | Events | Look up an event |
 |---|---|---|---|
 | Rust | `TxReceipt { tx_hash, block_hash, events }` | `(pallet, event)` names | `receipt.emitted("Secrets", "SecretStored")` |
-| TypeScript | `TxReceipt { txHash, blockHash, events }` | `[pallet, event]` names | `emitted(receipt, "Secrets", "SecretStored")` |
+| TypeScript | `TxReceipt { txHash, blockHash, events }` | `[pallet, event, fields]`, fields keyed by the runtime's names | `emitted(receipt, "Secrets", "SecretStored")`, `requireEvent(...)` returns the fields, `secretIdFromReceipt(receipt)` |
 | Python | `TxReceipt` | `(pallet, event, attributes)` | `receipt.emitted(...)`, `receipt.require_event(...)` returns the attributes |
 | Go | `TxReceipt { TxHash, BlockHash, ExtrinsicIndex, Events }` | `Event { Pallet, Name, Fields }` with decoded fields | `receipt.Emitted("Secrets", "SecretStored")` |
 

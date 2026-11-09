@@ -24,6 +24,10 @@ pub trait KeySigner: Send + Sync {
     fn account_id(&self) -> AccountId;
 
     /// Sign `message`, returning the raw 64-byte signature with no framing.
+    ///
+    /// Sign exactly these bytes; never hash them. The SDK has already applied
+    /// Substrate's rule (an extrinsic payload over 256 bytes arrives as its
+    /// 32-byte blake2b-256 digest), and committee request bytes are verified raw.
     fn sign(&self, message: &[u8]) -> Result<[u8; 64]>;
 }
 

@@ -1,25 +1,31 @@
-// Live Secrets round trip against a chain + committee. Needs a FUNDED account; the
-// key stays in the @polkadot keyring pair and the SDK only gets a sign callback.
+// Live Secrets round trip against a chain + committee, through MatterClient: the
+// store is encoded, signed and followed to finality by the SDK, and the committee
+// requests are authorized by the same KeySigner. Needs a FUNDED account; the key
+// stays in the @polkadot keyring pair and the SDK only gets a sign callback.
 // See README.md.
 
-import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Keyring } from "@polkadot/keyring";
+import { TypeRegistry } from "@polkadot/types";
 import { cryptoWaitReady } from "@polkadot/util-crypto";
-import { u8aConcat, u8aToHex } from "@polkadot/util";
+import { hexToU8a, u8aConcat, u8aToHex } from "@polkadot/util";
 
 import {
   Aad,
-  aadBytes,
   decrypt,
   encrypt,
   FetchTransport,
+  keySigner,
   storeSecret,
-  substrateSigner,
   wipe,
   type CommitteeNode,
   type EncryptedSecret,
+  type KeySigner,
 } from "../../packages/typescript-core/src/index.js";
+import { MatterClient, secretIdFromReceipt } from "../../packages/typescript/src/index.js";
 import { defaultRpcUrl, Network } from "../../packages/typescript/src/network.js";
+
+/** The label the stored secret carries on chain. */
+const SECRET_LABEL = "ts-e2e";
 
 const AAD_TAGS: Record<string, Aad> = {
   env: Aad.EnvV1,
@@ -32,7 +38,7 @@ const AAD_TAGS: Record<string, Aad> = {
 interface Config {
   rpcUrl: string;
   seed: string;
-  network: string;
+  network: Network;
   secret: string;
   secretId?: string;
   aad: Aad;
@@ -89,27 +95,30 @@ const STATE_CALL_TYPES = {
   KgcNodeInfoJs: { endpoint: "Bytes", dkg_index: "u64" },
   EncryptedSecretJs: { binding_id: "Bytes", capsule: "Bytes", proof: "Bytes", ct: "Bytes" },
 };
-let typesRegistered = false;
-function ensureTypes(api: ApiPromise): void {
-  if (typesRegistered) return;
-  api.registry.register(STATE_CALL_TYPES);
-  typesRegistered = true;
+/** Decodes SCALE runtime-API results; needs no metadata for these base types. */
+function registryForStateCalls(): TypeRegistry {
+  const registry = new TypeRegistry();
+  registry.register(STATE_CALL_TYPES);
+  return registry;
 }
 
-async function stateCall(api: ApiPromise, method: string, argsHex = "0x"): Promise<Uint8Array> {
-  const res = await (api.rpc as any).state.call(method, argsHex);
-  return res.toU8a(true);
+/** A runtime API read through the SDK; the result is SCALE, decoded by the caller. */
+async function stateCall(client: MatterClient, method: string, argsHex = "0x"): Promise<Uint8Array> {
+  return hexToU8a(await client.runtimeApi(method, argsHex));
 }
 
-function decodeOptionBytes(api: ApiPromise, bytes: Uint8Array): Uint8Array | null {
-  const opt = api.registry.createType("Option<Bytes>", bytes) as any;
+function decodeOptionBytes(api: TypeRegistry, bytes: Uint8Array): Uint8Array | null {
+  const opt = api.createType("Option<Bytes>", bytes) as any;
   return opt.isSome ? opt.unwrap().toU8a(true) : null;
 }
 
-async function fetchEncryptionContext(api: ApiPromise): Promise<{ jointPk: Uint8Array; epoch: number }> {
-  const jointPk = decodeOptionBytes(api, await stateCall(api, "KgcApi_joint_pk"));
+async function fetchEncryptionContext(
+  client: MatterClient,
+  api: TypeRegistry,
+): Promise<{ jointPk: Uint8Array; epoch: number }> {
+  const jointPk = decodeOptionBytes(api, await stateCall(client, "KgcApi_joint_pk"));
   if (!jointPk || jointPk.length === 0) throw new Error("KGC DKG not finalised on chain (joint_pk is None).");
-  const epoch = (api.registry.createType("u32", await stateCall(api, "KgcApi_dkg_epoch")) as any).toNumber();
+  const epoch = (api.createType("u32", await stateCall(client, "KgcApi_dkg_epoch")) as any).toNumber();
   return { jointPk, epoch };
 }
 
@@ -119,11 +128,10 @@ interface KgcNodeRow {
   endpoint: string;
 }
 
-async function readNodes(api: ApiPromise): Promise<KgcNodeRow[]> {
-  ensureTypes(api);
-  const vec = api.registry.createType(
+async function readNodes(client: MatterClient, api: TypeRegistry): Promise<KgcNodeRow[]> {
+  const vec = api.createType(
     "Vec<(AccountId, KgcNodeInfoJs)>",
-    await stateCall(api, "KgcApi_kgc_nodes"),
+    await stateCall(client, "KgcApi_kgc_nodes"),
   ) as any[];
   return vec.map((pair) => ({
     account: pair[0].toString(),
@@ -132,37 +140,41 @@ async function readNodes(api: ApiPromise): Promise<KgcNodeRow[]> {
   }));
 }
 
-async function readSharedA(api: ApiPromise): Promise<Uint8Array> {
-  const v = decodeOptionBytes(api, await stateCall(api, "KgcApi_shared_a"));
+async function readSharedA(client: MatterClient, api: TypeRegistry): Promise<Uint8Array> {
+  const v = decodeOptionBytes(api, await stateCall(client, "KgcApi_shared_a"));
   if (!v) throw new Error("KGC shared_a unavailable (DKG not finalised).");
   return v;
 }
 
-async function readThresholdAtEpoch(api: ApiPromise, epoch: number): Promise<number> {
+async function readThresholdAtEpoch(client: MatterClient, api: TypeRegistry, epoch: number): Promise<number> {
   const argsHex = u8aToHex(api.createType("u32", epoch).toU8a());
-  const tuple = api.registry.createType("(u64,u64)", await stateCall(api, "KgcApi_threshold_params_at_epoch", argsHex)) as any;
+  const tuple = api.createType("(u64,u64)", await stateCall(client, "KgcApi_threshold_params_at_epoch", argsHex)) as any;
   return tuple[1].toNumber();
 }
 
-async function readShareCommitment(api: ApiPromise, epoch: number, account: string): Promise<Uint8Array> {
+async function readShareCommitment(
+  client: MatterClient,
+  api: TypeRegistry,
+  epoch: number,
+  account: string,
+): Promise<Uint8Array> {
   const argsHex = u8aToHex(
     u8aConcat(api.createType("u32", epoch).toU8a(), api.createType("AccountId", account).toU8a()),
   );
-  const v = decodeOptionBytes(api, await stateCall(api, "KgcApi_share_commitment", argsHex));
+  const v = decodeOptionBytes(api, await stateCall(client, "KgcApi_share_commitment", argsHex));
   if (!v) throw new Error(`no share commitment for node ${account} at epoch ${epoch}`);
   return v;
 }
 
-function secretIdArgHex(api: ApiPromise, secretId: string): string {
+function secretIdArgHex(api: TypeRegistry, secretId: bigint): string {
   // SCALE u128 (little-endian).
-  return u8aToHex(api.createType("u128", BigInt(secretId)).toU8a());
+  return u8aToHex(api.createType("u128", secretId).toU8a());
 }
 
-async function readSecretPayload(api: ApiPromise, secretId: string): Promise<EncryptedSecret> {
-  ensureTypes(api);
-  const opt = api.registry.createType(
+async function readSecretPayload(client: MatterClient, api: TypeRegistry, secretId: bigint): Promise<EncryptedSecret> {
+  const opt = api.createType(
     "Option<EncryptedSecretJs>",
-    await stateCall(api, "SecretsApi_secret_payload", secretIdArgHex(api, secretId)),
+    await stateCall(client, "SecretsApi_secret_payload", secretIdArgHex(api, secretId)),
   ) as any;
   if (!opt.isSome) throw new Error(`secret ${secretId} not found on chain`);
   const s = opt.unwrap();
@@ -174,10 +186,10 @@ async function readSecretPayload(api: ApiPromise, secretId: string): Promise<Enc
   };
 }
 
-async function readSecretEpoch(api: ApiPromise, secretId: string): Promise<number> {
-  const opt = api.registry.createType(
+async function readSecretEpoch(client: MatterClient, api: TypeRegistry, secretId: bigint): Promise<number> {
+  const opt = api.createType(
     "Option<u32>",
-    await stateCall(api, "SecretsApi_secret_epoch", secretIdArgHex(api, secretId)),
+    await stateCall(client, "SecretsApi_secret_epoch", secretIdArgHex(api, secretId)),
   ) as any;
   if (!opt.isSome) throw new Error(`secret ${secretId} has no epoch`);
   return opt.unwrap().toNumber();
@@ -189,48 +201,15 @@ function normalizeEndpoint(raw: string): string {
   return withScheme.replace(/\/+$/, "");
 }
 
-async function storeOnChain(
-  api: ApiPromise,
-  pair: any,
-  env: EncryptedSecret,
-  epoch: number,
-  aad: Aad,
-): Promise<string> {
-  const payload = {
-    binding_id: u8aToHex(env.bindingId),
-    capsule: u8aToHex(env.capsule),
-    proof: u8aToHex(env.proof),
-    ct: u8aToHex(env.ct),
-  };
-  const tx = (api.tx as any).secrets.storeSecret(payload, epoch, "0x", u8aToHex(aadBytes(aad)));
-
-  return await new Promise<string>((resolve, reject) => {
-    tx.signAndSend(pair, ({ status, events, dispatchError }: any) => {
-      if (dispatchError) {
-        reject(new Error(decodeDispatchError(api, dispatchError)));
-        return;
-      }
-      // Wait for finalization, not in-block: the committee authorizes against a
-      // finalized block_hash and returns 403 for a secret it cannot see yet.
-      if (status.isFinalized) {
-        for (const { event } of events) {
-          if (event.section === "secrets" && event.method === "SecretStored") {
-            resolve(event.data[0].toString());
-            return;
-          }
-        }
-        reject(new Error("storeSecret landed but emitted no secrets.SecretStored event"));
-      }
-    }).catch(reject);
-  });
-}
-
-function decodeDispatchError(api: ApiPromise, dispatchError: any): string {
-  if (dispatchError.isModule) {
-    const meta = api.registry.findMetaError(dispatchError.asModule);
-    return `storeSecret failed: ${meta.section}.${meta.name} — ${meta.docs.join(" ")}`;
-  }
-  return `storeSecret failed: ${dispatchError.toString()}`;
+/**
+ * Store through the SDK: `SecretsFacade` shapes the call, `PolkadotBackend`
+ * encodes it against live metadata, hashes the (far over 256 bytes) signing
+ * payload before the KeySigner sees it, and resolves once finalized. The id
+ * comes from the receipt's `Secrets.SecretStored` event.
+ */
+async function storeOnChain(client: MatterClient, env: EncryptedSecret, epoch: number, aad: Aad): Promise<bigint> {
+  const receipt = await client.secrets.store(storeSecret(env, epoch, SECRET_LABEL, aad));
+  return secretIdFromReceipt(receipt);
 }
 
 async function main(): Promise<void> {
@@ -244,40 +223,50 @@ async function main(): Promise<void> {
   const pair = new Keyring({ type: "sr25519" }).addFromUri(cfg.seed);
   console.log(`Network: ${cfg.network}   Signer: ${pair.address}`);
 
-  const api = await ApiPromise.create({ provider: new WsProvider(cfg.rpcUrl) });
+  // The custom-signer seam, as an HSM or KMS would implement it: the SDK hands
+  // over bytes to sign and gets a raw 64-byte sr25519 signature back.
+  const hsmLike: KeySigner = { accountId: pair.publicKey, sign: (message) => pair.sign(message) };
+  const client = await MatterClient.connectWithSigner(hsmLike, {
+    network: cfg.network,
+    rpcUrl: cfg.rpcUrl,
+    confirmMainnet: process.env.MATTER_CONFIRM === "yes",
+  });
+  // No second connection: every read and write goes through the client. The
+  // registry only decodes the SCALE that `client.runtimeApi` returns.
+  const api = registryForStateCalls();
   try {
-    const { jointPk, epoch } = await fetchEncryptionContext(api);
+    const { jointPk, epoch } = await fetchEncryptionContext(client, api);
     console.log(`Connected. Committee epoch=${epoch}, joint_pk=${jointPk.length}B`);
 
     // 1. Store a new secret, or use MATTER_SECRET_ID.
-    let secretId: string;
+    let secretId: bigint;
     let env: EncryptedSecret;
     let secretEpoch: number;
     const plaintext = new TextEncoder().encode(cfg.secret);
 
     if (cfg.secretId) {
-      secretId = cfg.secretId;
-      env = await readSecretPayload(api, secretId);
-      secretEpoch = await readSecretEpoch(api, secretId);
+      secretId = BigInt(cfg.secretId);
+      env = await readSecretPayload(client, api, secretId);
+      secretEpoch = await readSecretEpoch(client, api, secretId);
       console.log(`Using existing secret ${secretId} (epoch ${secretEpoch}).`);
     } else {
       env = encrypt(jointPk, epoch, plaintext, cfg.aad);
       console.log(
         `Sealed ${plaintext.length}B -> capsule ${env.capsule.length}B, proof ${env.proof.length}B, ct ${env.ct.length}B`,
       );
-      console.log("Submitting secrets.storeSecret ...");
-      secretId = await storeOnChain(api, pair, env, epoch, cfg.aad);
-      secretEpoch = await readSecretEpoch(api, secretId);
+      console.log("Submitting Secrets.store_secret through MatterClient ...");
+      secretId = await storeOnChain(client, env, epoch, cfg.aad);
+      secretEpoch = await readSecretEpoch(client, api, secretId);
       console.log(`Stored on chain: secret_id=${secretId} (epoch ${secretEpoch}).`);
       // Decrypt the persisted bytes, not the local envelope.
-      env = await readSecretPayload(api, secretId);
+      env = await readSecretPayload(client, api, secretId);
     }
 
     // 2. Gather committee state for the secret's epoch.
     const [nodes, sharedA, threshold] = await Promise.all([
-      readNodes(api),
-      readSharedA(api),
-      readThresholdAtEpoch(api, secretEpoch),
+      readNodes(client, api),
+      readSharedA(client, api),
+      readThresholdAtEpoch(client, api, secretEpoch),
     ]);
     console.log(`Committee: ${nodes.length} nodes, threshold t=${threshold}.`);
 
@@ -285,17 +274,17 @@ async function main(): Promise<void> {
       nodes.map(async (n) => ({
         index: n.dkgIndex,
         endpoint: n.endpoint,
-        shareCommitment: await readShareCommitment(api, secretEpoch, n.account),
+        shareCommitment: await readShareCommitment(client, api, secretEpoch, n.account),
       })),
     );
 
-    // 3. Threshold-decrypt.
-    const blockHash = (await api.rpc.chain.getFinalizedHead()).toU8a();
-    const signer = substrateSigner(pair.publicKey, (p) => pair.sign(p));
+    // 3. Threshold-decrypt with the same KeySigner that signed the store.
+    const blockHash = await client.finalizedHead();
+    const signer = keySigner(client.signer!);
 
     console.log("Collecting partial decryptions ...");
     const recovered = await decrypt(new FetchTransport(), signer, {
-      secretId: BigInt(secretId),
+      secretId,
       epoch: secretEpoch,
       bindingId: env.bindingId,
       aad: cfg.aad,
@@ -318,7 +307,7 @@ async function main(): Promise<void> {
       console.log("Round trip verified ✔");
     }
   } finally {
-    await api.disconnect();
+    await client.disconnect();
   }
 }
 

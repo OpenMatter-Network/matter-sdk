@@ -16,7 +16,7 @@ func capturingClient(t *testing.T) (*MatterClient, *types.Call) {
 	t.Helper()
 	captured := &types.Call{}
 	client := &MatterClient{
-		chain: &ChainClient{meta: loadSpec322Metadata(t)},
+		chain: &ChainClient{meta: loadSpec330Metadata(t)},
 		submitCall: func(call types.Call) (TxReceipt, error) {
 			*captured = call
 			return TxReceipt{}, nil

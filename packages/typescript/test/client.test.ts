@@ -75,7 +75,10 @@ class FakeBackend implements ChainBackend {
     return {
       txHash: "0xtx",
       blockHash: "0xblock",
-      events: [["Secrets", "SecretStored"] as const, ["System", "ExtrinsicSuccess"] as const],
+      events: [
+        ["Secrets", "SecretStored", { secret_id: 1, owner: "ss58:32" }] as const,
+        ["System", "ExtrinsicSuccess", {}] as const,
+      ],
     };
   }
   async query(pallet: string, entry: string, keys: unknown[]): Promise<unknown> {
@@ -86,6 +89,9 @@ class FakeBackend implements ChainBackend {
   }
   constant(pallet: string, name: string): unknown {
     return `${pallet}.${name}`;
+  }
+  async finalizedHead(): Promise<Uint8Array> {
+    return new Uint8Array(32).fill(0xf1);
   }
   canSign(): boolean {
     return this.#signs;
@@ -389,5 +395,26 @@ describe("diagnostics", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("warn:");
     expect(lines[0]).toContain("tokenDecimals");
+  });
+});
+
+describe("finalized head", () => {
+  it("reads it through the backend", async () => {
+    const client = await MatterClient.connect({ backend: new FakeBackend() });
+    expect(await client.finalizedHead()).toEqual(new Uint8Array(32).fill(0xf1));
+  });
+
+  it("fails as a chain error when the backend cannot read it", async () => {
+    // A backend without the optional method; bound so FakeBackend's private fields resolve.
+    const fake = new FakeBackend();
+    const backend = new Proxy(fake, {
+      get(target, key) {
+        if (key === "finalizedHead") return undefined;
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    }) as ChainBackend;
+    const client = await MatterClient.connect({ backend });
+    await expect(client.finalizedHead()).rejects.toMatchObject({ kind: "chain" });
   });
 });

@@ -14,6 +14,8 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+	"github.com/vedhavyas/go-subkey/v2"
+	"github.com/vedhavyas/go-subkey/v2/sr25519"
 )
 
 // How long StoreSecret waits for the stored secret to appear at the finalized
@@ -343,17 +345,23 @@ type ExtrinsicSigner interface {
 	SignExtrinsic(payload []byte) ([]byte, error)
 }
 
-// KeyringSigner adapts a GSRPC KeyringPair to ExtrinsicSigner.
+// KeyringSigner adapts a GSRPC KeyringPair to ExtrinsicSigner. Through
+// MatterClient.Signer it also authorizes committee requests.
 type KeyringSigner struct{ Pair signature.KeyringPair }
 
 // AccountID returns the pair's 32-byte public key.
 func (k KeyringSigner) AccountID() []byte { return k.Pair.PublicKey }
 
-// SignExtrinsic signs with the pair's URI. `signature.Sign` hashes only payloads
-// over 256 bytes, and an oversized payload arrives as a 32-byte digest, so it is
-// signed verbatim as the runtime expects.
+// SignExtrinsic signs the bytes it is given, verbatim, with the pair's URI.
+// Hashing is the SDK's job, done before this call (UnsignedExtrinsic.SigningPayload);
+// GSRPC's signature.Sign would hash anything over 256 bytes again, which the
+// committee, verifying a request payload raw, would reject.
 func (k KeyringSigner) SignExtrinsic(payload []byte) ([]byte, error) {
-	return signature.Sign(payload, k.Pair.URI)
+	pair, err := subkey.DeriveKeyPair(sr25519.Scheme{}, k.Pair.URI)
+	if err != nil {
+		return nil, fmt.Errorf("derive keyring pair: %w", err)
+	}
+	return pair.Sign(payload)
 }
 
 // SubmitCall signs and submits any call, returning the transaction hash. Signed
