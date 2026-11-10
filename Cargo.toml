@@ -13,7 +13,7 @@ resolver = "2"
 [workspace.package]
 license = "Apache-2.0"
 authors = ["Open Matter <admin@openmatter.network>"]
-version = "2.4.1"
+version = "2.4.2"
 homepage = "https://openmatter.network"
 repository = "https://github.com/openmatter-network/matter-sdk"
 edition = "2021"
@@ -21,7 +21,7 @@ edition = "2021"
 rust-version = "1.90"
 
 [workspace.dependencies]
-matter-crypto = { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.8.1", default-features = false }
+matter-crypto = { git = "ssh://git@github.com/openmatter-network/matter-crypto.git", tag = "v0.9.0", default-features = false }
 matter-kgc-proto = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }
 # Keep on the same tag as matter-kgc-proto.
 matter-kgc-config = { git = "ssh://git@github.com/openmatter-network/matter-kgc.git", tag = "v0.10.0", default-features = false }

@@ -79,6 +79,17 @@ versions follow [Semantic Versioning](https://semver.org/).
   ids as `AccountId32`, and `Orgs.Allot` its amount as `u128`; the calls were malformed.
 - Python signs with the SS58 prefix the chain reports instead of assuming 42.
 
+### Security
+
+- The threshold-crypto core (`matter-crypto` 0.9.0) moves to `crypto-bigint` 0.7.11, which
+  removes secret-dependent timing in big-integer arithmetic (RUSTSEC-2026-0387). Ciphertexts,
+  proofs and derived keys are byte-for-byte unchanged, so this release interoperates with
+  committees and SDKs on earlier versions in both directions.
+- TLS and async runtime updates: `rustls` 0.23.46 (RUSTSEC-2026-0346, -0347, -0348, -0349),
+  `rustls-webpki` 0.103.16 (RUSTSEC-2026-0382), `webpki-roots` and `webpki-root-certs` 1.0.11
+  (RUSTSEC-2026-0381, -0383, removing the distrusted emSign root) and `tokio` 1.54.1
+  (RUSTSEC-2026-0386).
+
 ## [2.3.0] - 2026-09-25
 
 The first public release: a general client for OpenMatter's MatterChain, with threshold
