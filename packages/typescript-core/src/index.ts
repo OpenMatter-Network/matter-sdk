@@ -52,6 +52,7 @@ export type {
   FaultStage,
   NodeFault,
   Transport,
+  LoginTransport,
   Health,
   PartialDecryptRequest,
   PartialDecryptResponse,
@@ -73,4 +74,40 @@ export type {
   DeleteSecret,
   GrantTarget,
 } from "./calls.js";
+export {
+  loginIdentity,
+  loginNonce,
+  loginPayloadHash,
+  loginAttestationPayload,
+  loginSeedAad,
+  loginAccount,
+  decodeIdTokenClaims,
+  oidcSigner,
+  prepareLoginRegistration,
+  attestLoginRequest,
+  collectLoginAttestations,
+  registerLogin,
+  loginForArgs,
+  decodeLoginRecord,
+  openLogin,
+  LOGIN_FIRST_GENERATION,
+  LOGIN_SEED_BYTES,
+  LOGIN_FOR_RUNTIME_API,
+} from "./login.js";
+export type {
+  IdTokenClaims,
+  LoginSession,
+  LoginRegistration,
+  LoginAttestation,
+  RegisterLogin,
+  LoginRecord,
+  OpenLoginParams,
+} from "./login.js";
+export { LoginError, LoginAccountMismatch } from "./loginwire.js";
+export type {
+  AttestLoginRequest,
+  AttestLoginResponse,
+  LoginErrorKind,
+  LoginAttestationFault,
+} from "./loginwire.js";
 export { toHex, fromHex, secretIdToHex, wipe } from "./util.js";

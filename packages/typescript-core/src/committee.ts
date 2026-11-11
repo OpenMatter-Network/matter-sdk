@@ -2,7 +2,9 @@
 
 import { Aad, aadBytes } from "./aad.js";
 import { cryptoProtocolVersion, lagrangeFor, maxCommitteeResponseBytes, openSecret } from "./crypto.js";
-import type { Signer } from "./signer.js";
+import { attestStatusKind, LoginError, redactToken } from "./loginwire.js";
+import type { AttestLoginRequest, AttestLoginResponse } from "./loginwire.js";
+import type { AuthScheme, Signer } from "./signer.js";
 import type { PartialInput } from "./types.js";
 import { fromHex, secretIdToHex, toHex } from "./util.js";
 
@@ -21,10 +23,14 @@ export interface PartialDecryptRequest {
   requester: string;
   block_hash: string;
   signature: string;
-  auth: "substrate" | "ethereum";
+  auth: AuthScheme;
   eth_address?: string;
   valid_until?: number;
   eth_signature?: string;
+  /** `oidc` only: the identity provider's ID token. Never log it. */
+  id_token?: string;
+  /** `oidc` only: `0x` + the 32-byte id of the app the token signs in to. */
+  app_id?: string;
 }
 
 /** `/partial-decrypt` response body. */
@@ -45,6 +51,21 @@ export interface Transport {
   partialDecrypt(endpoint: string, req: PartialDecryptRequest): Promise<PartialDecryptResponse>;
 }
 
+/**
+ * A {@link Transport} that can also ask a node to attest an OpenMatter Login
+ * registration. Separate from `Transport` so existing implementations keep
+ * compiling; {@link FetchTransport} is both.
+ */
+export interface LoginTransport extends Transport {
+  /** @throws LoginError carrying the node's HTTP status when it refuses. */
+  attestLogin(endpoint: string, req: AttestLoginRequest): Promise<AttestLoginResponse>;
+}
+
+/** Most of a refusal body that is read at all; a node's refusals are one word. */
+const REFUSAL_BODY_BYTES = 8192;
+/** Characters of a refusal body quoted in an error. */
+const REFUSAL_SNIPPET_CHARS = 200;
+
 /** Bounds on each committee request, so one node can neither stall nor flood a decrypt. */
 export interface FetchTransportOptions {
   /** Whole-request deadline in milliseconds. Default 30 000. */
@@ -54,7 +75,7 @@ export interface FetchTransportOptions {
 }
 
 /** A `fetch`-based transport for browsers and Node 22+. */
-export class FetchTransport implements Transport {
+export class FetchTransport implements LoginTransport {
   private readonly timeoutMs: number;
   private readonly maxResponseBytes: number;
 
@@ -85,12 +106,55 @@ export class FetchTransport implements Transport {
     return this.readJson<PartialDecryptResponse>(res, endpoint);
   }
 
+  /**
+   * Ask one node to attest an OpenMatter Login registration, under the same
+   * deadline and response cap as `partialDecrypt`.
+   *
+   * A refusal throws a `LoginError` that keeps the HTTP status: `409` is
+   * `already-registered`, `401`/`403` `token-refused`, `429` `rate-limited`,
+   * `503` `unavailable`. The message never contains the token.
+   */
+  async attestLogin(endpoint: string, req: AttestLoginRequest): Promise<AttestLoginResponse> {
+    const res = await this.fetchImpl(`${trimEnd(endpoint)}/attest-login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    const transportFailure = (message: string) => new LoginError("transport", message);
+    if (!res.ok) {
+      const said = await this.readText(res, endpoint, transportFailure, REFUSAL_BODY_BYTES).catch(() => "");
+      // Redact the whole body first: a cut could leave part of a token unmatched.
+      const reason = redactToken(said, req.id_token).slice(0, REFUSAL_SNIPPET_CHARS).trim();
+      throw new LoginError(
+        attestStatusKind(res.status),
+        `attest-login ${res.status} from ${endpoint}${reason ? `: ${reason}` : ""}`,
+        { status: res.status },
+      );
+    }
+    return this.readJson<AttestLoginResponse>(res, endpoint, transportFailure);
+  }
+
   /** JSON-decode a body, refusing one over the cap instead of buffering it. */
-  private async readJson<T>(res: Response, endpoint: string): Promise<T> {
-    const tooLarge = () =>
-      new DecryptError("transport", `response from ${endpoint} exceeded ${this.maxResponseBytes} bytes`);
+  private async readJson<T>(
+    res: Response,
+    endpoint: string,
+    failure: (message: string) => Error = (message) => new DecryptError("transport", message),
+  ): Promise<T> {
+    return JSON.parse(await this.readText(res, endpoint, failure, this.maxResponseBytes)) as T;
+  }
+
+  /** Read a body as text, refusing one over `cap` bytes instead of buffering it. */
+  private async readText(
+    res: Response,
+    endpoint: string,
+    failure: (message: string) => Error,
+    cap: number,
+  ): Promise<string> {
+    const limit = Math.min(cap, this.maxResponseBytes);
+    const tooLarge = () => failure(`response from ${endpoint} exceeded ${limit} bytes`);
     const declared = Number(res.headers.get("content-length"));
-    if (declared > this.maxResponseBytes) throw tooLarge();
+    if (declared > limit) throw tooLarge();
     const chunks: Uint8Array[] = [];
     let total = 0;
     const reader = res.body?.getReader();
@@ -98,7 +162,7 @@ export class FetchTransport implements Transport {
       const next = reader ? await reader.read() : { done: true as const, value: undefined };
       if (next.done) break;
       total += next.value.length;
-      if (total > this.maxResponseBytes) {
+      if (total > limit) {
         await reader!.cancel();
         throw tooLarge();
       }
@@ -106,7 +170,7 @@ export class FetchTransport implements Transport {
     }
     const body = new Uint8Array(total);
     chunks.reduce((offset, chunk) => (body.set(chunk, offset), offset + chunk.length), 0);
-    return JSON.parse(new TextDecoder().decode(body)) as T;
+    return new TextDecoder().decode(body);
   }
 }
 
@@ -307,6 +371,8 @@ export async function decrypt(
         eth_address: auth.eth_address,
         valid_until: auth.valid_until,
         eth_signature: auth.eth_signature,
+        id_token: auth.id_token,
+        app_id: auth.app_id,
       };
 
       let resp: PartialDecryptResponse;

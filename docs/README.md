@@ -19,6 +19,8 @@ Python and Go side by side.
 - [**Organizations**](organizations.md): organizations, members, budgets, secrets agents.
 - [**Threshold secrets**](secrets.md): sealing, the AAD registry, storing, granting,
   recovering, and how decrypt works.
+- [**OpenMatter Login**](login.md): a chain account from an existing sign-in, with the
+  key sealed under the committee. TypeScript only for now.
 - [**Secure signing**](secure-signing.md): HSM, KMS and remote signers; operating an
   `ApiKey` safely.
 

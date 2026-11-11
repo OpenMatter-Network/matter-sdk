@@ -694,7 +694,13 @@ mod tests {
         let salt = [0x22u8; 31];
         let mut out = MsdkBuf::empty();
         let rc = unsafe {
-            msdk_binding_id_for(owner.as_ptr(), owner.len(), salt.as_ptr(), salt.len(), &mut out)
+            msdk_binding_id_for(
+                owner.as_ptr(),
+                owner.len(),
+                salt.as_ptr(),
+                salt.len(),
+                &mut out,
+            )
         };
         assert_eq!(rc, MSDK_OK);
         let id = unsafe { std::slice::from_raw_parts(out.ptr, out.len) }.to_vec();
@@ -723,7 +729,13 @@ mod tests {
         let salt = [0x22u8; 31];
         let mut out = MsdkBuf::empty();
         let rc = unsafe {
-            msdk_binding_id_for(owner.as_ptr(), owner.len(), salt.as_ptr(), salt.len(), &mut out)
+            msdk_binding_id_for(
+                owner.as_ptr(),
+                owner.len(),
+                salt.as_ptr(),
+                salt.len(),
+                &mut out,
+            )
         };
         assert_eq!(rc, MSDK_ERR_INVALID_ARG);
         assert!(out.ptr.is_null());

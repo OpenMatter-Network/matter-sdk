@@ -169,11 +169,19 @@ mod tests {
         let salt = [2u8; OWNER_BINDING_SALT_BYTES];
         assert!(matches!(
             binding_id_for(&owner[..31], &salt),
-            Err(CoreError::InvalidLength { field: "owner", expected: 32, actual: 31 })
+            Err(CoreError::InvalidLength {
+                field: "owner",
+                expected: 32,
+                actual: 31
+            })
         ));
         assert!(matches!(
             binding_id_for(&owner, &[2u8; 32]),
-            Err(CoreError::InvalidLength { field: "salt", expected: 31, actual: 32 })
+            Err(CoreError::InvalidLength {
+                field: "salt",
+                expected: 31,
+                actual: 32
+            })
         ));
     }
 }

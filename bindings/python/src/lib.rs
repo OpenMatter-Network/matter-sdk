@@ -54,7 +54,11 @@ fn seal_for<'py>(
 
 /// The owner-bound binding id for `owner` (32 bytes) under `salt` (31 bytes).
 #[pyfunction]
-fn binding_id_for<'py>(py: Python<'py>, owner: &[u8], salt: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+fn binding_id_for<'py>(
+    py: Python<'py>,
+    owner: &[u8],
+    salt: &[u8],
+) -> PyResult<Bound<'py, PyBytes>> {
     let id = core::binding_id_for(owner, salt).map_err(err)?;
     Ok(PyBytes::new(py, &id))
 }
@@ -259,7 +263,10 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(verify_plaintext_proof, m)?)?;
     m.add_function(wrap_pyfunction!(open_secret, m)?)?;
     m.add("CRYPTO_PROTOCOL_VERSION", core::CRYPTO_PROTOCOL_VERSION)?;
-    m.add("MAX_COMMITTEE_RESPONSE_BYTES", core::MAX_COMMITTEE_RESPONSE_BYTES)?;
+    m.add(
+        "MAX_COMMITTEE_RESPONSE_BYTES",
+        core::MAX_COMMITTEE_RESPONSE_BYTES,
+    )?;
     m.add_class::<ApiKeyPy>()?;
     Ok(())
 }

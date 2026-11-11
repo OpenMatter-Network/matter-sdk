@@ -47,6 +47,32 @@ export {
 } from "./facade.js";
 export type { FacadeHost } from "./facade.js";
 export {
+  AgentKeyKind,
+  KeyPrincipal,
+  MIN_TRANSFER_SPEC_VERSION,
+  OrgRole,
+  TransferActor,
+  TransferRefusal,
+  UnmovableKind,
+  oldAccountHoldsNothing,
+  planAccountTransfer,
+  planSecretCleanup,
+  toSudoBatch,
+} from "./admin/accountTransfer.js";
+export type {
+  AgentKeyFacts,
+  Allowance,
+  CallTree,
+  OldSecretFacts,
+  OrgTransferFacts,
+  PersonalHoldings,
+  ProjectTransferFacts,
+  TransferFacts,
+  TransferPlan,
+  TransferStep,
+  Unmovable,
+} from "./admin/accountTransfer.js";
+export {
   AmountError,
   decimalsFromExistentialDeposit,
   formatAmount,

@@ -1,0 +1,482 @@
+{
+  "_comment": "Operator account transfer: chain facts -> the ordered calls that move everything an old account holds to a new one, each tagged with the account it runs as. Maintained by hand (never emitted from the planner). Amounts are decimal strings. A step is [as, actor, \"Pallet.call\", args]. Each fact about the old account is a pair: `before` is the snapshot taken when the transfer began (what the new account must end up with), `now` is the live state (what is still to be taken away). The two differ only after an interrupted run.",
+  "min_spec_version": 333,
+  "accounts": {
+    "old": "5Old",
+    "new": "5New",
+    "third_party_owner": "5Bob",
+    "api_key": "5Key",
+    "session_key": "5Sess"
+  },
+  "cases": [
+    {
+      "name": "owner of an org with two projects, an API key, a browser key, a secret, a stray proxy and a balance",
+      "facts": {
+        "specVersion": 333,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": false,
+        "newOtherOrgCount": 0,
+        "oldActiveSinceIncident": false,
+        "newBillingOrg": null,
+        "orgs": [
+          {
+            "id": "0xa1",
+            "owner": "5Old",
+            "pendingOwner": null,
+            "oldRole": { "before": "Owner", "now": "Owner" },
+            "newRole": null,
+            "sponsor": "5Old",
+            "oldAllowance": { "before": { "plan": "5000", "purchased": "200" }, "now": { "plan": "5000", "purchased": "200" } },
+            "newAllowance": { "plan": "0", "purchased": "0" },
+            "oldResourceOperator": { "before": true, "now": true },
+            "newResourceOperator": false,
+            "projects": [
+              {
+                "id": "0xb1",
+                "oldAssigned": { "before": true, "now": true },
+                "newAssigned": false,
+                "oldDeployer": { "before": true, "now": true },
+                "newDeployer": false
+              },
+              {
+                "id": "0xb2",
+                "oldAssigned": { "before": false, "now": false },
+                "newAssigned": false,
+                "oldDeployer": { "before": false, "now": false },
+                "newDeployer": false
+              }
+            ]
+          }
+        ],
+        "agentKeys": [
+          {
+            "key": "5Key",
+            "principal": "old",
+            "scopes": 48,
+            "kind": "api_key"
+          },
+          {
+            "key": "5Sess",
+            "principal": "old",
+            "scopes": 248506,
+            "kind": "session_key"
+          }
+        ],
+        "oldOtherProxies": 1,
+        "oldSecrets": [
+          {
+            "id": "7",
+            "grantedToNew": false,
+            "replaced": false
+          },
+          {
+            "id": "9",
+            "grantedToNew": true,
+            "replaced": false
+          }
+        ],
+        "oldTransferable": "1000",
+        "personal": {
+          "deployments": 0,
+          "volumes": 0,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": "0xa1"
+      },
+      "refusals": [],
+      "unmovable": [],
+      "steps": [
+        ["old", "5Old", "Organizations.add_member", ["0xa1", "5New", "Admin"]],
+        ["old", "5Old", "Organizations.propose_ownership_transfer", ["0xa1", "5New"]],
+        ["new", "5New", "Organizations.accept_ownership_transfer", ["0xa1", ["0xb1", "0xb2"]]],
+        ["new", "5New", "Organizations.assign_to_project", ["0xa1", "0xb1", "5New"]],
+        ["new", "5New", "Budgets.authorize_project_deployer", ["0xa1", "0xb1", "5New"]],
+        ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]],
+        ["new", "5New", "Organizations.unassign_from_project", ["0xa1", "0xb1", "5Old"]],
+        ["old", "5Old", "Budgets.transfer_sponsorship", ["0xa1", "5New"]],
+        ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5New", "5000"]],
+        ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5New", "200"]],
+        ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5Old", "0"]],
+        ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5Old", "0"]],
+        ["new", "5New", "Budgets.set_member_billing", ["0xa1", "5New"]],
+        ["new", "5New", "Budgets.authorize_org_resource_operator", ["0xa1", "5New"]],
+        ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]],
+        ["old", "5Old", "Budgets.revoke_agent_key", ["5Key"]],
+        ["new", "5New", "Budgets.authorize_agent_key", ["5Key", 48]],
+        ["old", "5Old", "Budgets.revoke_agent_key", ["5Sess"]],
+        ["old", "5Old", "Secrets.grant_access", ["7", { "User": "5New" }]],
+        ["old", "5Old", "Proxy.remove_proxies", []],
+        ["old", "5Old", "Balances.transfer_all", ["5New", false]]
+      ]
+    },
+    {
+      "name": "member of an org someone else owns: the org's owner makes every change",
+      "facts": {
+        "specVersion": 333,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": false,
+        "newOtherOrgCount": 0,
+        "oldActiveSinceIncident": false,
+        "newBillingOrg": null,
+        "orgs": [
+          {
+            "id": "0xa2",
+            "owner": "5Bob",
+            "pendingOwner": null,
+            "oldRole": { "before": "Member", "now": "Member" },
+            "newRole": null,
+            "sponsor": "5Bob",
+            "oldAllowance": { "before": { "plan": "0", "purchased": "0" }, "now": { "plan": "0", "purchased": "0" } },
+            "newAllowance": { "plan": "0", "purchased": "0" },
+            "oldResourceOperator": { "before": false, "now": false },
+            "newResourceOperator": false,
+            "projects": [
+              {
+                "id": "0xc1",
+                "oldAssigned": { "before": true, "now": true },
+                "newAssigned": false,
+                "oldDeployer": { "before": true, "now": true },
+                "newDeployer": false
+              }
+            ]
+          }
+        ],
+        "agentKeys": [],
+        "oldOtherProxies": 0,
+        "oldSecrets": [],
+        "oldTransferable": "0",
+        "personal": {
+          "deployments": 0,
+          "volumes": 0,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": null
+      },
+      "refusals": [],
+      "unmovable": [],
+      "steps": [
+        ["org_owner", "5Bob", "Organizations.add_member", ["0xa2", "5New", "Member"]],
+        ["org_owner", "5Bob", "Organizations.assign_to_project", ["0xa2", "0xc1", "5New"]],
+        ["org_owner", "5Bob", "Budgets.authorize_project_deployer", ["0xa2", "0xc1", "5New"]],
+        ["org_owner", "5Bob", "Budgets.revoke_project_deployer", ["0xa2", "0xc1", "5Old"]],
+        ["org_owner", "5Bob", "Organizations.unassign_from_project", ["0xa2", "0xc1", "5Old"]],
+        ["org_owner", "5Bob", "Organizations.remove_member", ["0xa2", "5Old"]]
+      ]
+    },
+    {
+      "name": "interrupted after the ownership hand-over: only what is still missing",
+      "facts": {
+        "specVersion": 334,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": false,
+        "newOtherOrgCount": 0,
+        "oldActiveSinceIncident": false,
+        "newBillingOrg": "0xa1",
+        "orgs": [
+          {
+            "id": "0xa1",
+            "owner": "5New",
+            "pendingOwner": null,
+            "oldRole": { "before": "Owner", "now": "Admin" },
+            "newRole": "Owner",
+            "sponsor": "5New",
+            "oldAllowance": { "before": { "plan": "5000", "purchased": "0" }, "now": { "plan": "0", "purchased": "0" } },
+            "newAllowance": { "plan": "5000", "purchased": "0" },
+            "oldResourceOperator": { "before": false, "now": false },
+            "newResourceOperator": false,
+            "projects": [
+              {
+                "id": "0xb1",
+                "oldAssigned": { "before": true, "now": false },
+                "newAssigned": true,
+                "oldDeployer": { "before": true, "now": true },
+                "newDeployer": true
+              }
+            ]
+          }
+        ],
+        "agentKeys": [
+          {
+            "key": "5Key",
+            "principal": "new",
+            "scopes": 48,
+            "kind": "api_key"
+          }
+        ],
+        "oldOtherProxies": 0,
+        "oldSecrets": [
+          {
+            "id": "7",
+            "grantedToNew": true,
+            "replaced": false
+          }
+        ],
+        "oldTransferable": "12",
+        "personal": {
+          "deployments": 0,
+          "volumes": 0,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": "0xa1"
+      },
+      "refusals": [],
+      "unmovable": [],
+      "steps": [
+        ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]],
+        ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]],
+        ["old", "5Old", "Balances.transfer_all", ["5New", false]]
+      ]
+    },
+    {
+      "name": "nothing left to move",
+      "facts": {
+        "specVersion": 334,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": false,
+        "newOtherOrgCount": 0,
+        "oldActiveSinceIncident": false,
+        "newBillingOrg": "0xa1",
+        "orgs": [
+          {
+            "id": "0xa1",
+            "owner": "5New",
+            "pendingOwner": null,
+            "oldRole": { "before": "Owner", "now": null },
+            "newRole": "Owner",
+            "sponsor": "5New",
+            "oldAllowance": { "before": { "plan": "5000", "purchased": "0" }, "now": { "plan": "0", "purchased": "0" } },
+            "newAllowance": { "plan": "5000", "purchased": "0" },
+            "oldResourceOperator": { "before": false, "now": false },
+            "newResourceOperator": false,
+            "projects": [
+              {
+                "id": "0xb1",
+                "oldAssigned": { "before": true, "now": false },
+                "newAssigned": true,
+                "oldDeployer": { "before": true, "now": false },
+                "newDeployer": true
+              }
+            ]
+          }
+        ],
+        "agentKeys": [],
+        "oldOtherProxies": 0,
+        "oldSecrets": [
+          {
+            "id": "7",
+            "grantedToNew": true,
+            "replaced": true
+          }
+        ],
+        "oldTransferable": "0",
+        "personal": {
+          "deployments": 0,
+          "volumes": 0,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": "0xa1"
+      },
+      "refusals": [],
+      "unmovable": [],
+      "steps": []
+    },
+    {
+      "name": "a grant to the new account failed after the old one's was revoked: the snapshot still says what to grant",
+      "facts": {
+        "specVersion": 333,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": false,
+        "newOtherOrgCount": 0,
+        "oldActiveSinceIncident": false,
+        "newBillingOrg": null,
+        "orgs": [
+          {
+            "id": "0xa2",
+            "owner": "5Bob",
+            "pendingOwner": null,
+            "oldRole": { "before": "Member", "now": null },
+            "newRole": "Member",
+            "sponsor": "5Bob",
+            "oldAllowance": { "before": { "plan": "0", "purchased": "0" }, "now": { "plan": "0", "purchased": "0" } },
+            "newAllowance": { "plan": "0", "purchased": "0" },
+            "oldResourceOperator": { "before": false, "now": false },
+            "newResourceOperator": false,
+            "projects": [
+              {
+                "id": "0xc1",
+                "oldAssigned": { "before": true, "now": false },
+                "newAssigned": true,
+                "oldDeployer": { "before": true, "now": false },
+                "newDeployer": false
+              }
+            ]
+          }
+        ],
+        "agentKeys": [
+          {
+            "key": "5Key",
+            "principal": "none",
+            "scopes": 48,
+            "kind": "api_key"
+          },
+          {
+            "key": "5Sess",
+            "principal": "none",
+            "scopes": 248506,
+            "kind": "session_key"
+          }
+        ],
+        "oldOtherProxies": 0,
+        "oldSecrets": [],
+        "oldTransferable": "0",
+        "personal": {
+          "deployments": 0,
+          "volumes": 0,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": null
+      },
+      "refusals": [],
+      "unmovable": [],
+      "steps": [
+        ["org_owner", "5Bob", "Budgets.authorize_project_deployer", ["0xa2", "0xc1", "5New"]],
+        ["new", "5New", "Budgets.authorize_agent_key", ["5Key", 48]]
+      ]
+    },
+    {
+      "name": "refused: nothing is planned while any refusal stands",
+      "facts": {
+        "specVersion": 332,
+        "old": "5Old",
+        "new": "5New",
+        "newIsAgentKey": true,
+        "newOtherOrgCount": 1,
+        "oldActiveSinceIncident": true,
+        "newBillingOrg": null,
+        "orgs": [
+          {
+            "id": "0xa1",
+            "owner": "5Old",
+            "pendingOwner": null,
+            "oldRole": { "before": "Owner", "now": "Owner" },
+            "newRole": null,
+            "sponsor": null,
+            "oldAllowance": { "before": { "plan": "0", "purchased": "0" }, "now": { "plan": "0", "purchased": "0" } },
+            "newAllowance": { "plan": "0", "purchased": "0" },
+            "oldResourceOperator": { "before": false, "now": false },
+            "newResourceOperator": false,
+            "projects": []
+          }
+        ],
+        "agentKeys": [],
+        "oldOtherProxies": 0,
+        "oldSecrets": [],
+        "oldTransferable": "5",
+        "personal": {
+          "deployments": 2,
+          "volumes": 1,
+          "networks": 0,
+          "resources": 0
+        },
+        "acknowledgedUnmovable": false,
+        "oldBillingOrgBefore": null
+      },
+      "refusals": [
+        "spec_too_old",
+        "new_account_is_agent_key",
+        "new_account_has_workspace",
+        "old_account_active_since_incident",
+        "unmovable_not_acknowledged"
+      ],
+      "unmovable": [
+        [
+          "deployments",
+          2
+        ],
+        [
+          "volumes",
+          1
+        ]
+      ],
+      "steps": []
+    }
+  ],
+  "cleanup": {
+    "_comment": "Phase 2, after the new account has re-sealed what it was granted: the old account's replaced secrets are deleted. A secret not yet replaced is never deleted.",
+    "old": "5Old",
+    "oldSecrets": [
+      {
+        "id": "7",
+        "grantedToNew": true,
+        "replaced": true
+      },
+      {
+        "id": "9",
+        "grantedToNew": true,
+        "replaced": false
+      }
+    ],
+    "steps": [
+      ["old", "5Old", "Secrets.delete_secret", ["7"]]
+    ]
+  },
+  "sudo_batch": {
+    "_comment": "How steps become one operator call: Utility.batch_all of Sudo.sudo_as(actor, call). sudo_as never fails the outer call; each item reports its own result.",
+    "steps": [
+      ["old", "5Old", "Budgets.revoke_agent_key", ["5Key"]],
+      ["new", "5New", "Budgets.authorize_agent_key", ["5Key", 48]]
+    ],
+    "tree": {
+      "pallet": "Utility",
+      "call": "batch_all",
+      "args": [
+        [
+          {
+            "pallet": "Sudo",
+            "call": "sudo_as",
+            "args": [
+              "5Old",
+              {
+                "pallet": "Budgets",
+                "call": "revoke_agent_key",
+                "args": [
+                  "5Key"
+                ]
+              }
+            ]
+          },
+          {
+            "pallet": "Sudo",
+            "call": "sudo_as",
+            "args": [
+              "5New",
+              {
+                "pallet": "Budgets",
+                "call": "authorize_agent_key",
+                "args": [
+                  "5Key",
+                  48
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  }
+}

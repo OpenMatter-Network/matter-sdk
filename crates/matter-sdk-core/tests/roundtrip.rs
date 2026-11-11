@@ -22,16 +22,16 @@ use matter_sdk_core::{
     binding_commits_to,
     binding_id_for,
     encrypt,
-    seal_for,
-    CoreError,
-    OWNER_BINDING_SALT_BYTES,
     lagrange_for,
     open_secret,
+    seal_for,
     signing_payload,
     verify_plaintext_proof,
     Aad,
+    CoreError,
     EncryptedSecret,
     PartialInput,
+    OWNER_BINDING_SALT_BYTES,
 };
 
 type Params = SecureParams;
@@ -201,7 +201,11 @@ fn seal_for_refuses_an_owner_that_is_not_an_account_id() {
     let joint_pk = bincode::serialize(&outputs[0].joint_pk).unwrap();
     assert!(matches!(
         seal_for(&[0x11u8; 20], &joint_pk, 0, b"x", Aad::EnvV1.as_bytes()),
-        Err(CoreError::InvalidLength { field: "owner", expected: 32, actual: 20 })
+        Err(CoreError::InvalidLength {
+            field: "owner",
+            expected: 32,
+            actual: 20
+        })
     ));
 }
 

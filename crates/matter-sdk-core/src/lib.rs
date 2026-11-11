@@ -5,6 +5,8 @@
 //!   [`seal_for`] (or [`encrypt`] under a binding id you choose).
 //! * **Open** it from an already-collected quorum: [`open_secret`], with
 //!   [`signing_payload`], [`lagrange_for`] and [`verify_plaintext_proof`].
+//! * **OpenMatter Login**: the byte contract of a seed released against a
+//!   sign-in token, in [`login`].
 //!
 //! Crypto delegates to `matter-crypto`; wire types come from `matter-kgc-proto`
 //! (see [`wire`]). Networking, quorum selection, retry, and request signing
@@ -25,6 +27,7 @@ mod encrypt;
 mod error;
 mod types;
 
+pub mod login;
 pub mod wire;
 
 pub use aad::Aad;
@@ -40,6 +43,13 @@ pub use binding::{
 pub use decrypt::{lagrange_for, open_secret, signing_payload, verify_plaintext_proof};
 pub use encrypt::{encrypt, seal_for};
 pub use error::{CoreError, Result};
+pub use login::{
+    login_attestation_payload,
+    login_identity,
+    login_nonce,
+    login_payload_hash,
+    login_seed_aad,
+};
 pub use types::{EncryptedSecret, PartialInput, Plaintext};
 
 /// Crypto protocol version this core speaks, as reported in a node's `/health`.

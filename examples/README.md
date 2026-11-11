@@ -9,6 +9,7 @@ by default and covers the surface most integrations use.
 | [`delegated-e2e`](delegated-e2e) (Rust) | testnet | **no**, unless `MATTER_SUBMIT=yes` | A member-tied scoped key: the resolved `Mode`, a local `NeverAdmitted` refusal, a local `NotPermitted` refusal, and a write wrapped as the member |
 | [`rust`](rust) · [`typescript`](typescript) | none | no | Seal and recover against an in-process committee. The TypeScript demo replays `testvectors/open_secret.json` |
 | [`rust-e2e`](rust-e2e) · [`e2e`](e2e) (TypeScript) · [`python-e2e`](python-e2e) · [`go-e2e`](go-e2e) | testnet | **yes** | A full Secrets round trip: seal → `Secrets.store_secret` → read back → threshold-decrypt → compare |
+| [`login-e2e`](login-e2e) (TypeScript) | **local dev chain only** | local funds | OpenMatter Login: register a login with a sign-in token, then recover the same key from a fresh session |
 
 ## Environment
 

@@ -40,6 +40,7 @@ is the single list of where the languages differ.
 | Offline extrinsic signing | via `subxt()` | via @polkadot | via substrate-interface | `PrepareExtrinsic` |
 | Committee transport timeout | 30 s | 30 s | 15 s | 20 s |
 | Browser build | — | `-core` (`wasm-web`) | — | — |
+| [OpenMatter Login](login.md) | byte contract only (`matter_sdk::login`) | `-core`: contract, `oidcSigner`, attestations, `openLogin` | — | — |
 | Logging | `tracing` | `MatterConfig.logger` | stdlib `logging` | `*slog.Logger` |
 | Error model | `SdkError` enum | `ClientError.kind` | exception classes | `ChainError.Kind` |
 

@@ -14,6 +14,19 @@ versions follow [Semantic Versioning](https://semver.org/).
   `binding_commits_to`, and the cross-language vector `testvectors/binding_ids.json`.
   Use `seal_for` for every secret you store; see `docs/secrets.md`.
 
+- **OpenMatter Login** in the TypeScript core: a chain account from an OpenID Connect
+  sign-in, with the key sealed under the committee and released only against a valid
+  ID token. `prepareLoginRegistration`, `attestLoginRequest`, `collectLoginAttestations`
+  and `registerLogin` register a login; `oidcSigner` and `openLogin` sign in;
+  `FetchTransport.attestLogin` and the typed `LoginError` keep each node's HTTP status.
+  `AuthScheme` gains `"oidc"`, and `RequestAuth` / `PartialDecryptRequest` gain the
+  optional `id_token` and `app_id`; requests from every other signer are byte-identical.
+  See `docs/login.md` and `examples/login-e2e`.
+- The login byte contract in the core (`login_identity`, `login_nonce`,
+  `login_payload_hash`, `login_attestation_payload`, `login_seed_aad`; `matter_sdk::login`
+  in Rust, `loginIdentity` … in TypeScript), pinned by `testvectors/login.json`. Python,
+  Go and the C ABI do not expose it yet.
+
 - TypeScript receipts carry each event's fields under the runtime's field names
   (`["Secrets", "SecretStored", { secret_id, owner }]`), with `requireEvent` and
   `secretIdFromReceipt`, so the id of a stored secret is read from the receipt as in

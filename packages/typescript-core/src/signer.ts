@@ -3,10 +3,12 @@ import { toHex } from "./util.js";
 
 /**
  * How a `/partial-decrypt` request is authorized. `substrate`: an sr25519
- * `MultiSignature` (every signer shipped here). `ethereum`: EIP-712, accepted by
- * the wire protocol but only via a custom {@link Signer}.
+ * `MultiSignature` by an account the chain authorizes for the secret.
+ * `ethereum`: EIP-712, accepted by the wire protocol but only via a custom
+ * {@link Signer}. `oidc`: a sign-in token plus an sr25519 signature by the
+ * session key the token's `nonce` names (OpenMatter Login; `oidcSigner`).
  */
-export type AuthScheme = "substrate" | "ethereum";
+export type AuthScheme = "substrate" | "ethereum" | "oidc";
 
 /** Auth fields attached to a `/partial-decrypt` request. */
 export interface RequestAuth {
@@ -18,6 +20,10 @@ export interface RequestAuth {
   eth_address?: string;
   valid_until?: number;
   eth_signature?: string;
+  /** `oidc` only: the identity provider's ID token. Never log it. */
+  id_token?: string;
+  /** `oidc` only: `0x` + the 32-byte id of the app the token signs in to. */
+  app_id?: string;
 }
 
 /** Per-request context handed to a {@link Signer}. One request targets one node. */

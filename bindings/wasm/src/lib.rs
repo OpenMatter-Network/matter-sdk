@@ -83,7 +83,11 @@ impl ApiKeyJs {
     /// Redacted. Never renders the key.
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string_js(&self) -> String {
-        format!("ApiKey({}, {}, <redacted>)", self.scheme(), self.account_id_hex())
+        format!(
+            "ApiKey({}, {}, <redacted>)",
+            self.scheme(),
+            self.account_id_hex()
+        )
     }
 
     /// Redacted: returns the `toString` string, so `JSON.stringify` cannot
@@ -222,6 +226,67 @@ pub fn verify_plaintext_proof(
     epoch: u32,
 ) -> Result<bool, JsError> {
     core::verify_plaintext_proof(joint_pk, capsule, tagged_proof, binding_id, epoch).map_err(js_err)
+}
+
+/// OpenMatter Login: who a login belongs to, for the app `app_id` (32 bytes)
+/// and a sign-in token's `iss` and `sub` claims as UTF-8 bytes. 32 bytes.
+#[wasm_bindgen(js_name = loginIdentity)]
+pub fn login_identity(app_id: &[u8], issuer: &[u8], subject: &[u8]) -> Result<Vec<u8>, JsError> {
+    core::login_identity(app_id, issuer, subject)
+        .map(|identity| identity.to_vec())
+        .map_err(js_err)
+}
+
+/// OpenMatter Login: the `nonce` claim a sign-in token must carry to be used
+/// with the sr25519 key `requester` (32 bytes). 64 lowercase hex characters.
+#[wasm_bindgen(js_name = loginNonce)]
+pub fn login_nonce(requester: &[u8]) -> Result<String, JsError> {
+    core::login_nonce(requester).map_err(js_err)
+}
+
+/// OpenMatter Login: the 32-byte hash an attestation carries of the sealed
+/// seed envelope.
+#[wasm_bindgen(js_name = loginPayloadHash)]
+pub fn login_payload_hash(binding_id: &[u8], capsule: &[u8], proof: &[u8], ct: &[u8]) -> Vec<u8> {
+    core::login_payload_hash(binding_id, capsule, proof, ct).to_vec()
+}
+
+/// OpenMatter Login: the bytes a committee node signs to attest a
+/// registration, and the requester key signs to ask for it. Every byte
+/// argument is 32 bytes; `generation` is `0` for a first registration.
+#[wasm_bindgen(js_name = loginAttestationPayload)]
+pub fn login_attestation_payload(
+    genesis: &[u8],
+    app_id: &[u8],
+    identity: &[u8],
+    account: &[u8],
+    payload_hash: &[u8],
+    generation: u32,
+) -> Result<Vec<u8>, JsError> {
+    core::login_attestation_payload(genesis, app_id, identity, account, payload_hash, generation)
+        .map_err(js_err)
+}
+
+/// OpenMatter Login: the AAD a login seed is sealed under, for `app_id` and
+/// `identity` (32 bytes each).
+#[wasm_bindgen(js_name = loginSeedAad)]
+pub fn login_seed_aad(app_id: &[u8], identity: &[u8]) -> Result<Vec<u8>, JsError> {
+    core::login_seed_aad(app_id, identity).map_err(js_err)
+}
+
+/// OpenMatter Login: the 32-byte account id the login seed `seed` (a 32-byte
+/// sr25519 mini-secret) controls. The message never contains the seed.
+#[wasm_bindgen(js_name = loginAccount)]
+pub fn login_account(seed: &[u8]) -> Result<Vec<u8>, JsError> {
+    let seed: &[u8; core::login::SEED_BYTES] = seed.try_into().map_err(|_| {
+        js_err(core::CoreError::InvalidLength {
+            field: "seed",
+            expected: core::login::SEED_BYTES,
+            actual: seed.len(),
+        })
+    })?;
+    let key = ApiKey::from_seed(seed).map_err(key_err)?;
+    Ok(key.account_id().as_bytes().to_vec())
 }
 
 /// The crypto protocol version this core speaks. A node reporting a different
