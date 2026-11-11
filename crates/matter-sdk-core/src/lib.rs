@@ -1,7 +1,8 @@
 //! Pure, non-networked cryptographic core shared by every MatterSDK binding
 //! (Rust, wasm/TypeScript, Python, Go, C).
 //!
-//! * **Seal** a secret under the committee joint public key: [`encrypt`].
+//! * **Seal** a secret for its owner under the committee joint public key:
+//!   [`seal_for`] (or [`encrypt`] under a binding id you choose).
 //! * **Open** it from an already-collected quorum: [`open_secret`], with
 //!   [`signing_payload`], [`lagrange_for`] and [`verify_plaintext_proof`].
 //!
@@ -17,6 +18,7 @@
 //! material.
 
 mod aad;
+mod binding;
 mod ctx;
 mod decrypt;
 mod encrypt;
@@ -26,8 +28,17 @@ mod types;
 pub mod wire;
 
 pub use aad::Aad;
+pub use binding::{
+    binding_commits_to,
+    binding_id_for,
+    OWNER_BINDING_DOMAIN,
+    OWNER_BINDING_ID_BYTES,
+    OWNER_BINDING_SALT_BYTES,
+    OWNER_BINDING_VERSION,
+    OWNER_BYTES,
+};
 pub use decrypt::{lagrange_for, open_secret, signing_payload, verify_plaintext_proof};
-pub use encrypt::encrypt;
+pub use encrypt::{encrypt, seal_for};
 pub use error::{CoreError, Result};
 pub use types::{EncryptedSecret, PartialInput, Plaintext};
 

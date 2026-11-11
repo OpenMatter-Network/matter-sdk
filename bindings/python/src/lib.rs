@@ -30,7 +30,43 @@ fn key_err(e: matter_sdk_key::KeyError) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 
-/// Seal `plaintext` under `joint_pk`, returning `(binding_id, capsule, proof, ct)`.
+/// Seal `plaintext` for the account that will own the secret on chain, returning
+/// `(binding_id, capsule, proof, ct)`. The binding id commits to `owner` (32 bytes),
+/// so the chain accepts the envelope only as that account's secret.
+#[pyfunction]
+#[pyo3(signature = (joint_pk, epoch, plaintext, aad, *, owner))]
+fn seal_for<'py>(
+    py: Python<'py>,
+    joint_pk: &[u8],
+    epoch: u32,
+    plaintext: &[u8],
+    aad: &[u8],
+    owner: &[u8],
+) -> PyResult<EnvelopeBytes<'py>> {
+    let env = core::seal_for(owner, joint_pk, epoch, plaintext, aad).map_err(err)?;
+    Ok((
+        PyBytes::new(py, &env.binding_id),
+        PyBytes::new(py, &env.capsule),
+        PyBytes::new(py, &env.proof),
+        PyBytes::new(py, &env.ct),
+    ))
+}
+
+/// The owner-bound binding id for `owner` (32 bytes) under `salt` (31 bytes).
+#[pyfunction]
+fn binding_id_for<'py>(py: Python<'py>, owner: &[u8], salt: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+    let id = core::binding_id_for(owner, salt).map_err(err)?;
+    Ok(PyBytes::new(py, &id))
+}
+
+/// Whether `binding_id` is an owner-bound binding id committing to `owner`.
+#[pyfunction]
+fn binding_commits_to(owner: &[u8], binding_id: &[u8]) -> bool {
+    core::binding_commits_to(owner, binding_id)
+}
+
+/// Seal `plaintext` under `joint_pk` under a binding id you choose, returning
+/// `(binding_id, capsule, proof, ct)`. For a secret you will store, use `seal_for`.
 #[pyfunction]
 #[pyo3(signature = (joint_pk, epoch, plaintext, aad, binding_id=None))]
 fn encrypt<'py>(
@@ -215,6 +251,9 @@ impl ApiKeyPy {
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(encrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(seal_for, m)?)?;
+    m.add_function(wrap_pyfunction!(binding_id_for, m)?)?;
+    m.add_function(wrap_pyfunction!(binding_commits_to, m)?)?;
     m.add_function(wrap_pyfunction!(signing_payload, m)?)?;
     m.add_function(wrap_pyfunction!(lagrange_for, m)?)?;
     m.add_function(wrap_pyfunction!(verify_plaintext_proof, m)?)?;

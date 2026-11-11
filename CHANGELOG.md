@@ -8,6 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `seal_for` (`sealFor`, `SealFor`, `msdk_seal_for`) seals a secret for the account that
+  will own it: the envelope's binding id is an owner-bound binding id, which the chain
+  checks when the secret is stored or rotated. With it come `binding_id_for` and
+  `binding_commits_to`, and the cross-language vector `testvectors/binding_ids.json`.
+  Use `seal_for` for every secret you store; see `docs/secrets.md`.
+
 - TypeScript receipts carry each event's fields under the runtime's field names
   (`["Secrets", "SecretStored", { secret_id, owner }]`), with `requireEvent` and
   `secretIdFromReceipt`, so the id of a stored secret is read from the receipt as in
@@ -25,6 +31,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `encrypt` refuses an explicit binding id that is empty (previously sealed under an empty
+  label). Omit it for the random default, or use `seal_for`.
 - **Breaking (Go):** `ChainClient.StoreSecret` takes an `ExtrinsicSigner` and a `label`:
   `StoreSecret(signer, env, epoch, label, aad)`. Wrap a keyring pair in `KeyringSigner`.
 - An `ApiKey` with an unknown `scheme:` prefix is now `Malformed` rather than

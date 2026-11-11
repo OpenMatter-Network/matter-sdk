@@ -52,7 +52,26 @@ int32_t msdk_signing_payload(const uint8_t *secret_id, const uint64_t *subset,
 int32_t msdk_lagrange_for(uint64_t point, const uint64_t *subset,
                         size_t subset_len, MsdkBuf *out);
 
-/* binding_id may be NULL (a random one is generated). */
+/* Seal for the account that will own the secret: the binding id commits to
+ * `owner` (exactly 32 bytes). Prefer this over msdk_encrypt. */
+int32_t msdk_seal_for(const uint8_t *owner, size_t owner_len,
+                    const uint8_t *joint_pk, size_t joint_pk_len, uint32_t epoch,
+                    const uint8_t *secrets, size_t secrets_len,
+                    const uint8_t *aad, size_t aad_len,
+                    MsdkEnvelope *out);
+
+/* The owner-bound binding id for owner (32 bytes) under salt (31 bytes). */
+int32_t msdk_binding_id_for(const uint8_t *owner, size_t owner_len,
+                          const uint8_t *salt, size_t salt_len, MsdkBuf *out);
+
+/* Writes 1 to *out_commits iff binding_id is an owner-bound id for owner. */
+int32_t msdk_binding_commits_to(const uint8_t *owner, size_t owner_len,
+                              const uint8_t *binding_id, size_t binding_id_len,
+                              uint8_t *out_commits);
+
+/* binding_id may be NULL (a random label that commits to no owner); a non-NULL
+ * binding_id of length 0 is refused. For a secret you will store, use
+ * msdk_seal_for. */
 int32_t msdk_encrypt(const uint8_t *joint_pk, size_t joint_pk_len, uint32_t epoch,
                    const uint8_t *secrets, size_t secrets_len,
                    const uint8_t *aad, size_t aad_len,

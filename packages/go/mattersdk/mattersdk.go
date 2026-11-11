@@ -160,8 +160,73 @@ type EncryptedSecret struct {
 	CT        []byte
 }
 
-// Encrypt seals secrets under the committee joint public key. A nil bindingID
-// causes a random one to be generated (returned in the result).
+// OwnerBindingSaltBytes is the salt length of an owner-bound binding id.
+const OwnerBindingSaltBytes = 31
+
+// OwnerBindingIDBytes is the length of an owner-bound binding id.
+const OwnerBindingIDBytes = 64
+
+// SealFor seals secrets for the account that will own the secret on chain. The
+// envelope's binding id commits to owner, so the chain accepts it only as that
+// account's secret. Prefer this over Encrypt for anything you store.
+//
+// owner is the 32-byte account id the store is dispatched as: for a proxied
+// store, the account acted for, not the key that signs.
+func SealFor(owner [32]byte, jointPk []byte, epoch uint32, secrets, aad []byte) (*EncryptedSecret, error) {
+	if len(jointPk) == 0 || len(secrets) == 0 {
+		return nil, ErrInvalidArg
+	}
+	var out C.MsdkEnvelope
+	rc := C.msdk_seal_for(
+		(*C.uint8_t)(unsafe.Pointer(&owner[0])), C.size_t(len(owner)),
+		(*C.uint8_t)(unsafe.Pointer(&jointPk[0])), C.size_t(len(jointPk)),
+		C.uint32_t(epoch),
+		(*C.uint8_t)(unsafe.Pointer(&secrets[0])), C.size_t(len(secrets)),
+		bytesPtr(aad), C.size_t(len(aad)),
+		&out,
+	)
+	if err := errFromCode(rc); err != nil {
+		return nil, err
+	}
+	return &EncryptedSecret{
+		BindingID: goBytesAndFree(out.binding_id),
+		Capsule:   goBytesAndFree(out.capsule),
+		Proof:     goBytesAndFree(out.proof),
+		CT:        goBytesAndFree(out.ct),
+	}, nil
+}
+
+// BindingIDFor is the owner-bound binding id for owner under salt.
+func BindingIDFor(owner [32]byte, salt [OwnerBindingSaltBytes]byte) ([]byte, error) {
+	var out C.MsdkBuf
+	rc := C.msdk_binding_id_for(
+		(*C.uint8_t)(unsafe.Pointer(&owner[0])), C.size_t(len(owner)),
+		(*C.uint8_t)(unsafe.Pointer(&salt[0])), C.size_t(len(salt)),
+		&out,
+	)
+	if err := errFromCode(rc); err != nil {
+		return nil, err
+	}
+	return goBytesAndFree(out), nil
+}
+
+// BindingCommitsTo reports whether bindingID is an owner-bound binding id
+// committing to owner. False for anything that is not exactly that form. For
+// sealers and store calls only: never gate an open on it.
+func BindingCommitsTo(owner [32]byte, bindingID []byte) bool {
+	var commits C.uint8_t
+	rc := C.msdk_binding_commits_to(
+		(*C.uint8_t)(unsafe.Pointer(&owner[0])), C.size_t(len(owner)),
+		bytesPtr(bindingID), C.size_t(len(bindingID)),
+		&commits,
+	)
+	return errFromCode(rc) == nil && commits != 0
+}
+
+// Encrypt seals secrets under the committee joint public key, under a binding
+// id you choose. A nil or empty bindingID causes a random one to be generated
+// (returned in the result); it commits to no owner, so for a secret you will
+// store, use SealFor.
 func Encrypt(jointPk []byte, epoch uint32, secrets, aad, bindingID []byte) (*EncryptedSecret, error) {
 	if len(jointPk) == 0 || len(secrets) == 0 {
 		return nil, ErrInvalidArg

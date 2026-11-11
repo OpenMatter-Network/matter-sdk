@@ -148,3 +148,54 @@ func TestLagrangeConformance(t *testing.T) {
 		}
 	}
 }
+
+// The owner-bound binding id is a wire contract with the chain, which checks it
+// on every stored secret. matter-node pins the first row as a literal too.
+func TestOwnerBoundBindingIDConformance(t *testing.T) {
+	var doc struct {
+		Commits []struct {
+			OwnerHex     string `json:"owner_hex"`
+			SaltHex      string `json:"salt_hex"`
+			BindingIDHex string `json:"binding_id_hex"`
+		} `json:"commits"`
+		DoesNotCommit []struct {
+			Why          string `json:"why"`
+			OwnerHex     string `json:"owner_hex"`
+			BindingIDHex string `json:"binding_id_hex"`
+		} `json:"does_not_commit"`
+	}
+	load(t, "binding_ids.json", &doc)
+	if len(doc.Commits) == 0 || len(doc.DoesNotCommit) == 0 {
+		t.Fatal("binding_ids.json has no cases")
+	}
+	unhex := func(s string) []byte {
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			t.Fatalf("bad hex %q: %v", s, err)
+		}
+		return b
+	}
+	for _, c := range doc.Commits {
+		var owner [32]byte
+		var salt [OwnerBindingSaltBytes]byte
+		copy(owner[:], unhex(c.OwnerHex))
+		copy(salt[:], unhex(c.SaltHex))
+		got, err := BindingIDFor(owner, salt)
+		if err != nil {
+			t.Fatalf("BindingIDFor: %v", err)
+		}
+		if hex.EncodeToString(got) != c.BindingIDHex {
+			t.Errorf("binding id = %x, want %s", got, c.BindingIDHex)
+		}
+		if !BindingCommitsTo(owner, got) {
+			t.Errorf("%s does not commit to its owner", c.BindingIDHex)
+		}
+	}
+	for _, c := range doc.DoesNotCommit {
+		var owner [32]byte
+		copy(owner[:], unhex(c.OwnerHex))
+		if BindingCommitsTo(owner, unhex(c.BindingIDHex)) {
+			t.Errorf("%s: unexpectedly commits", c.Why)
+		}
+	}
+}

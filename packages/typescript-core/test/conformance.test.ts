@@ -5,7 +5,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { lagrangeFor, openSecret, signingPayload } from "../src/index.js";
+import {
+  bindingCommitsTo,
+  bindingIdFor,
+  lagrangeFor,
+  openSecret,
+  signingPayload,
+} from "../src/index.js";
 import { fromHex, toHex } from "../src/util.js";
 
 const vectorsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../testvectors");
@@ -47,5 +53,20 @@ describe("open_secret conformance", () => {
       partials,
     });
     expect(toHex(plaintext)).toBe("0x" + v.expected_plaintext_hex);
+  });
+});
+
+// The owner-bound binding id is a wire contract with the chain, which checks it
+// on every stored secret. matter-node pins the first row as a literal too.
+describe("owner-bound binding id conformance", () => {
+  const v = load("binding_ids.json");
+  it.each(v.commits)("derives $binding_id_hex", (c: any) => {
+    const [owner, salt] = [fromHex("0x" + c.owner_hex), fromHex("0x" + c.salt_hex)];
+    const id = bindingIdFor(owner, salt);
+    expect(toHex(id)).toBe("0x" + c.binding_id_hex);
+    expect(bindingCommitsTo(owner, id)).toBe(true);
+  });
+  it.each(v.does_not_commit)("refuses $why", (c: any) => {
+    expect(bindingCommitsTo(fromHex("0x" + c.owner_hex), fromHex("0x" + c.binding_id_hex))).toBe(false);
   });
 });

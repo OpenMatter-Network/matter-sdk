@@ -326,6 +326,127 @@ pub unsafe extern "C" fn msdk_encrypt(
     })
 }
 
+/// Seal `secrets` for the account that will own the secret on chain: the
+/// envelope's binding id commits to `owner` (exactly 32 bytes), so the chain
+/// accepts it only as that account's secret. Prefer this over [`msdk_encrypt`].
+///
+/// # Safety
+///
+/// Each `(pointer, length)` pair must be valid for that many reads (or null
+/// with length 0); `out` must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn msdk_seal_for(
+    owner: *const u8,
+    owner_len: usize,
+    joint_pk: *const u8,
+    joint_pk_len: usize,
+    epoch: u32,
+    secrets: *const u8,
+    secrets_len: usize,
+    aad: *const u8,
+    aad_len: usize,
+    out: *mut MsdkEnvelope,
+) -> i32 {
+    guard(|| {
+        if out.is_null() {
+            return MSDK_ERR_INVALID_ARG;
+        }
+        // Clear first so a caller that frees after an error never frees garbage.
+        *out = MsdkEnvelope::empty();
+        let (Some(owner), Some(pk), Some(sec), Some(aad)) = (
+            as_slice(owner, owner_len),
+            as_slice(joint_pk, joint_pk_len),
+            as_slice(secrets, secrets_len),
+            as_slice(aad, aad_len),
+        ) else {
+            return MSDK_ERR_INVALID_ARG;
+        };
+        match core::seal_for(owner, pk, epoch, sec, aad) {
+            Ok(env) => {
+                *out = MsdkEnvelope {
+                    binding_id: into_buf(env.binding_id),
+                    capsule: into_buf(env.capsule),
+                    proof: into_buf(env.proof),
+                    ct: into_buf(env.ct),
+                };
+                MSDK_OK
+            }
+            Err(
+                core::CoreError::Empty(_)
+                | core::CoreError::Decode { .. }
+                | core::CoreError::InvalidLength { .. },
+            ) => MSDK_ERR_INVALID_ARG,
+            Err(_) => MSDK_ERR_CRYPTO,
+        }
+    })
+}
+
+/// The owner-bound binding id for `owner` (32 bytes) under `salt` (31 bytes),
+/// written to `*out` (64 bytes; free with `msdk_free`).
+///
+/// # Safety
+///
+/// Each `(pointer, length)` pair must be valid for that many reads (or null
+/// with length 0); `out` must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn msdk_binding_id_for(
+    owner: *const u8,
+    owner_len: usize,
+    salt: *const u8,
+    salt_len: usize,
+    out: *mut MsdkBuf,
+) -> i32 {
+    guard(|| {
+        if out.is_null() {
+            return MSDK_ERR_INVALID_ARG;
+        }
+        *out = MsdkBuf::empty();
+        let (Some(owner), Some(salt)) = (as_slice(owner, owner_len), as_slice(salt, salt_len))
+        else {
+            return MSDK_ERR_INVALID_ARG;
+        };
+        match core::binding_id_for(owner, salt) {
+            Ok(id) => {
+                *out = into_buf(id.to_vec());
+                MSDK_OK
+            }
+            Err(_) => MSDK_ERR_INVALID_ARG,
+        }
+    })
+}
+
+/// Whether `binding_id` is an owner-bound binding id committing to `owner`.
+/// On [`MSDK_OK`], `*out_commits` is `1` or `0`; anything that is not exactly
+/// that form (wrong lengths included) is `0`, never an error.
+///
+/// # Safety
+///
+/// Each `(pointer, length)` pair must be valid for that many reads (or null
+/// with length 0); `out_commits` must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn msdk_binding_commits_to(
+    owner: *const u8,
+    owner_len: usize,
+    binding_id: *const u8,
+    binding_id_len: usize,
+    out_commits: *mut u8,
+) -> i32 {
+    guard(|| {
+        if out_commits.is_null() {
+            return MSDK_ERR_INVALID_ARG;
+        }
+        *out_commits = 0;
+        let (Some(owner), Some(binding)) = (
+            as_slice(owner, owner_len),
+            as_slice(binding_id, binding_id_len),
+        ) else {
+            return MSDK_ERR_INVALID_ARG;
+        };
+        *out_commits = core::binding_commits_to(owner, binding) as u8;
+        MSDK_OK
+    })
+}
+
 /// Verify a capsule's plaintext proof before collecting partials. On [`MSDK_OK`],
 /// `*out_valid` is `1` (valid) or `0` (invalid); undecodable inputs return
 /// [`MSDK_ERR_CRYPTO`].
@@ -563,6 +684,70 @@ mod tests {
             )
         };
         assert_eq!(rc, MSDK_ERR_INVALID_ARG, "encrypt binding_id");
+    }
+
+    /// The pinned first row of `testvectors/binding_ids.json`, through the C ABI.
+    #[test]
+    fn binding_id_for_matches_the_pinned_vector_and_commits() {
+        let owner = [0x11u8; 32];
+        let other = [0x12u8; 32];
+        let salt = [0x22u8; 31];
+        let mut out = MsdkBuf::empty();
+        let rc = unsafe {
+            msdk_binding_id_for(owner.as_ptr(), owner.len(), salt.as_ptr(), salt.len(), &mut out)
+        };
+        assert_eq!(rc, MSDK_OK);
+        let id = unsafe { std::slice::from_raw_parts(out.ptr, out.len) }.to_vec();
+        unsafe { msdk_free(out) };
+        assert_eq!(
+            hex::encode(&id),
+            "0122222222222222222222222222222222222222222222222222222222222222\
+             8a60a15b74fe314fc81f355b1d980ba02c5b76343d5e90fc1c4cd18207b8201b"
+        );
+
+        let commits = |who: &[u8; 32]| {
+            let mut flag = 9u8;
+            let rc = unsafe {
+                msdk_binding_commits_to(who.as_ptr(), who.len(), id.as_ptr(), id.len(), &mut flag)
+            };
+            assert_eq!(rc, MSDK_OK);
+            flag
+        };
+        assert_eq!(commits(&owner), 1);
+        assert_eq!(commits(&other), 0);
+    }
+
+    #[test]
+    fn binding_id_for_and_seal_for_refuse_an_owner_that_is_not_32_bytes() {
+        let owner = [0x11u8; 20];
+        let salt = [0x22u8; 31];
+        let mut out = MsdkBuf::empty();
+        let rc = unsafe {
+            msdk_binding_id_for(owner.as_ptr(), owner.len(), salt.as_ptr(), salt.len(), &mut out)
+        };
+        assert_eq!(rc, MSDK_ERR_INVALID_ARG);
+        assert!(out.ptr.is_null());
+
+        // The owner is checked before the key is decoded, so a placeholder key is enough.
+        let mut env = MsdkEnvelope::empty();
+        let pk = [0u8; 4];
+        let secret = [1u8];
+        let rc = unsafe {
+            msdk_seal_for(
+                owner.as_ptr(),
+                owner.len(),
+                pk.as_ptr(),
+                pk.len(),
+                0,
+                secret.as_ptr(),
+                1,
+                std::ptr::null(),
+                0,
+                &mut env,
+            )
+        };
+        assert_eq!(rc, MSDK_ERR_INVALID_ARG);
+        assert!(env.binding_id.ptr.is_null());
     }
 
     #[test]

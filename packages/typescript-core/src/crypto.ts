@@ -6,13 +6,53 @@ import { secretIdToHex, subsetBig, toHex } from "./util.js";
 import { wasm } from "./wasm.js";
 
 /**
- * Seal a secret under the committee joint public key.
+ * Seal a secret for the account that will own it on chain. The envelope's
+ * binding id commits to `owner`, so the chain accepts it only as that
+ * account's secret. **Prefer this over {@link encrypt}** for anything you store.
+ *
+ * @param owner the 32-byte account id the store is dispatched as — for a
+ *   proxied store, the account acted for, not the key that signs
+ * @param jointPk bincode `PublicKey` from the chain's `KgcApi::joint_pk()`
+ * @param epoch current DKG epoch
+ * @param plaintext the secret bytes (e.g. `KEY=VALUE` lines)
+ * @param aad an {@link Aad} tag (or raw bytes) the secret is bound to
+ */
+export function sealFor(
+  owner: Uint8Array,
+  jointPk: Uint8Array,
+  epoch: number,
+  plaintext: Uint8Array,
+  aad: Aad | Uint8Array,
+): EncryptedSecret {
+  const env = wasm.sealFor(owner, jointPk, epoch, plaintext, aadBytes(aad));
+  // Copy the getters out before the wasm object is GC'd.
+  return { bindingId: env.bindingId, capsule: env.capsule, proof: env.proof, ct: env.ct };
+}
+
+/** The owner-bound binding id for `owner` (32 bytes) under `salt` (31 bytes). */
+export function bindingIdFor(owner: Uint8Array, salt: Uint8Array): Uint8Array {
+  return wasm.bindingIdFor(owner, salt);
+}
+
+/**
+ * Whether `bindingId` is an owner-bound binding id committing to `owner`.
+ * For sealers and store calls only: never gate an open on it — secrets sealed
+ * before this form existed must keep opening.
+ */
+export function bindingCommitsTo(owner: Uint8Array, bindingId: Uint8Array): boolean {
+  return wasm.bindingCommitsTo(owner, bindingId);
+}
+
+/**
+ * Seal a secret under the committee joint public key, under a binding id you
+ * choose. For a secret you will store, use {@link sealFor}.
  *
  * @param jointPk bincode `PublicKey` from the chain's `KgcApi::joint_pk()`
  * @param epoch current DKG epoch
  * @param plaintext the secret bytes (e.g. `KEY=VALUE` lines)
  * @param aad an {@link Aad} tag (or raw bytes) the secret is bound to
- * @param bindingId optional label; 32 random bytes are generated if omitted
+ * @param bindingId optional label; if omitted, 32 random bytes that commit to
+ *   no owner. An empty one is refused.
  */
 export function encrypt(
   jointPk: Uint8Array,

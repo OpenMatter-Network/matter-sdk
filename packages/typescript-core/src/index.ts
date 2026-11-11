@@ -23,6 +23,9 @@
 
 export { Aad, aadBytes } from "./aad.js";
 export {
+  sealFor,
+  bindingIdFor,
+  bindingCommitsTo,
   encrypt,
   signingPayload,
   lagrangeFor,

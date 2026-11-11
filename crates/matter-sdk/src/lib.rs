@@ -50,7 +50,17 @@ pub use committee::{decrypt, CommitteeNode, DecryptRequest};
 pub use error::{FaultStage, NodeFault, Result, SdkError};
 // Re-exported so consumers depend only on `matter-sdk`.
 #[doc(inline)]
-pub use matter_sdk_core::{self, encrypt, Aad, CoreError, EncryptedSecret, Plaintext};
+pub use matter_sdk_core::{
+    self,
+    binding_commits_to,
+    binding_id_for,
+    encrypt,
+    seal_for,
+    Aad,
+    CoreError,
+    EncryptedSecret,
+    Plaintext,
+};
 #[doc(inline)]
 pub use matter_sdk_key::{
     Access,

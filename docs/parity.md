@@ -8,7 +8,8 @@ is the single list of where the languages differ.
 
 ## What every language has
 
-- **The crypto core:** `encrypt`, `signing_payload`, `lagrange_for`,
+- **The crypto core:** `seal_for`, `binding_id_for`, `binding_commits_to`, `encrypt`,
+  `signing_payload`, `lagrange_for`,
   `verify_plaintext_proof`, `open_secret`, and the protocol constants.
 - **Keys:** `ApiKey` in every format, with the same guardrails, and scope parsing.
 - **Committee:** threshold `decrypt` with health probing, a random quorum, per-node

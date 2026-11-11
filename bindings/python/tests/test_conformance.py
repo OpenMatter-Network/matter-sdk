@@ -54,3 +54,19 @@ def test_open_secret_conformance():
         partials,
     )
     assert plaintext.hex() == v["expected_plaintext_hex"]
+
+
+def test_owner_bound_binding_id_conformance():
+    """The owner-bound binding id is a wire contract with the chain, which checks it on
+    every stored secret. matter-node pins the first row as a literal too."""
+    v = _load("binding_ids.json")
+    assert v["commits"] and v["does_not_commit"]
+    for case in v["commits"]:
+        owner = bytes.fromhex(case["owner_hex"])
+        got = matter_sdk.binding_id_for(owner, bytes.fromhex(case["salt_hex"]))
+        assert got.hex() == case["binding_id_hex"]
+        assert matter_sdk.binding_commits_to(owner, got)
+    for case in v["does_not_commit"]:
+        assert not matter_sdk.binding_commits_to(
+            bytes.fromhex(case["owner_hex"]), bytes.fromhex(case["binding_id_hex"])
+        ), case["why"]

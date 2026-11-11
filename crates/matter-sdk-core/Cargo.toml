@@ -31,6 +31,8 @@ thiserror = { workspace = true }
 zeroize = { workspace = true }
 rand = { workspace = true }
 once_cell = { workspace = true }
+# blake2b-256 for owner-bound binding ids; the hash the chain checks them with.
+blake2b_simd = { version = "1.0.4", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # Route `OsRng` through `crypto.getRandomValues` when compiled to wasm.

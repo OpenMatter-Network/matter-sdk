@@ -127,10 +127,45 @@ impl EncryptedSecretJs {
     }
 }
 
-/// Seal `secrets` under the committee joint public key.
+/// Seal `secrets` for the account that will own the secret on chain: the
+/// envelope's binding id commits to `owner` (32 bytes), so the chain accepts
+/// it only as that account's secret. Prefer this over `encryptSecret`.
+#[wasm_bindgen(js_name = sealFor)]
+pub fn seal_for(
+    owner: &[u8],
+    joint_pk: &[u8],
+    epoch: u32,
+    secrets: &[u8],
+    aad: &[u8],
+) -> Result<EncryptedSecretJs, JsError> {
+    let env = core::seal_for(owner, joint_pk, epoch, secrets, aad).map_err(js_err)?;
+    Ok(EncryptedSecretJs {
+        binding_id: env.binding_id,
+        capsule: env.capsule,
+        proof: env.proof,
+        ct: env.ct,
+    })
+}
+
+/// The owner-bound binding id for `owner` (32 bytes) under `salt` (31 bytes).
+#[wasm_bindgen(js_name = bindingIdFor)]
+pub fn binding_id_for(owner: &[u8], salt: &[u8]) -> Result<Vec<u8>, JsError> {
+    core::binding_id_for(owner, salt)
+        .map(|id| id.to_vec())
+        .map_err(js_err)
+}
+
+/// Whether `binding_id` is an owner-bound binding id committing to `owner`.
+#[wasm_bindgen(js_name = bindingCommitsTo)]
+pub fn binding_commits_to(owner: &[u8], binding_id: &[u8]) -> bool {
+    core::binding_commits_to(owner, binding_id)
+}
+
+/// Seal `secrets` under the committee joint public key, under a binding id you
+/// choose. For a secret you will store, use `sealFor`.
 ///
 /// `joint_pk` is the bincode `PublicKey`; `aad` is the tag's bytes (TS `Aad`);
-/// `binding_id` defaults to 32 random bytes.
+/// `binding_id` defaults to 32 random bytes that commit to no owner.
 #[wasm_bindgen(js_name = encryptSecret)]
 pub fn encrypt_secret(
     joint_pk: &[u8],

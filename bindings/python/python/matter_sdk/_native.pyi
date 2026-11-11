@@ -15,7 +15,32 @@ def encrypt(
     aad: bytes,
     binding_id: Optional[bytes] = None,
 ) -> Tuple[bytes, bytes, bytes, bytes]:
-    """Seal ``plaintext``, returning ``(binding_id, capsule, proof, ct)``."""
+    """Seal ``plaintext`` under a binding id you choose, returning ``(binding_id, capsule, proof, ct)``.
+
+    For a secret you will store, use :func:`seal_for`: the default binding id here is a
+    random label that commits to no owner.
+    """
+
+def seal_for(
+    joint_pk: bytes,
+    epoch: int,
+    plaintext: bytes,
+    aad: bytes,
+    *,
+    owner: bytes,
+) -> Tuple[bytes, bytes, bytes, bytes]:
+    """Seal ``plaintext`` for the 32-byte account ``owner`` that will own the secret.
+
+    The binding id commits to ``owner``, so the chain accepts the envelope only as that
+    account's secret. ``owner`` is the account the store is dispatched as, not
+    necessarily the key that signs it.
+    """
+
+def binding_id_for(owner: bytes, salt: bytes) -> bytes:
+    """The owner-bound binding id for ``owner`` (32 bytes) under ``salt`` (31 bytes)."""
+
+def binding_commits_to(owner: bytes, binding_id: bytes) -> bool:
+    """Whether ``binding_id`` is an owner-bound binding id committing to ``owner``."""
 
 def signing_payload(secret_id: int, subset: List[int], block_hash: bytes, recipient_index: int) -> bytes:
     """The canonical bytes a requester signs for one node's ``/partial-decrypt`` request."""

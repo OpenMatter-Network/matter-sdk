@@ -21,12 +21,13 @@ shares ([architecture](architecture.md)). Networking and signing are native to e
 
 ## Sealing
 
-`encrypt` seals plaintext under the committee's joint public key for one epoch and one
-[AAD tag](#aad-registry). It returns an `EncryptedSecret` with four fields:
+`seal_for` seals plaintext for the account that will own the secret, under the committee's
+joint public key, for one epoch and one [AAD tag](#aad-registry). It returns an
+`EncryptedSecret` with four fields:
 
 | Field | Contents |
 |---|---|
-| `binding_id` | Label bound into key derivation and the proof. Pass your own, or leave it out to get 32 random bytes. |
+| `binding_id` | Bound into key derivation and the proof. `seal_for` makes it an [owner-bound binding id](#owner-bound-binding-ids). |
 | `capsule` | The BGV-encrypted key seed. Only the committee can open it, jointly. |
 | `proof` | A version-tagged zero-knowledge proof that `capsule` is well-formed. |
 | `ct` | `nonce(12) ‖ AES-256-GCM(plaintext)`. |
@@ -38,31 +39,57 @@ The joint public key and current epoch come from the runtime APIs `KgcApi.joint_
 `Option<Bytes>` for the key and a little-endian `u32` for the epoch, for example
 `Number(new DataView(hexToU8a(await client.runtimeApi("KgcApi_dkg_epoch")).buffer).getUint32(0, true))`.
 
-```rust
-use matter_sdk::{encrypt, Aad};
+`owner` is the 32-byte account id the store will be dispatched **as**. That is your own
+account when you sign directly, and the account you act for when the store goes through a
+proxy: the member behind an API key, or a project budget account.
 
-let sealed = encrypt(&joint_pk, epoch, b"DATABASE_URL=postgres://…", Aad::EnvV1.as_bytes(), None)?;
+```rust
+use matter_sdk::{seal_for, Aad};
+
+let sealed = seal_for(&owner, &joint_pk, epoch, b"DATABASE_URL=postgres://…", Aad::EnvV1.as_bytes())?;
 ```
 
 ```ts
-import { encrypt, Aad } from "@openmatter-network/matter-sdk";
+import { sealFor, Aad } from "@openmatter-network/matter-sdk-core";
 
-const sealed = encrypt(jointPk, epoch, new TextEncoder().encode("DATABASE_URL=…"), Aad.EnvV1);
+const sealed = sealFor(owner, jointPk, epoch, new TextEncoder().encode("DATABASE_URL=…"), Aad.EnvV1);
 ```
 
 ```python
-from matter_sdk import encrypt, Aad, aad_bytes
+from matter_sdk import seal_for, Aad, aad_bytes
 
 chain = client.chain
-sealed = encrypt(chain.joint_pk(), chain.dkg_epoch(), b"DATABASE_URL=...", aad_bytes(Aad.ENV_V1))
+sealed = seal_for(chain.joint_pk(), chain.dkg_epoch(), b"DATABASE_URL=...", aad_bytes(Aad.ENV_V1), owner=owner)
 ```
 
 ```go
 chain := client.Chain()
 jointPk, _ := chain.JointPk()
 epoch, _ := chain.DkgEpoch()
-sealed, err := mattersdk.Encrypt(jointPk, epoch, []byte("DATABASE_URL=…"), mattersdk.AadBytes(mattersdk.AadEnvV1), nil)
+sealed, err := mattersdk.SealFor(owner, jointPk, epoch, []byte("DATABASE_URL=…"), mattersdk.AadBytes(mattersdk.AadEnvV1))
 ```
+
+### Owner-bound binding ids
+
+An owner-bound binding id commits to the account that owns the secret:
+
+```text
+VERSION (0x01) ‖ salt (31 bytes) ‖ blake2b-256("matter-secrets/owner-binding/v1" ‖ VERSION ‖ owner (32 bytes) ‖ salt)
+```
+
+The chain checks that commitment against the account storing or rotating the secret
+(`SecretsApi.owner_binding_enforced` says whether a payload without one is still accepted;
+a refused write fails with `Secrets.BindingNotOwnerBound`). The layout is pinned by
+`testvectors/binding_ids.json`. `binding_id_for(owner, salt)` computes one with a salt you
+choose, for the rare caller that must recompute it; `binding_commits_to(owner, binding_id)`
+checks one before you submit.
+
+`encrypt` remains for sealing under a binding id you supply. Left to its default it uses 32
+random bytes that commit to no owner, so use it only where you pass an owner-bound id
+yourself. An empty binding id is refused.
+
+Opening a secret never looks at the form of its binding id: secrets sealed before this
+form existed open exactly as before.
 
 Guarantees:
 

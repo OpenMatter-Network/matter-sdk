@@ -13,9 +13,12 @@ are pure Python.
 from ._native import (
     CRYPTO_PROTOCOL_VERSION,
     MAX_COMMITTEE_RESPONSE_BYTES,
+    binding_commits_to,
+    binding_id_for,
     encrypt,
     lagrange_for,
     open_secret,
+    seal_for,
     signing_payload,
     verify_plaintext_proof,
 )
@@ -113,6 +116,9 @@ except ImportError as exc:  # pragma: no cover - depends on the install extra
 
 __all__ = [
     # crypto core
+    "seal_for",
+    "binding_id_for",
+    "binding_commits_to",
     "encrypt",
     "signing_payload",
     "lagrange_for",
