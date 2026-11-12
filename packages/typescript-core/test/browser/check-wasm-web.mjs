@@ -23,6 +23,8 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "..", "..", "..");
 const TIMEOUT_MS = 60_000;
+/** How long a killed browser gets to exit before its profile is removed anyway. */
+const EXIT_WAIT_MS = 5_000;
 const MIME = { ".js": "text/javascript", ".wasm": "application/wasm", ".html": "text/html", ".json": "application/json" };
 const SERVED = ["dist", "wasm-web"];
 const KEY_FILL = 7;
@@ -124,9 +126,20 @@ const timer = setTimeout(() => finish({ error: `no answer from the browser withi
 
 const got = await result;
 clearTimeout(timer);
-chrome.kill();
+// Wait for the browser to be GONE before removing its profile: `kill()` only
+// sends the signal, and a browser still shutting down keeps writing there —
+// on a CI runner the removal met "ENOTEMPTY" and failed a check that had
+// passed. And tidying up is never the verdict: a profile that will not go is
+// reported and left for the OS's temp cleaner.
+const exited = new Promise((gone) => chrome.once("exit", gone));
+chrome.kill("SIGKILL");
+await Promise.race([exited, new Promise((waited) => setTimeout(waited, EXIT_WAIT_MS))]);
 server.close();
-rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
+try {
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+} catch (e) {
+  console.error(`check-wasm-web: left ${profile} behind (${e.code ?? e.message})`);
+}
 
 if (got.error) fail(`the page failed: ${got.error}`);
 const differing = Object.keys(expected).filter((key) => JSON.stringify(got[key]) !== JSON.stringify(expected[key]));

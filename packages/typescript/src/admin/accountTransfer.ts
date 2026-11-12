@@ -15,8 +15,15 @@
 // and the caller dispatches it as that account (an operator through
 // `Sudo.sudo_as`, see `toSudoBatch`).
 //
-// The old account's key is never needed and never trusted. What the chain
-// gives no call to move is reported in `unmovable`, never dropped silently.
+// In the operator plan the old account's key is never needed and never
+// trusted. What the chain gives no call to move is reported in `unmovable`,
+// never dropped silently.
+//
+// Since 2.5.0 the same facts also plan a SELF-SERVE move (`planSelfTransfer`,
+// at the end of this file) for a person who holds both keys; it is the path
+// applications use. The operator plan stays for tools that act through
+// `Sudo.sudo_as`, and is what the self-serve plan is derived from, so the two
+// can never disagree about what a move consists of.
 
 /** The first runtime with the two-step organization hand-over. */
 export const MIN_TRANSFER_SPEC_VERSION = 333;
@@ -411,4 +418,177 @@ export function toSudoBatch(steps: readonly TransferStep[]): CallTree {
       })),
     ],
   };
+}
+
+// ── The self-serve move ─────────────────────────────────────────────────────
+//
+// The same facts, for a person who holds BOTH keys: each account signs its own
+// half as ordinary calls, with no operator. What differs from the plan above:
+//
+//  - The calls are grouped into PHASES, each one account's `Utility.batch_all`
+//    — which, signed by its own account, is atomic. Every dependency between
+//    the two accounts points one way (the old account lets go, then the new
+//    one takes), so the phases run in one fixed order.
+//  - What only a third party can sign (another organization's owner, or a
+//    sponsor that is neither account) cannot be done at all: it is reported in
+//    `needsOthers`, never planned.
+//  - The old account signing is the point, so that it "signed since the
+//    incident" is not a refusal. Only an account that OWNS an organization is
+//    served; a member asks its organization's owner for a fresh invite.
+//
+// Between `take` and `leave` the new account re-seals the secrets it was let
+// into; that is the caller's work, and `leave` deletes a secret only once the
+// facts say it was replaced.
+
+/** One account's batch. The values are the fixed order they run in. */
+export enum SelfTransferPhase {
+  /** Old: let the new account in — membership, the hand-over offer, its keys
+   *  released, its secrets shared. */
+  Share = "share",
+  /** New: accept the hand-over and take what the old account held in it. */
+  Take = "take",
+  /** Old: delete what was replaced, hand over sponsorship, clear its proxies,
+   *  and send its balance — last, since nothing it sends after could be paid. */
+  Leave = "leave",
+  /** New, once it is the sponsor: the allowances. */
+  Settle = "settle",
+  /** New: remove the old account from the organization. */
+  Close = "close",
+}
+
+export enum SelfTransferRefusal {
+  SameAccount = "same_account",
+  SpecTooOld = "spec_too_old",
+  NewAccountIsAgentKey = "new_account_is_agent_key",
+  NewAccountHasWorkspace = "new_account_has_workspace",
+  /** The old account owned no organization when the move began. */
+  OldOwnsNoOrganization = "old_owns_no_organization",
+  UnmovableNotAcknowledged = "unmovable_not_acknowledged",
+}
+
+export type SelfSigner = TransferActor.Old | TransferActor.New;
+
+export interface SelfTransferBatch {
+  readonly phase: SelfTransferPhase;
+  readonly signer: SelfSigner;
+  /** Never empty: a phase with nothing left is not in the plan. */
+  readonly steps: readonly TransferStep[];
+}
+
+export interface SelfTransferPlan {
+  readonly phases: readonly SelfTransferBatch[];
+  /** Calls only another organization's owner, or a sponsor, can make. */
+  readonly needsOthers: readonly TransferStep[];
+  readonly refusals: readonly SelfTransferRefusal[];
+  readonly unmovable: readonly Unmovable[];
+}
+
+const PHASE_SIGNER: Readonly<Record<SelfTransferPhase, SelfSigner>> = {
+  [SelfTransferPhase.Share]: TransferActor.Old,
+  [SelfTransferPhase.Take]: TransferActor.New,
+  [SelfTransferPhase.Leave]: TransferActor.Old,
+  [SelfTransferPhase.Settle]: TransferActor.New,
+  [SelfTransferPhase.Close]: TransferActor.New,
+};
+
+/** Which phase each call belongs to, by the account that signs it. A call
+ *  the operator plan emits and this table lacks is a bug, found at once. */
+const PHASE_OF: Readonly<Record<SelfSigner, Readonly<Record<string, SelfTransferPhase>>>> = {
+  [TransferActor.Old]: {
+    "Organizations.add_member": SelfTransferPhase.Share,
+    "Organizations.propose_ownership_transfer": SelfTransferPhase.Share,
+    "Budgets.revoke_agent_key": SelfTransferPhase.Share,
+    "Secrets.grant_access": SelfTransferPhase.Share,
+    "Secrets.delete_secret": SelfTransferPhase.Leave,
+    "Budgets.transfer_sponsorship": SelfTransferPhase.Leave,
+    "Proxy.remove_proxies": SelfTransferPhase.Leave,
+    "Balances.transfer_all": SelfTransferPhase.Leave,
+  },
+  [TransferActor.New]: {
+    "Organizations.accept_ownership_transfer": SelfTransferPhase.Take,
+    "Organizations.assign_to_project": SelfTransferPhase.Take,
+    "Budgets.authorize_project_deployer": SelfTransferPhase.Take,
+    "Budgets.revoke_project_deployer": SelfTransferPhase.Take,
+    "Organizations.unassign_from_project": SelfTransferPhase.Take,
+    "Budgets.set_member_billing": SelfTransferPhase.Take,
+    "Budgets.authorize_org_resource_operator": SelfTransferPhase.Take,
+    "Budgets.authorize_agent_key": SelfTransferPhase.Take,
+    "Budgets.set_plan_allotment": SelfTransferPhase.Settle,
+    "Budgets.set_purchased_allotment": SelfTransferPhase.Settle,
+    "Organizations.remove_member": SelfTransferPhase.Close,
+  },
+};
+
+const isSelfSigned = (s: TransferStep): boolean => s.as === TransferActor.Old || s.as === TransferActor.New;
+
+function phaseOf(s: TransferStep): SelfTransferPhase {
+  const phase = PHASE_OF[s.as as SelfSigner][`${s.pallet}.${s.call}`];
+  if (phase === undefined) throw new Error(`planSelfTransfer: no phase for ${s.pallet}.${s.call} signed as ${s.as}`);
+  return phase;
+}
+
+const OPERATOR_TO_SELF: Readonly<Partial<Record<TransferRefusal, SelfTransferRefusal>>> = {
+  [TransferRefusal.SameAccount]: SelfTransferRefusal.SameAccount,
+  [TransferRefusal.SpecTooOld]: SelfTransferRefusal.SpecTooOld,
+  [TransferRefusal.NewAccountIsAgentKey]: SelfTransferRefusal.NewAccountIsAgentKey,
+  [TransferRefusal.NewAccountHasWorkspace]: SelfTransferRefusal.NewAccountHasWorkspace,
+  [TransferRefusal.UnmovableNotAcknowledged]: SelfTransferRefusal.UnmovableNotAcknowledged,
+};
+
+function selfRefusalsOf(facts: TransferFacts, operatorRefusals: readonly TransferRefusal[]): SelfTransferRefusal[] {
+  const carried = operatorRefusals.flatMap((r) => OPERATOR_TO_SELF[r] ?? []);
+  if (carried.includes(SelfTransferRefusal.SameAccount)) return carried;
+  // The SNAPSHOT's role: after the hand-over the old account is an Admin, and
+  // a move resumed there is still the move of an account that owned one.
+  const ownedOne = facts.orgs.some((o) => o.oldRole.before === OrgRole.Owner);
+  // The enum's own order is the reporting order.
+  return Object.values(SelfTransferRefusal).filter(
+    (r) => carried.includes(r) || (r === SelfTransferRefusal.OldOwnsNoOrganization && !ownedOne),
+  );
+}
+
+/**
+ * Everything still to do for a person holding both keys to move what the old
+ * account held, as the batches each account signs, in the order they run.
+ *
+ * POST: no phase is empty; every step of a phase is signed by that phase's
+ *       account; `Balances.transfer_all` is the last step of `leave`.
+ */
+export function planSelfTransfer(facts: TransferFacts): SelfTransferPlan {
+  const operator = planAccountTransfer({ ...facts, oldActiveSinceIncident: false });
+  const refusals = selfRefusalsOf(facts, operator.refusals);
+  if (refusals.length > 0) return { phases: [], needsOthers: [], refusals, unmovable: operator.unmovable };
+
+  const all = [...operator.steps, ...planSecretCleanup(facts.old, facts.oldSecrets)];
+  const own = all.filter(isSelfSigned);
+  // Within a phase the operator plan's order holds, except that the balance
+  // goes after everything else the old account still has to send.
+  const leavingLast = (steps: readonly TransferStep[]): TransferStep[] => [
+    ...steps.filter((s) => s.call !== "transfer_all"),
+    ...steps.filter((s) => s.call === "transfer_all"),
+  ];
+  const phases = Object.values(SelfTransferPhase)
+    .map((phase) => ({
+      phase,
+      signer: PHASE_SIGNER[phase],
+      steps: leavingLast(own.filter((s) => phaseOf(s) === phase)),
+    }))
+    .filter((p) => p.steps.length > 0);
+  return { phases, needsOthers: all.filter((s) => !isSelfSigned(s)), refusals, unmovable: operator.unmovable };
+}
+
+/**
+ * Whether a self-serve move has nothing left to send. `keptSecretIds` are the
+ * old account's secrets the new account could NOT replace (something still
+ * reads the original): they stay with the old account, shared, and do not
+ * hold the move open. Any other secret must be gone.
+ */
+export function selfTransferIsComplete(facts: TransferFacts, keptSecretIds: readonly string[]): boolean {
+  const plan = planSelfTransfer(facts);
+  const kept = new Set(keptSecretIds);
+  return (
+    plan.refusals.length === 0 &&
+    plan.phases.length === 0 &&
+    facts.oldSecrets.every((s) => kept.has(s.id))
+  );
 }

@@ -1,0 +1,183 @@
+{
+  "_comment": "Self-serve account move: the person holds BOTH keys and each account signs its own half, with ordinary signed calls and no sudo. Chain facts -> ordered PHASES, each one account's atomic batch. Maintained by hand (never emitted from the planner). Facts are taken from account_transfer.json by case name (`facts_from`; `orgs_from` appends another case's orgs; `with` replaces top-level fields), so the two planners are pinned against the same states. A phase is [phase, signer, steps]; a step is [as, actor, \"Pallet.call\", args]. `needs_others` are the calls only a third party (another organization's owner, or a sponsor) can make: reported, never signed.",
+  "phase_order": ["share", "take", "leave", "settle", "close"],
+  "cases": [
+    {
+      "name": "owner of an org: five phases, old then new, the balance last of the old account's calls",
+      "facts_from": "owner of an org with two projects",
+      "refusals": [],
+      "phases": [
+        ["share", "old", [
+          ["old", "5Old", "Organizations.add_member", ["0xa1", "5New", "Admin"]],
+          ["old", "5Old", "Organizations.propose_ownership_transfer", ["0xa1", "5New"]],
+          ["old", "5Old", "Budgets.revoke_agent_key", ["5Key"]],
+          ["old", "5Old", "Budgets.revoke_agent_key", ["5Sess"]],
+          ["old", "5Old", "Secrets.grant_access", ["7", { "User": "5New" }]]
+        ]],
+        ["take", "new", [
+          ["new", "5New", "Organizations.accept_ownership_transfer", ["0xa1", ["0xb1", "0xb2"]]],
+          ["new", "5New", "Organizations.assign_to_project", ["0xa1", "0xb1", "5New"]],
+          ["new", "5New", "Budgets.authorize_project_deployer", ["0xa1", "0xb1", "5New"]],
+          ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]],
+          ["new", "5New", "Organizations.unassign_from_project", ["0xa1", "0xb1", "5Old"]],
+          ["new", "5New", "Budgets.set_member_billing", ["0xa1", "5New"]],
+          ["new", "5New", "Budgets.authorize_org_resource_operator", ["0xa1", "5New"]],
+          ["new", "5New", "Budgets.authorize_agent_key", ["5Key", 48]]
+        ]],
+        ["leave", "old", [
+          ["old", "5Old", "Budgets.transfer_sponsorship", ["0xa1", "5New"]],
+          ["old", "5Old", "Proxy.remove_proxies", []],
+          ["old", "5Old", "Balances.transfer_all", ["5New", false]]
+        ]],
+        ["settle", "new", [
+          ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5New", "5000"]],
+          ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5New", "200"]],
+          ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5Old", "0"]],
+          ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5Old", "0"]]
+        ]],
+        ["close", "new", [
+          ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]]
+        ]]
+      ],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "owner who is also a member of someone else's org: its own org moves, the other org's calls are reported",
+      "facts_from": "owner of an org with two projects",
+      "orgs_from": "member of an org someone else owns",
+      "with": { "agentKeys": [], "oldSecrets": [], "oldOtherProxies": 0, "oldTransferable": "0" },
+      "refusals": [],
+      "phases": [
+        ["share", "old", [
+          ["old", "5Old", "Organizations.add_member", ["0xa1", "5New", "Admin"]],
+          ["old", "5Old", "Organizations.propose_ownership_transfer", ["0xa1", "5New"]]
+        ]],
+        ["take", "new", [
+          ["new", "5New", "Organizations.accept_ownership_transfer", ["0xa1", ["0xb1", "0xb2"]]],
+          ["new", "5New", "Organizations.assign_to_project", ["0xa1", "0xb1", "5New"]],
+          ["new", "5New", "Budgets.authorize_project_deployer", ["0xa1", "0xb1", "5New"]],
+          ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]],
+          ["new", "5New", "Organizations.unassign_from_project", ["0xa1", "0xb1", "5Old"]],
+          ["new", "5New", "Budgets.set_member_billing", ["0xa1", "5New"]],
+          ["new", "5New", "Budgets.authorize_org_resource_operator", ["0xa1", "5New"]]
+        ]],
+        ["leave", "old", [
+          ["old", "5Old", "Budgets.transfer_sponsorship", ["0xa1", "5New"]]
+        ]],
+        ["settle", "new", [
+          ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5New", "5000"]],
+          ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5New", "200"]],
+          ["new", "5New", "Budgets.set_plan_allotment", ["0xa1", "5Old", "0"]],
+          ["new", "5New", "Budgets.set_purchased_allotment", ["0xa1", "5Old", "0"]]
+        ]],
+        ["close", "new", [
+          ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]]
+        ]]
+      ],
+      "needs_others": [
+        ["org_owner", "5Bob", "Organizations.add_member", ["0xa2", "5New", "Member"]],
+        ["org_owner", "5Bob", "Organizations.assign_to_project", ["0xa2", "0xc1", "5New"]],
+        ["org_owner", "5Bob", "Budgets.authorize_project_deployer", ["0xa2", "0xc1", "5New"]],
+        ["org_owner", "5Bob", "Budgets.revoke_project_deployer", ["0xa2", "0xc1", "5Old"]],
+        ["org_owner", "5Bob", "Organizations.unassign_from_project", ["0xa2", "0xc1", "5Old"]],
+        ["org_owner", "5Bob", "Organizations.remove_member", ["0xa2", "5Old"]]
+      ],
+      "complete": false
+    },
+    {
+      "name": "interrupted after the hand-over: only the phases with something left, and no secret is deleted before it is replaced",
+      "facts_from": "interrupted after the ownership hand-over",
+      "refusals": [],
+      "phases": [
+        ["take", "new", [
+          ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]]
+        ]],
+        ["leave", "old", [
+          ["old", "5Old", "Balances.transfer_all", ["5New", false]]
+        ]],
+        ["close", "new", [
+          ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]]
+        ]]
+      ],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "the same, once the new account has replaced the secret: the old account deletes it before it leaves",
+      "facts_from": "interrupted after the ownership hand-over",
+      "with": { "oldSecrets": [{ "id": "7", "grantedToNew": true, "replaced": true }] },
+      "refusals": [],
+      "phases": [
+        ["take", "new", [
+          ["new", "5New", "Budgets.revoke_project_deployer", ["0xa1", "0xb1", "5Old"]]
+        ]],
+        ["leave", "old", [
+          ["old", "5Old", "Secrets.delete_secret", ["7"]],
+          ["old", "5Old", "Balances.transfer_all", ["5New", false]]
+        ]],
+        ["close", "new", [
+          ["new", "5New", "Organizations.remove_member", ["0xa1", "5Old"]]
+        ]]
+      ],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "the old account has left and its replaced secret is still on the network: one call remains",
+      "facts_from": "nothing left to move",
+      "refusals": [],
+      "phases": [
+        ["leave", "old", [
+          ["old", "5Old", "Secrets.delete_secret", ["7"]]
+        ]]
+      ],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "nothing left: no phases, and the move is complete",
+      "facts_from": "nothing left to move",
+      "with": { "oldSecrets": [] },
+      "refusals": [],
+      "phases": [],
+      "needs_others": [],
+      "complete": true
+    },
+    {
+      "name": "a secret that was kept, not replaced, does not hold the move open when the caller names it",
+      "facts_from": "nothing left to move",
+      "with": { "oldSecrets": [{ "id": "7", "grantedToNew": true, "replaced": false }] },
+      "kept": ["7"],
+      "refusals": [],
+      "phases": [],
+      "needs_others": [],
+      "complete": true
+    },
+    {
+      "name": "refused: an account that owns no organization is not served",
+      "facts_from": "member of an org someone else owns",
+      "refusals": ["old_owns_no_organization"],
+      "phases": [],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "refused: every reason at once, and that the old account signed recently is not one of them",
+      "facts_from": "refused: nothing is planned",
+      "refusals": ["spec_too_old", "new_account_is_agent_key", "new_account_has_workspace", "unmovable_not_acknowledged"],
+      "phases": [],
+      "needs_others": [],
+      "complete": false
+    },
+    {
+      "name": "refused: the two accounts are one",
+      "facts_from": "owner of an org with two projects",
+      "with": { "new": "5Old" },
+      "refusals": ["same_account"],
+      "phases": [],
+      "needs_others": [],
+      "complete": false
+    }
+  ]
+}

@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A self-serve account move** in `@openmatter-network/matter-sdk/admin`:
+  `planSelfTransfer(facts)` plans moving everything one account holds to another for a
+  person who holds both keys. It returns the batches each account signs (`share`, `take`,
+  `leave`, `settle`, `close`, in that order), the calls only a third party could make
+  (`needsOthers`), and typed refusals; `selfTransferIsComplete` is its end check. It reads
+  the same `TransferFacts` as `planAccountTransfer` and is pinned by
+  `testvectors/self_transfer.json`.
+
 - `@openmatter-network/matter-sdk-core` exports `./wasm-web/*`, so a bundler that needs
   to point at the browser build can name it without a path alias. CI now loads the
   published web build and the default transport in a headless browser
