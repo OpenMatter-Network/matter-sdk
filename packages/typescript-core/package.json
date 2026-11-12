@@ -1,6 +1,6 @@
 {
   "name": "@openmatter-network/matter-sdk-core",
-  "version": "2.4.4",
+  "version": "2.4.5",
   "description": "MatterSDK core, with zero runtime dependencies: seal secrets under the matter-kgc committee and recover them via a signed, threshold partial-decrypt quorum.",
   "keywords": [
     "openmatter",
@@ -35,6 +35,7 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./wasm-web/*": "./wasm-web/*",
     "./package.json": "./package.json"
   },
   "imports": {
@@ -54,6 +55,7 @@
     "build": "npm run build:wasm && npm run build:wasm-web && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build:wasm && vitest run",
+    "test:browser": "node test/browser/check-wasm-web.mjs",
     "prepublishOnly": "echo 'Publish the CI-built, checked tarball (npm publish <file>.tgz), never this directory; see RELEASING.md.' >&2 && exit 1"
   },
   "devDependencies": {

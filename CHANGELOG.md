@@ -8,6 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `@openmatter-network/matter-sdk-core` exports `./wasm-web/*`, so a bundler that needs
+  to point at the browser build can name it without a path alias. CI now loads the
+  published web build and the default transport in a headless browser
+  (`npm run test:browser`).
+
 - `seal_for` (`sealFor`, `SealFor`, `msdk_seal_for`) seals a secret for the account that
   will own it: the envelope's binding id is an owner-bound binding id, which the chain
   checks when the secret is stored or rotated. With it come `binding_id_for` and
@@ -67,6 +72,18 @@ versions follow [Semantic Versioning](https://semver.org/).
   `MATTER_SECRET_ID`.
 
 ### Fixed
+
+- `FetchTransport` works in a browser. It kept `fetch` as a field and called it as a
+  method, which a browser refuses ("Illegal invocation"), so the default transport — and
+  one handed `window.fetch` — failed every request there; Node allows the call, so tests
+  and the e2e runs passed. The caller's `fetch` is now always called bare. Browser callers
+  who worked around it with `new FetchTransport((...args) => fetch(...args))` can keep or
+  drop the wrapper.
+- `FetchTransport` no longer needs `AbortSignal.timeout`: where the runtime lacks it
+  (Safari before 16) the deadline is an `AbortController` and a timer.
+- The TypeScript client reads its mainnet confirmation variable through
+  `globalThis.process?.env`, so a browser bundle with no `process` gets the documented
+  `mainnetNotConfirmed` refusal instead of a `ReferenceError`.
 
 - **TypeScript could not submit `Secrets.store_secret`, `rotate_secret` or any call with a
   variable-length byte argument.** The façades and `tx` handed @polkadot raw `Uint8Array`s,

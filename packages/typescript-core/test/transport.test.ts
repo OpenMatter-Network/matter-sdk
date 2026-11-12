@@ -34,3 +34,67 @@ describe("FetchTransport", () => {
     expect(maxCommitteeResponseBytes()).toBeGreaterThan(1_180_574);
   });
 });
+
+// A browser's `fetch` accepts only an undefined receiver or the window:
+// called as a method of anything else it throws ("Illegal invocation";
+// Firefox: "'fetch' called on an object that does not implement interface
+// Window"). Node's does not, and every test above passes its own function —
+// so a transport that kept `fetch` as a field and called `this.fetchImpl(...)`
+// passed here and failed every request in every browser (found 2026-11-12:
+// a first sign-in read as "0 of N nodes answered"). `strictFetch` gives the
+// tests the browser's rule.
+describe("FetchTransport under a browser's receiver rule", () => {
+  const strictFetch = (seen: string[]): typeof fetch =>
+    function strict(this: unknown, input: string | URL | Request) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      seen.push(String(input));
+      return Promise.resolve(new Response('{"status":"active","attestation":"0x00"}', { status: 200 }));
+    } as typeof fetch;
+
+  const withGlobalFetch = async <T>(replacement: typeof fetch, body: () => Promise<T>): Promise<T> => {
+    const original = globalThis.fetch;
+    globalThis.fetch = replacement;
+    try {
+      return await body();
+    } finally {
+      globalThis.fetch = original;
+    }
+  };
+
+  it("the default transport sends every kind of request", async () => {
+    const seen: string[] = [];
+    await withGlobalFetch(strictFetch(seen), async () => {
+      const transport = new FetchTransport();
+      await transport.health("http://node-1");
+      await transport.partialDecrypt("http://node-1", {} as never);
+      await transport.attestLogin("http://node-1", { id_token: "a.b.c" } as never);
+    });
+    expect(seen).toEqual(["http://node-1/health", "http://node-1/partial-decrypt", "http://node-1/attest-login"]);
+  });
+
+  it("a caller who passes the global `fetch` itself is served too", async () => {
+    const seen: string[] = [];
+    await withGlobalFetch(strictFetch(seen), async () => {
+      await new FetchTransport(globalThis.fetch).health("http://node-1");
+    });
+    expect(seen).toEqual(["http://node-1/health"]);
+  });
+});
+
+describe("the request deadline", () => {
+  it("still exists where `AbortSignal.timeout` does not (Safari before 16)", async () => {
+    const original = AbortSignal.timeout;
+    (AbortSignal as { timeout?: unknown }).timeout = undefined;
+    try {
+      const seen: RequestInit[] = [];
+      await new FetchTransport(fakeFetch('{"status":"active"}', seen), { timeoutMs: 5 }).health("http://node-1");
+      const signal = seen[0]!.signal as AbortSignal;
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal.aborted).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(signal.aborted).toBe(true);
+    } finally {
+      AbortSignal.timeout = original;
+    }
+  });
+});

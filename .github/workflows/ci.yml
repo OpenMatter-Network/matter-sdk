@@ -177,6 +177,11 @@ jobs:
           npm ci
           npm run build
           npm test
+      # The published web build and the default transport, in a real browser:
+      # Node tolerates what a browser refuses (test/browser/check-wasm-web.mjs).
+      - name: Load the package in a headless browser
+        working-directory: matter-sdk/packages/typescript-core
+        run: npm run test:browser
       - name: Assert matter-sdk-core has no runtime dependencies
         working-directory: matter-sdk/packages/typescript-core
         run: |

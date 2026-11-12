@@ -74,33 +74,54 @@ export interface FetchTransportOptions {
   maxResponseBytes?: number;
 }
 
+/**
+ * A signal that aborts after `ms`. `AbortSignal.timeout` where the runtime
+ * has it; a controller and a timer where it does not (Safari before 16),
+ * where every request used to throw before it was sent.
+ */
+function deadline(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(new DOMException("The operation timed out.", "TimeoutError")), ms);
+  return controller.signal;
+}
+
 /** A `fetch`-based transport for browsers and Node 22+. */
 export class FetchTransport implements LoginTransport {
   private readonly timeoutMs: number;
   private readonly maxResponseBytes: number;
+  /**
+   * The caller's `fetch`, always called BARE.
+   *
+   * Until 2.4.4 this class kept `fetch` as a field and called
+   * `this.send(...)`. A browser's `fetch` accepts no receiver but the
+   * window ("Illegal invocation"), so the default transport — and one handed
+   * `window.fetch` — threw on every request in every browser; Node's `fetch`
+   * allows it, which is why the tests and the e2e runs passed. Wrapping it
+   * here makes the receiver irrelevant for both.
+   */
+  private readonly send: typeof fetch;
 
-  constructor(
-    private readonly fetchImpl: typeof fetch = fetch,
-    options: FetchTransportOptions = {},
-  ) {
+  constructor(fetchImpl: typeof fetch = fetch, options: FetchTransportOptions = {}) {
+    this.send = (input, init) => fetchImpl(input, init);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.maxResponseBytes = options.maxResponseBytes ?? maxCommitteeResponseBytes();
   }
 
   async health(endpoint: string): Promise<Health> {
-    const res = await this.fetchImpl(`${trimEnd(endpoint)}/health`, {
-      signal: AbortSignal.timeout(this.timeoutMs),
+    const res = await this.send(`${trimEnd(endpoint)}/health`, {
+      signal: deadline(this.timeoutMs),
     });
     if (!res.ok) throw new DecryptError("transport", `health ${res.status} from ${endpoint}`);
     return this.readJson<Health>(res, endpoint);
   }
 
   async partialDecrypt(endpoint: string, req: PartialDecryptRequest): Promise<PartialDecryptResponse> {
-    const res = await this.fetchImpl(`${trimEnd(endpoint)}/partial-decrypt`, {
+    const res = await this.send(`${trimEnd(endpoint)}/partial-decrypt`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: deadline(this.timeoutMs),
     });
     if (!res.ok) throw new DecryptError("transport", `partial-decrypt ${res.status} from ${endpoint}`);
     return this.readJson<PartialDecryptResponse>(res, endpoint);
@@ -115,11 +136,11 @@ export class FetchTransport implements LoginTransport {
    * `503` `unavailable`. The message never contains the token.
    */
   async attestLogin(endpoint: string, req: AttestLoginRequest): Promise<AttestLoginResponse> {
-    const res = await this.fetchImpl(`${trimEnd(endpoint)}/attest-login`, {
+    const res = await this.send(`${trimEnd(endpoint)}/attest-login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: deadline(this.timeoutMs),
     });
     const transportFailure = (message: string) => new LoginError("transport", message);
     if (!res.ok) {

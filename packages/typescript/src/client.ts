@@ -196,7 +196,9 @@ export class MatterClient {
     // Read-only mainnet access needs no confirmation.
     if (!isMainnet || this.#signer === undefined) return;
 
-    const confirmed = confirmMainnet || process.env[CONFIRM_ENV] === CONFIRM_VALUE;
+    // `globalThis.process?.`: a browser bundle has no `process`, and a bare
+    // read threw a ReferenceError in place of the refusal below.
+    const confirmed = confirmMainnet || globalThis.process?.env?.[CONFIRM_ENV] === CONFIRM_VALUE;
     if (confirmed) return;
     throw ClientError.mainnetNotConfirmed(this.#properties.chainName, detectedVia);
   }

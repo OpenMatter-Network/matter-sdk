@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-core"
-version = "2.4.4"
+version = "2.4.5"
 dependencies = [
  "bincode",
  "blake2b_simd",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-key"
-version = "2.4.4"
+version = "2.4.5"
 dependencies = [
  "getrandom",
  "hex",
@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-wasm"
-version = "2.4.4"
+version = "2.4.5"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
