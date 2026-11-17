@@ -27,6 +27,14 @@ export const LOGIN_FIRST_GENERATION = 0;
 export const LOGIN_SEED_BYTES = 32;
 /** The runtime API (by `state_call` name) that answers {@link loginForArgs}. */
 export const LOGIN_FOR_RUNTIME_API = "LoginsApi_login_for";
+/**
+ * The runtime API that answers with the login an identity resolved to BEFORE
+ * its last rotation, while the chain keeps that account on record (runtime
+ * spec 337, `LoginsApi` v3). Same arguments ({@link loginForArgs}) and same
+ * answer ({@link decodeLoginRecord}) as {@link LOGIN_FOR_RUNTIME_API}; open
+ * it with {@link openLogin} to move out what that account owns.
+ */
+export const LOGIN_PREVIOUS_FOR_RUNTIME_API = "LoginsApi_previous_login_for";
 
 const ID_BYTES = 32;
 const SR25519_SIGNATURE_BYTES = 64;
@@ -224,9 +232,18 @@ export function oidcSigner(args: LoginSession & { appId: Uint8Array }): Signer {
 
 // ---- Registration -----------------------------------------------------------
 
-/** Everything a first registration is made of. See {@link prepareLoginRegistration}. */
+/**
+ * Everything a first registration — or a rotation — is made of. See
+ * {@link prepareLoginRegistration} and {@link prepareLoginRotation}.
+ */
 export interface LoginRegistration {
   appId: Uint8Array;
+  /**
+   * The generation the login will be at once this lands:
+   * {@link LOGIN_FIRST_GENERATION} for a registration, one more than the
+   * chain's record for a rotation.
+   */
+  generation: number;
   /** The account the seed controls; it signs `register_login` and owns the secret. */
   account: Uint8Array;
   /** The DKG epoch the seed was sealed under. */
@@ -254,7 +271,44 @@ export interface LoginRegistration {
  * @throws LoginAccountMismatch if `seed` does not control `account`: the chain
  * would refuse the envelope, or worse, register a key nobody holds.
  */
-export function prepareLoginRegistration(args: {
+export function prepareLoginRegistration(args: NewLoginSeed): LoginRegistration {
+  return prepareAt(args, LOGIN_FIRST_GENERATION);
+}
+
+/**
+ * Seal a NEW seed for a NEW account and derive everything moving an existing
+ * login to it needs. Pure: no network.
+ *
+ * What a person does when the seed of the account they have may have leaked:
+ * a key cannot be taken back, but the sign-in is still theirs. The committee
+ * attests the new account at the login's next generation for a fresh sign-in
+ * token, and `rotate_login` ({@link rotateLogin}), signed by the NEW account,
+ * moves the login. The account it leaves stays on chain as the previous one
+ * ({@link LOGIN_PREVIOUS_FOR_RUNTIME_API}) so what it owns can be moved out.
+ *
+ * Rotating does not make the old key harmless: whoever holds it still holds
+ * that account. It gives the person an account nobody else holds.
+ *
+ * @param args.from the login as the chain has it now ({@link decodeLoginRecord})
+ * @throws LoginError `invalid-input` if `args.account` is the account the
+ * login already has — that is not a rotation — or the login is at the last
+ * generation there is
+ * @throws LoginAccountMismatch if `seed` does not control `account`
+ */
+export function prepareLoginRotation(
+  args: NewLoginSeed & { from: Pick<LoginRecord, "account" | "generation"> },
+): LoginRegistration {
+  if (sameBytes(args.from.account, args.account)) {
+    throw new LoginError("invalid-input", "a rotation moves a login to a new account; this one already has it");
+  }
+  if (args.from.generation >= MAX_GENERATION) {
+    throw new LoginError("invalid-input", "this login has been rotated as many times as a login can be");
+  }
+  return prepareAt(args, args.from.generation + 1);
+}
+
+/** What sealing a new login seed takes. See {@link prepareLoginRegistration}. */
+export interface NewLoginSeed {
   appId: Uint8Array;
   issuer: string;
   subject: string;
@@ -263,7 +317,12 @@ export function prepareLoginRegistration(args: {
   epoch: number;
   seed: Uint8Array;
   genesis: Uint8Array;
-}): LoginRegistration {
+}
+
+/** The chain keeps a generation in a `u32`. */
+const MAX_GENERATION = 0xffff_ffff;
+
+function prepareAt(args: NewLoginSeed, generation: number): LoginRegistration {
   const { appId, account, epoch, genesis } = args;
   requireLength("seed", args.seed, LOGIN_SEED_BYTES);
   if (!sameBytes(loginAccount(args.seed), account)) {
@@ -278,17 +337,21 @@ export function prepareLoginRegistration(args: {
     identity,
     account,
     payloadHash,
-    LOGIN_FIRST_GENERATION,
+    generation,
   );
-  return { appId, account, epoch, identity, envelope, payloadHash, attestationPayload };
+  return { appId, generation, account, epoch, identity, envelope, payloadHash, attestationPayload };
 }
 
 /**
  * The `/attest-login` body for `registration`, signed by the session key so a
  * captured token cannot be attested for another account or envelope.
+ *
+ * A first registration's body is exactly what it always was; a rotation's
+ * also says which generation it asks for.
  */
 export async function attestLoginRequest(
-  registration: Pick<LoginRegistration, "appId" | "account" | "payloadHash" | "attestationPayload">,
+  registration: Pick<LoginRegistration, "appId" | "account" | "payloadHash" | "attestationPayload"> &
+    Partial<Pick<LoginRegistration, "generation">>,
   session: LoginSession,
 ): Promise<AttestLoginRequest> {
   requireTokenBoundTo(session);
@@ -301,8 +364,13 @@ export async function attestLoginRequest(
     payload_hash: toHex(registration.payloadHash),
     requester: toHex(session.requester),
     signature: toHex(signature),
+    ...(isRotation(registration.generation) ? { generation: registration.generation } : {}),
   };
 }
+
+/** Whether `generation` is a rotation's: stated, and past the first. */
+const isRotation = (generation: number | undefined): generation is number =>
+  generation !== undefined && generation > LOGIN_FIRST_GENERATION;
 
 /** One committee node's signature over a registration's attestation payload. */
 export interface LoginAttestation {
@@ -326,17 +394,51 @@ function faultOf(endpoint: string, reason: unknown, idToken: string): LoginAttes
     : { endpoint, kind: "transport", detail };
 }
 
+/** How {@link collectLoginAttestations} chooses whom to ask. */
+export interface CollectAttestationsOptions {
+  /**
+   * The order to ask `count` nodes in: every index from 0 to `count - 1`,
+   * each once. Default: uniformly at random, so no node is asked more often
+   * than another. Supply one only to make a test repeatable.
+   */
+  order?: (count: number) => readonly number[];
+}
+
+/** Every index below `count`, shuffled (Fisher–Yates over `crypto.getRandomValues`). */
+function randomOrder(count: number): number[] {
+  const indices = Array.from({ length: count }, (_, i) => i);
+  const draws = crypto.getRandomValues(new Uint32Array(count));
+  for (let last = count - 1; last > 0; last -= 1) {
+    // The bias of a 32-bit draw over a committee-sized range is far below anything observable.
+    const pick = draws[last]! % (last + 1);
+    [indices[last], indices[pick]] = [indices[pick]!, indices[last]!];
+  }
+  return indices;
+}
+
+function isPermutation(order: readonly number[], count: number): boolean {
+  return order.length === count && new Set(order).size === count && order.every((i) => Number.isInteger(i) && i >= 0 && i < count);
+}
+
 /**
- * Ask every node in `nodes` to attest `request`, in parallel, and resolve as
- * soon as `threshold` **distinct** nodes have signed; a slow node does not
- * delay success.
+ * Ask `threshold` of `nodes` to attest `request`, and one more for each that
+ * does not sign, until `threshold` **distinct** nodes have signed or there is
+ * nobody left to ask.
+ *
+ * Only as many nodes as are needed see the request: a sign-in token names the
+ * person (a provider's may carry their email address), and every node asked
+ * reads it. Which nodes are asked is random ({@link CollectAttestationsOptions}).
+ * Each request is bounded by the transport's own deadline; a node that does
+ * not answer in time counts as one that did not sign.
  *
  * Signatures are not verified here: the chain verifies each against the
  * seated committee when `register_login` is dispatched. A node account that
  * answers twice is counted once.
  *
  * @throws LoginError `already-registered` as soon as any node answers 409 —
- * read the login record and sign in instead; `attestations` when fewer than
+ * read the login record and sign in instead (for a rotation the same answer
+ * is `rotation-conflict`: the login has moved on, or is already this
+ * account's — read the record again); `attestations` when fewer than
  * `threshold` nodes signed, with one `faults` entry per node that did not
  * (each keeps its HTTP status: `401`/`403` means the token was refused, `503`
  * that the node could not check).
@@ -346,6 +448,7 @@ export async function collectLoginAttestations(
   nodes: ReadonlyArray<{ endpoint: string }>,
   request: AttestLoginRequest,
   threshold: number,
+  options: CollectAttestationsOptions = {},
 ): Promise<LoginAttestation[]> {
   if (!Number.isInteger(threshold) || threshold < 1) {
     throw new LoginError("invalid-input", `threshold must be a positive integer, got ${threshold}`);
@@ -358,12 +461,17 @@ export async function collectLoginAttestations(
       { faults },
     );
   if (nodes.length < threshold) throw tooFew(0, []);
+  const order = (options.order ?? randomOrder)(nodes.length);
+  if (!isPermutation(order, nodes.length)) {
+    throw new LoginError("invalid-input", `order must list each of ${nodes.length} nodes once`);
+  }
 
   return new Promise<LoginAttestation[]>((resolve, reject) => {
     // Shared by the per-node callbacks below; nothing else touches them.
     const signed = new Map<string, LoginAttestation>();
     const faults = new Map<number, LoginAttestationFault>();
-    let outstanding = nodes.length;
+    let asked = 0;
+    let outstanding = 0;
     let settled = false;
     const settle = (finish: () => void) => {
       if (!settled) {
@@ -371,17 +479,24 @@ export async function collectLoginAttestations(
         finish();
       }
     };
-    const answered = () => {
+    const answered = (signedNow: boolean) => {
       outstanding -= 1;
       if (signed.size >= threshold) {
         settle(() => resolve([...signed.values()].slice(0, threshold)));
+      } else if (!signedNow && asked < order.length) {
+        // One that did not sign is replaced by exactly one that has not been asked.
+        ask();
       } else if (outstanding === 0) {
         const inNodeOrder = [...faults.entries()].sort(([a], [b]) => a - b).map(([, fault]) => fault);
         settle(() => reject(tooFew(signed.size, inNodeOrder)));
       }
     };
-
-    nodes.forEach(({ endpoint }, position) => {
+    const ask = () => {
+      if (settled) return;
+      const position = order[asked]!;
+      const { endpoint } = nodes[position]!;
+      asked += 1;
+      outstanding += 1;
       // `then` on a resolved value, so a transport that throws synchronously is a fault too.
       Promise.resolve()
         .then(() => transport.attestLogin(endpoint, request))
@@ -391,19 +506,27 @@ export async function collectLoginAttestations(
             const key = toHex(attestation.nodeAccount);
             if (signed.has(key)) {
               faults.set(position, { endpoint, kind: "transport", detail: `node account ${key} already counted` });
-            } else {
-              signed.set(key, attestation);
+              return false;
             }
+            signed.set(key, attestation);
+            return true;
           },
           (reason: unknown) => {
             if (reason instanceof LoginError && reason.kind === "already-registered") {
-              settle(() => reject(reason));
+              // A node says only "conflict"; what it conflicts with is what was asked.
+              const conflict = isRotation(request.generation)
+                ? new LoginError("rotation-conflict", reason.message, { status: reason.status })
+                : reason;
+              settle(() => reject(conflict));
             }
             faults.set(position, faultOf(endpoint, reason, request.id_token));
+            return false;
           },
         )
         .then(answered);
-    });
+    };
+
+    for (let i = 0; i < threshold; i += 1) ask();
   });
 }
 
@@ -432,6 +555,22 @@ export function registerLogin(
     epoch: registration.epoch,
     attestations: attestations.map((a) => [a.nodeAccount, a.signature]),
   };
+}
+
+/** Arguments for `logins.rotateLogin(app_id, identity, payload, epoch, attestations)`. */
+export type RotateLogin = RegisterLogin;
+
+/**
+ * Build `rotate_login` args from a {@link prepareLoginRotation} result. Submit
+ * the call **signed by the NEW account** (the new seed's own) with your chain
+ * client. The app's pot pays for a login's rotation at most once per sponsor
+ * interval; a sooner one is the new account's own to pay.
+ */
+export function rotateLogin(
+  rotation: Pick<LoginRegistration, "appId" | "identity" | "envelope" | "epoch">,
+  attestations: readonly LoginAttestation[],
+): RotateLogin {
+  return registerLogin(rotation, attestations);
 }
 
 // ---- The login record -------------------------------------------------------

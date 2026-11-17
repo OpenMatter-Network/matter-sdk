@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Rotating a login** in the TypeScript core (runtime spec 337, committee nodes that
+  attest rotations): `prepareLoginRotation` seals a new seed for a new account at the
+  login's next generation, `rotateLogin` builds the call the new account signs, and
+  `LOGIN_PREVIOUS_FOR_RUNTIME_API` reads the account the login left, which `openLogin`
+  opens like the current one. A refused rotation is `LoginError` kind
+  `rotation-conflict`. `LoginRegistration` carries its `generation`. See `docs/login.md`.
+
 - **A self-serve account move** in `@openmatter-network/matter-sdk/admin`:
   `planSelfTransfer(facts)` plans moving everything one account holds to another for a
   person who holds both keys. It returns the batches each account signs (`share`, `take`,
@@ -56,6 +63,11 @@ versions follow [Semantic Versioning](https://semver.org/).
   `eth_signature`) from a custom committee `Signer`.
 
 ### Changed
+
+- `collectLoginAttestations` asks a threshold of nodes rather than all of them (see
+  Security). A node that does not answer is replaced only once its request's deadline
+  passes, so one slow node can now delay a registration by that long. It takes an
+  optional fifth argument, `{ order }`, to make the choice repeatable in a test.
 
 - `encrypt` refuses an explicit binding id that is empty (previously sealed under an empty
   label). Omit it for the random default, or use `seal_for`.
@@ -126,6 +138,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 - Python signs with the SS58 prefix the chain reports instead of assuming 42.
 
 ### Security
+
+- `collectLoginAttestations` no longer sends a sign-in token to every committee node.
+  It asks `threshold` of them, chosen at random, and one more for each that does not
+  sign. A token names the person, and a provider's may carry their email address.
 
 - The threshold-crypto core (`matter-crypto` 0.9.0) moves to `crypto-bigint` 0.7.11, which
   removes secret-dependent timing in big-integer arithmetic (RUSTSEC-2026-0387). Ciphertexts,
