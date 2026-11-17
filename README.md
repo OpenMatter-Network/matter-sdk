@@ -19,6 +19,7 @@ await client.tx("Communities", "vote_proposal", [community, proposal, vote]); //
 | Capability | What it gives you | Guide |
 |---|---|---|
 | **Any pallet, by name** | `tx`, `query`, runtime APIs and constants for all 60+ pallets, resolved from live metadata, so a runtime upgrade needs no SDK release. Writes wait for finality and return a receipt. | [Chain surface](docs/chain-surface.md) |
+| **Reading chain state** | the `accounts`, `network` and `fees` façades: an account's balance and what a transfer can actually move; the chain's latest finalized block, its timing, and the health of the node; what a call would cost and who would be charged for it. One call each, at the finalized block or one you pin. Every result has one canonical JSON text, byte for byte identical in all four languages. | [Reading chain state](docs/reading-state.md) |
 | **Deployments** | the `deployments` façade: request and cancel workloads, attach sealed env and TLS secrets, set env, register post-quantum WireGuard peers, run QuantumGuard-guarded deployments | [Deployments](docs/deployments.md) |
 | **Compute resources** | the `resources` façade: register machines, manage privacy and allow-lists | [Resources](docs/resources.md) |
 | **Staking** | the `staking` façade: bond, nominate, unbond, and nomination pools | [Staking](docs/staking.md) |
@@ -73,7 +74,7 @@ cryptography repositories, which the published packages ship compiled:
 
 ```toml
 [dependencies]
-matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.6.0" }
+matter-sdk = { git = "https://github.com/OpenMatter-Network/matter-sdk", tag = "v2.7.0" }
 # features = ["chain"] adds the chain client and façades (subxt + tokio); default is off.
 ```
 
@@ -142,7 +143,7 @@ default. A signing client refuses mainnet unless you set `MATTER_CONFIRM=yes`. S
 
 | | Rust | TypeScript | Python | Go |
 |---|:--:|:--:|:--:|:--:|
-| Generic chain surface and the six façades | ✅ | ✅ | ✅ | ✅ |
+| Generic chain surface and every façade | ✅ | ✅ | ✅ | ✅ |
 | `ApiKey`, scoped keys, mainnet guard | ✅ | ✅ | ✅ | ✅ |
 | Threshold secrets (seal, store, grant, recover) | ✅ | ✅ | ✅ | ✅ |
 | Signer that keeps the key out of the process | ✅ | ✅ | ✅ (keypair-shaped) | ✅ |

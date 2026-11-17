@@ -13,9 +13,12 @@ from typing import Dict, List, Optional, Tuple
 from scalecodec.base import ScaleBytes
 from substrateinterface import ExtrinsicReceipt, Keypair, KeypairType, SubstrateInterface
 from substrateinterface.exceptions import StorageFunctionNotFound, SubstrateRequestException
+from substrateinterface.storage import StorageKey
 from substrateinterface.utils.ss58 import ss58_decode, ss58_encode
 
 from .committee import CommitteeNode
+from .hexutil import hex_if_bytes, to_hex
+from .reads._source import snapshot
 from .errors import (
     ChainError,
     DispatchError,
@@ -38,7 +41,8 @@ _AGENT_KEY_PALLET = "Budgets"
 _AGENT_KEY_CALL = "authorize_agent_key"
 _AGENT_KEY_API = "BudgetsApi_agent_key"
 
-#: SS58 address format when the chain reports none (Substrate's generic prefix).
+#: SS58 address format for a signer built outside a client (Substrate's generic
+#: prefix). A client passes its chain's own.
 _SS58_FORMAT = 42
 
 #: Seconds a write waits for finalization before :class:`FinalityTimeoutError`;
@@ -174,6 +178,18 @@ def _secret_id_from_attributes(attrs) -> int:
     return int(head)
 
 
+_STATE_CALL = "state_call"
+#: The call a member-tied key's calls are wrapped in.
+_PROXY_CALL = ("Proxy", "proxy")
+
+
+def _proxy_params(principal: bytes, call) -> dict:
+    """``Proxy.proxy``'s arguments for running ``call`` as ``principal``, with no
+    proxy type forced. The account goes in as hex: scalecodec takes raw bytes
+    for an SS58 string and fails."""
+    return {"real": {"Id": hex_if_bytes(principal)}, "force_proxy_type": None, "call": call}
+
+
 class ChainClient:
     """A thin wrapper over ``substrate-interface`` for the matter-kgc chain."""
 
@@ -273,16 +289,118 @@ class ChainClient:
         return bytes.fromhex(self.substrate.get_chain_finalised_head()[2:])
 
     def free_balance(self, address: str) -> int:
-        return int(self.substrate.query("System", "Account", [address]).value["data"]["free"])
+        """Plancks ``address`` holds free at the latest finalized block; 0 for an
+        account the chain does not store. Freezes and the existential deposit
+        hold some of it back: ``MatterClient.accounts.balance`` says what can move.
+        """
+        account = self.query("System", "Account", [address])
+        return 0 if account is None else int(account["data"]["free"])
+
+    def _rpc(self, method: str, params: Optional[List] = None):
+        """One raw JSON-RPC request, answered with its ``result``. Façade reads
+        decode that themselves, so nothing here depends on how scalecodec would
+        render it. A refused request raises :class:`ChainError` naming the method.
+        """
+        try:
+            return self.substrate.rpc_request(method, list(params or []))["result"]
+        except SubstrateRequestException as exc:
+            raise ChainError(
+                f"chain error at {method}: {exc}", pallet=method.split("_", 1)[0], call=method
+            ) from exc
+
+    def _runtime_call(self, api: str, args: bytes, at: bytes):
+        """One runtime API call (``Trait_method``) with SCALE-encoded ``args`` at
+        block ``at``, answered with the node's raw result. A refused call raises
+        :class:`ChainError` naming the API, not ``state_call``."""
+        try:
+            return self.substrate.rpc_request(
+                _STATE_CALL, [api, "0x" + bytes(args).hex(), "0x" + bytes(at).hex()]
+            )["result"]
+        except SubstrateRequestException as exc:
+            raise ChainError(
+                f"chain error at {api}: {exc}", pallet=api.split("_", 1)[0], call=api
+            ) from exc
+
+    def _call_data(
+        self, pallet: str, call: str, params: Optional[dict], principal: Optional[bytes] = None
+    ) -> bytes:
+        """``pallet.call(params)`` as :meth:`submit` would submit it, SCALE-encoded:
+        the call itself, or wrapped in ``Proxy.proxy`` to run as ``principal``
+        when one is given. A call the runtime does not have raises
+        :class:`ChainError`.
+
+        Built from the metadata already loaded, like :meth:`_storage_key`, so
+        pricing a call makes no request of its own.
+        """
+        if self.substrate.metadata is None:
+            self.substrate.init_runtime()
+        if not any(
+            found.name == pallet and any(c.name == call for c in found.calls or [])
+            for found in self.substrate.metadata.pallets
+        ):
+            raise _unknown_name(pallet, call)
+        composed = self._compose(pallet, call, params or {})
+        if principal is not None:
+            composed = self._compose(*_PROXY_CALL, _proxy_params(principal, composed))
+        return bytes(composed.data.data)
+
+    def _compose(self, pallet: str, call: str, params: dict):
+        """What ``substrate.compose_call`` builds, without its trip to the node."""
+        composed = self.substrate.runtime_config.create_scale_object(
+            type_string="Call", metadata=self.substrate.metadata
+        )
+        composed.encode({"call_module": pallet, "call_function": call, "call_args": params})
+        return composed
+
+    def _storage_key(self, pallet: str, entry: str, keys: Optional[List] = None) -> bytes:
+        """The raw key ``pallet.entry(keys)`` is stored under. Byte keys (an
+        account id) are passed as given. An entry the runtime does not have raises
+        :class:`ChainError`.
+
+        Built from the metadata already loaded, not through
+        ``substrate.create_storage_key``: that re-reads the chain head and runtime
+        version on every call, which would cost a pinned read a dozen requests and
+        read at a block the caller did not ask for.
+        """
+        if self.substrate.metadata is None:
+            self.substrate.init_runtime()
+        try:
+            key = StorageKey.create_from_storage_function(
+                pallet,
+                entry,
+                [hex_if_bytes(key) for key in keys or []],
+                runtime_config=self.substrate.runtime_config,
+                metadata=self.substrate.metadata,
+            )
+        except StorageFunctionNotFound as exc:
+            raise _unknown_name(pallet, entry, exc) from exc
+        return bytes.fromhex(key.to_hex()[2:])
+
+    def _constant_bytes(self, pallet: str, name: str) -> bytes:
+        """A pallet constant's SCALE bytes, from the metadata already loaded (so
+        no request is made). A constant the runtime does not have raises
+        :class:`ChainError`."""
+        if self.substrate.metadata is None:
+            self.substrate.init_runtime()
+        for found in self.substrate.metadata.pallets:
+            if found.name != pallet:
+                continue
+            for constant in found.constants or []:
+                if constant.value["name"] == name:
+                    return bytes(constant.constant_value)
+        raise _unknown_name(pallet, name)
 
     def query(self, pallet: str, entry: str, keys: Optional[List] = None):
-        """Read any storage entry. ``None`` means nothing is stored under it (not an
-        error), even for an entry with a storage default such as ``System.Account``.
+        """Read any storage entry at the latest finalized block, so the answer
+        cannot be reverted and a write that has returned is visible. ``None``
+        means nothing is stored under it (not an error), even for an entry with a
+        storage default such as ``System.Account``.
 
         An entry the runtime does not have raises :class:`ChainError`.
         """
+        at = to_hex(snapshot(self, None).at)
         try:
-            result = self.substrate.query(pallet, entry, keys or [])
+            result = self.substrate.query(pallet, entry, keys or [], block_hash=at)
         except StorageFunctionNotFound as exc:
             raise _unknown_name(pallet, entry, exc) from exc
         if result is None or not getattr(result, "meta_info", {}).get("result_found", True):
@@ -290,18 +408,13 @@ class ChainClient:
         return result.value
 
     def runtime_api(self, method: str, args: bytes = b"", return_type: str = "Bytes"):
-        """Call any runtime API by its ``state_call`` name, e.g.
+        """Call any runtime API by its ``state_call`` name at the latest
+        finalized block, e.g.
         ``runtime_api("KgcApi_dkg_epoch", return_type="Option<u32>")``.
 
         A method the runtime does not have raises :class:`ChainError`.
         """
-        try:
-            raw = self._call(method, args)
-        except SubstrateRequestException as exc:
-            raise ChainError(
-                f"{method} failed: {exc}", pallet=method.split("_", 1)[0], call=method
-            ) from exc
-        return self._decode(return_type, raw)
+        return self._decode(return_type, snapshot(self, None).call(method, args))
 
     def constant(self, pallet: str, name: str):
         """Read any pallet constant from the live metadata. A constant the runtime
@@ -436,15 +549,11 @@ class ChainClient:
         composed = self.substrate.compose_call(pallet, call, params)
         if principal is not None:
             composed = self.substrate.compose_call(
-                "Proxy",
-                "proxy",
-                {
-                    "real": {"Id": principal},
-                    "force_proxy_type": None,
-                    "call": composed,
-                },
+                *_PROXY_CALL, _proxy_params(principal, composed)
             )
         # get_account_nonce() can report 0 on this runtime, signing a stale tx (1010).
+        # Decoded from metadata at the best block, not by the strict account decoder
+        # the reads use: a change elsewhere in the account must never stop a write.
         nonce = int(
             self.substrate.query("System", "Account", [keypair.ss58_address]).value["nonce"]
         )

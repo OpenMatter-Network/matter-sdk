@@ -14,7 +14,7 @@ publish = false
 default = []
 # The MatterChain client. Off by default so crypto-only consumers need neither
 # subxt nor a tokio runtime (check with `cargo tree -p matter-sdk`).
-chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio", "dep:tracing"]
+chain = ["dep:subxt", "dep:parity-scale-codec", "dep:tokio", "dep:tracing", "dep:blake2b_simd", "dep:bs58"]
 
 [dependencies]
 matter-sdk-core = { workspace = true }
@@ -40,6 +40,10 @@ parity-scale-codec = { version = "3", features = ["derive"], optional = true }
 tokio = { version = "1.47.1", features = ["rt", "time"], optional = true }
 # Connect diagnostics; silent without a subscriber. Already a subxt dependency.
 tracing = { version = "0.1", default-features = false, features = ["std"], optional = true }
+# SS58 addresses under the chain's own prefix (subxt renders prefix 42 only). Both are
+# already in the graph: blake2b through `matter-sdk-core`, bs58 through subxt.
+blake2b_simd = { version = "1.0.4", default-features = false, optional = true }
+bs58 = { version = "0.5.1", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 # The fake-committee test computes real partials.
@@ -49,6 +53,8 @@ tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
 # Replay tests need raw sr25519 to model an attacker and a verifying node. The
 # shipped crate signs only through `matter-sdk-key`.
 subxt-signer = { version = "0.44.0", default-features = false, features = ["sr25519"] }
+# Read decoders are pinned against the type registry in the metadata fixture.
+scale-info = { version = "2.11", default-features = false }
 
 [lints]
 workspace = true

@@ -8,6 +8,12 @@
 //! * [`MatterClient::runtime_api`]: call any runtime API.
 //! * [`MatterClient::constant`]: read any pallet constant.
 //!
+//! Above it, façades answer common questions in one call, with the pallet and
+//! its encoding hidden: [`MatterClient::accounts`] reads what an account holds,
+//! [`MatterClient::network`] the chain's head and timing,
+//! [`MatterClient::fees`] what a call would cost and who pays,
+//! [`MatterClient::staking`] bonds and nominates, and so on.
+//!
 //! ```no_run
 //! # async fn demo() -> Result<(), matter_sdk::SdkError> {
 //! use matter_sdk::chain::{MatterClient, MatterConfig, Network};
@@ -36,6 +42,7 @@
 mod amount;
 mod facade;
 mod mode;
+mod read;
 mod recover;
 pub mod scopes_table;
 
@@ -51,9 +58,38 @@ use subxt::utils::{AccountId32, MultiSignature};
 use subxt::{OnlineClient, PolkadotConfig};
 
 pub use self::amount::{format_amount, one_token, parse_amount};
-pub use self::facade::{Deployments, Keys, Orgs, Resources, Secrets, Staking};
+pub use self::facade::{
+    Accounts,
+    Deployments,
+    Fees,
+    Keys,
+    NetworkState,
+    Orgs,
+    Resources,
+    Secrets,
+    Staking,
+};
 pub use self::mode::Mode;
 use self::mode::Refresh;
+pub use self::read::{
+    parse_account,
+    AccountBalance,
+    Address,
+    BalanceLock,
+    BalanceReason,
+    BilledTo,
+    Block,
+    BlockHeader,
+    DispatchClass,
+    FeeEstimate,
+    LockReasons,
+    NetworkInfo,
+    NetworkTiming,
+    NodeStatus,
+    Text,
+    Weight,
+};
+use self::read::{Pin, SS58_MAX_PREFIX};
 use crate::error::{Result, SdkError};
 
 /// Default RPC endpoints; must match `testvectors/networks.json`.
@@ -76,6 +112,11 @@ const PROXY_CALL: &str = "proxy";
 const PROXY_EXECUTED_EVENT: &str = "ProxyExecuted";
 /// No such delegation: the key was revoked or rebound.
 const NOT_PROXY_ERROR: &str = "NotProxy";
+
+const SYSTEM_PALLET: &str = "System";
+const SS58_PREFIX_CONSTANT: &str = "SS58Prefix";
+const BALANCES_PALLET: &str = "Balances";
+const EXISTENTIAL_DEPOSIT_CONSTANT: &str = "ExistentialDeposit";
 
 /// `Balances.ExistentialDeposit` is `UNIT / 1000`, i.e. `10^(decimals - 3)`.
 const ED_DECIMAL_OFFSET: u32 = 3;
@@ -172,7 +213,8 @@ pub struct ChainProperties {
     pub spec_version: u32,
     /// `system_properties.tokenSymbol`, e.g. `"MTR-Test"`.
     pub token_symbol: String,
-    /// `system_properties.ss58Format`, defaulting to 42.
+    /// The runtime's `System.SS58Prefix`: **consensus-backed**, unlike the
+    /// node's presentational `system_properties.ss58Format`.
     pub ss58_prefix: u16,
 
     /// `system_properties.tokenDecimals`: **presentational**, from the node's
@@ -234,6 +276,9 @@ impl TxReceipt {
 pub struct MatterClient {
     api: OnlineClient<PolkadotConfig>,
     rpc: LegacyRpcMethods<PolkadotConfig>,
+    /// The same connection, for requests the typed methods above do not model
+    /// (a header whose block number is wider than the config's).
+    raw: RpcClient,
     signer: Option<Arc<dyn KeySigner>>,
     properties: ChainProperties,
     config: MatterConfig,
@@ -296,7 +341,7 @@ impl MatterClient {
             .await
             .map_err(|e| rpc_error(&url, e))?;
         let rpc = LegacyRpcMethods::<PolkadotConfig>::new(rpc_client.clone());
-        let api = OnlineClient::<PolkadotConfig>::from_rpc_client(rpc_client)
+        let api = OnlineClient::<PolkadotConfig>::from_rpc_client(rpc_client.clone())
             .await
             .map_err(|e| rpc_error(&url, e))?;
 
@@ -305,6 +350,7 @@ impl MatterClient {
         let mut client = Self {
             api,
             rpc,
+            raw: rpc_client,
             signer,
             properties,
             config,
@@ -399,16 +445,20 @@ impl MatterClient {
 
     /// The member this client acts for, as SS58. `None` when it acts as itself.
     pub fn principal_address(&self) -> Option<String> {
-        self.principal()
-            .map(|id| AccountId32(*id.as_bytes()).to_string())
+        self.principal().map(|id| self.address_of(id).to_string())
     }
 
-    /// The signing identity's SS58 address (prefix 42), or `None` for a
-    /// read-only client.
+    /// The signing identity's SS58 address under this chain's prefix, or `None`
+    /// for a read-only client.
     ///
     /// Not on [`AccountId`] to keep `matter-sdk-key` light enough for wasm.
     pub fn address(&self) -> Option<String> {
-        self.account_id().map(|id| AccountId32(id).to_string())
+        self.account().map(|id| self.address_of(id).to_string())
+    }
+
+    /// `id` as this chain renders it.
+    fn address_of(&self, id: AccountId) -> Address {
+        Address::new(id, self.properties.ss58_prefix)
     }
 
     /// The underlying subxt client, for anything this surface does not cover.
@@ -554,6 +604,27 @@ impl MatterClient {
         }
 
         Ok(proxy_payload(principal, pallet, call, args))
+    }
+
+    /// The bytes of `pallet.call(args)` as this client would submit it: the call
+    /// itself, or wrapped in `Proxy.proxy` when the client acts for a member.
+    /// Also reports whether it was wrapped. No scope is judged: this is what
+    /// would be signed, not whether it may be.
+    fn call_as_submitted(
+        &self,
+        pallet: &str,
+        call: &str,
+        args: Vec<Value>,
+    ) -> Result<(Vec<u8>, bool)> {
+        use subxt::tx::Payload;
+        let (payload, wrapped) = match self.read_mode().principal() {
+            Some(principal) => (proxy_payload(&principal, pallet, call, args), true),
+            None => (subxt::dynamic::tx(pallet, call, args), false),
+        };
+        payload
+            .encode_call_data(&self.api.metadata())
+            .map(|bytes| (bytes, wrapped))
+            .map_err(|e| chain_error(pallet, call, e))
     }
 
     /// Classify a pool rejection.
@@ -745,6 +816,22 @@ impl MatterClient {
     // Façade calls belong in `facade.rs`; one that needs a new `SdkError` or
     // `MatterConfig` field means the seam has leaked.
 
+    /// Accounts: what an account holds and how much of it can move.
+    pub fn accounts(&self) -> Accounts<'_> {
+        Accounts(self, Pin::Finalized)
+    }
+
+    /// The network: which chain this is, its latest finalized block, its timing,
+    /// and the health of the node answering.
+    pub fn network(&self) -> NetworkState<'_> {
+        NetworkState(self, Pin::Finalized)
+    }
+
+    /// Fees: what a call would cost, and who would be charged for it.
+    pub fn fees(&self) -> Fees<'_> {
+        Fees(self, Pin::Finalized)
+    }
+
     /// Secrets: store, rotate, share, and delete secrets.
     pub fn secrets(&self) -> Secrets<'_> {
         Secrets(self)
@@ -784,6 +871,47 @@ impl MatterClient {
     fn require_signer(&self) -> Result<&Arc<dyn KeySigner>> {
         self.signer.as_ref().ok_or(SdkError::ReadOnly)
     }
+
+    /// A read-only client over `rpc` that never dials out: metadata comes from
+    /// the spec-330 fixture, so reads run against a fake chain.
+    #[cfg(test)]
+    pub(in crate::chain) fn offline(
+        rpc: impl subxt::ext::subxt_rpcs::client::RpcClientT,
+        properties: ChainProperties,
+    ) -> Self {
+        Self::offline_as(rpc, properties, None, Mode::Direct)
+    }
+
+    /// [`MatterClient::offline`] with an identity: who signs, and for whom.
+    #[cfg(test)]
+    pub(in crate::chain) fn offline_as(
+        rpc: impl subxt::ext::subxt_rpcs::client::RpcClientT,
+        properties: ChainProperties,
+        signer: Option<Arc<dyn KeySigner>>,
+        mode: Mode,
+    ) -> Self {
+        let rpc_client = RpcClient::new(rpc);
+        let version = subxt::client::RuntimeVersion {
+            spec_version: properties.spec_version,
+            transaction_version: 0,
+        };
+        let api = OnlineClient::<PolkadotConfig>::from_rpc_client_with(
+            subxt::utils::H256(properties.genesis_hash),
+            version,
+            test_metadata(),
+            rpc_client.clone(),
+        )
+        .expect("an offline client is built from parts already in hand");
+        Self {
+            api,
+            rpc: LegacyRpcMethods::new(rpc_client.clone()),
+            raw: rpc_client,
+            signer,
+            properties,
+            config: MatterConfig::default(),
+            mode: RwLock::new(mode),
+        }
+    }
 }
 
 /// Read `MATTER_API_KEY`, falling back to `MATTER_SIGNER_SEED`.
@@ -819,12 +947,9 @@ async fn read_properties(
         .get("tokenDecimals")
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u8;
-    let ss58_prefix = props
-        .get("ss58Format")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(42) as u16;
-
-    let existential_deposit = read_existential_deposit(api)?;
+    let ss58_prefix = read_ss58_prefix(api)?;
+    let existential_deposit =
+        read_unsigned_constant(api, BALANCES_PALLET, EXISTENTIAL_DEPOSIT_CONSTANT)?;
     let token_decimals_effective =
         decimals_from_existential_deposit(existential_deposit).unwrap_or(token_decimals_declared);
 
@@ -851,18 +976,35 @@ async fn read_properties(
     Ok(properties)
 }
 
-fn read_existential_deposit(api: &OnlineClient<PolkadotConfig>) -> Result<u128> {
-    let address = subxt::dynamic::constant("Balances", "ExistentialDeposit");
+/// An unsigned-integer pallet constant from the metadata fetched at connect.
+fn read_unsigned_constant(
+    api: &OnlineClient<PolkadotConfig>,
+    pallet: &str,
+    name: &str,
+) -> Result<u128> {
+    let address = subxt::dynamic::constant(pallet, name);
     let value = api
         .constants()
         .at(&address)
-        .map_err(|e| chain_error("Balances", "ExistentialDeposit", e))?
+        .map_err(|e| chain_error(pallet, name, e))?
         .to_value()
-        .map_err(|e| chain_error("Balances", "ExistentialDeposit", e))?;
+        .map_err(|e| chain_error(pallet, name, e))?;
     value.as_u128().ok_or_else(|| SdkError::Chain {
-        target: "Balances.ExistentialDeposit".to_string(),
+        target: format!("{pallet}.{name}"),
         detail: "constant is not an unsigned integer".to_string(),
     })
+}
+
+/// The prefix every address this client renders is encoded under.
+fn read_ss58_prefix(api: &OnlineClient<PolkadotConfig>) -> Result<u16> {
+    let prefix = read_unsigned_constant(api, SYSTEM_PALLET, SS58_PREFIX_CONSTANT)?;
+    u16::try_from(prefix)
+        .ok()
+        .filter(|prefix| *prefix <= SS58_MAX_PREFIX)
+        .ok_or_else(|| SdkError::Chain {
+            target: format!("{SYSTEM_PALLET}.{SS58_PREFIX_CONSTANT}"),
+            detail: format!("{prefix} is not a valid SS58 prefix"),
+        })
 }
 
 /// Recover `d` from `ED == 10^(d - 3)`, or `None` if `ED` is not a power of ten.

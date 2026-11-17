@@ -8,7 +8,12 @@
 
 #![cfg(feature = "chain")]
 
-use matter_sdk::chain::{MatterClient, MatterConfig, Network, Value};
+mod common;
+
+use std::collections::BTreeSet;
+
+use matter_sdk::chain::{parse_account, MatterClient, MatterConfig, Network, Value};
+use serde_json::{json, Value as Json};
 
 async fn testnet() -> MatterClient {
     MatterClient::connect(MatterConfig::for_network(Network::Testnet))
@@ -195,6 +200,188 @@ async fn pointing_testnet_config_at_mainnet_is_caught() {
         Err(other) => println!("mainnet endpoint unreachable, skipping: {other}"),
         Ok(_) => panic!("a testnet config accepted a mainnet endpoint"),
     }
+}
+
+/// The chain the read check runs against: `MATTER_RPC_URL` when set, as the
+/// nightly drift job sets it per network, otherwise the public testnet. `None`
+/// when a named endpoint cannot be reached, which this file treats as a skip.
+async fn read_target() -> Option<MatterClient> {
+    let Ok(url) = std::env::var("MATTER_RPC_URL") else {
+        return Some(testnet().await);
+    };
+    match MatterClient::connect(MatterConfig::for_url(url.clone())).await {
+        Ok(client) => Some(client),
+        Err(e) => {
+            println!("{url} unreachable, skipping: {e}");
+            None
+        }
+    }
+}
+
+/// The block to read at: `MATTER_AT_BLOCK` (hex) when set, so every binding can
+/// be pointed at the same one; otherwise the latest finalized block.
+async fn read_block(client: &MatterClient) -> [u8; 32] {
+    match std::env::var("MATTER_AT_BLOCK") {
+        Ok(text) => {
+            let mut block = [0u8; 32];
+            hex::decode_to_slice(text.trim().trim_start_matches("0x"), &mut block)
+                .expect("MATTER_AT_BLOCK is a 32-byte block hash in hex");
+            block
+        }
+        Err(_) => {
+            client
+                .rpc()
+                .chain_get_finalized_head()
+                .await
+                .expect("read the finalized head")
+                .0
+        }
+    }
+}
+
+/// One catalogue read by name, as its canonical JSON text. Rust has no
+/// reflection, so a read added to the catalogue needs an arm here.
+async fn live_read(
+    client: &MatterClient,
+    at: [u8; 32],
+    facade: &str,
+    method: &str,
+    args: &Json,
+) -> String {
+    let text = |name: &str| args[name].as_str().expect("a live argument is text");
+    let account =
+        |name: &str| parse_account(text(name)).expect("live_reads.json holds valid accounts");
+    // Wide integers travel as decimal strings: JSON numbers cannot carry 64 bits.
+    let number = |name: &str| {
+        text(name)
+            .parse::<u64>()
+            .expect("a u64 argument is decimal")
+    };
+    // A call's arguments, as `tx` takes them here: values in declared order.
+    let call_args = |name: &str| -> Vec<Value> {
+        let list = args[name].as_array().expect("call arguments are a list");
+        list.iter()
+            .map(|arg| match arg["type"].as_str() {
+                Some("u128") => Value::u128(
+                    arg["value"]
+                        .as_str()
+                        .and_then(|value| value.parse().ok())
+                        .expect("a u128 call argument is decimal"),
+                ),
+                other => panic!("live_reads.json names a call argument type this test does not convert: {other:?}"),
+            })
+            .collect()
+    };
+    fn canonical<T: serde::Serialize>(read: &str, result: matter_sdk::Result<T>) -> String {
+        let value = result.unwrap_or_else(|e| panic!("{read}: {e}"));
+        serde_json::to_string(&value).expect("a read result serializes")
+    }
+    let read = format!("{facade}.{method}({args}) at 0x{}", hex::encode(at));
+
+    match (facade, method) {
+        ("accounts", "balance") => canonical(
+            &read,
+            client.accounts().at(at).balance(account("who")).await,
+        ),
+        ("fees", "estimate") => canonical(
+            &read,
+            client
+                .fees()
+                .at(at)
+                .estimate(text("pallet"), text("call"), call_args("args"))
+                .await,
+        ),
+        ("network", "info") => canonical(&read, Ok(client.network().info())),
+        ("network", "head") => canonical(&read, client.network().at(at).head().await),
+        ("network", "block") => canonical(&read, client.network().block(number("number")).await),
+        ("network", "node") => canonical(&read, client.network().node().await),
+        ("network", "timing") => canonical(&read, client.network().timing()),
+        other => panic!("live_reads.json names a read this test does not dispatch: {other:?}"),
+    }
+}
+
+/// Strict decoders fail when a forkless upgrade changes a layout. This runs every
+/// catalogue read against the live runtime, so that shows up here first.
+///
+/// With `MATTER_LIVE_READS_OUT` set it also writes the results there, for
+/// `scripts/compare-live-reads.sh` to hold the four bindings to the same bytes.
+#[tokio::test]
+#[ignore = "needs the live testnet"]
+async fn every_catalogue_read_decodes_against_the_live_runtime() {
+    let catalogue: Json =
+        serde_json::from_str(include_str!("../../../testvectors/facade_reads.json")).unwrap();
+    let live: Json =
+        serde_json::from_str(include_str!("../../../testvectors/live_reads.json")).unwrap();
+    let name = |row: &Json| {
+        (
+            row["facade"].as_str().unwrap().to_string(),
+            row["method"].as_str().unwrap().to_string(),
+        )
+    };
+    let pinned: BTreeSet<_> = catalogue["reads"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(name)
+        .collect();
+    let exercised: BTreeSet<_> = live["reads"].as_array().unwrap().iter().map(name).collect();
+    assert_eq!(
+        pinned, exercised,
+        "testvectors/live_reads.json must exercise exactly the reads the catalogue pins"
+    );
+
+    let Some(client) = read_target().await else {
+        return;
+    };
+    let at = read_block(&client).await;
+    let mut reads = Vec::new();
+    for row in live["reads"].as_array().unwrap() {
+        let (facade, method) = name(row);
+        let result_json = live_read(&client, at, &facade, &method, &row["args"]).await;
+        println!("{facade}.{method}({}) = {result_json}", row["args"]);
+        // The canonical text itself: the comparison is of bytes, not parsed values.
+        reads.push(json!({
+            "facade": facade,
+            "method": method,
+            "args": row["args"],
+            "result_json": result_json,
+        }));
+    }
+
+    if let Ok(path) = std::env::var("MATTER_LIVE_READS_OUT") {
+        let out = json!({ "at": format!("0x{}", hex::encode(at)), "reads": reads });
+        std::fs::write(&path, serde_json::to_string_pretty(&out).unwrap())
+            .unwrap_or_else(|e| panic!("write {path}: {e}"));
+    }
+}
+
+/// Decoders fail on a layout they were not written for, but only once a value
+/// with that layout is read: a new hold reason breaks nobody until an account
+/// holds funds under it. This compares every source's layout itself, so the
+/// drift job reports the change before a user meets it.
+#[tokio::test]
+#[ignore = "needs the live testnet"]
+async fn catalogue_sources_have_the_layout_the_decoders_were_written_for() {
+    let Some(client) = read_target().await else {
+        return;
+    };
+    let live = common::source_shapes(&client.subxt().metadata());
+    let drifted: Vec<String> = common::pinned_shapes()
+        .into_iter()
+        .filter(|(source, pinned)| live.get(source) != Some(pinned))
+        .map(|(source, pinned)| {
+            let now = live.get(&source).map_or("<absent>", String::as_str);
+            format!("{source}\n    decoders expect: {pinned}\n    runtime has:     {now}")
+        })
+        .collect();
+    assert!(
+        drifted.is_empty(),
+        "the live runtime (spec {}) lays out {} source(s) differently from what the read \
+         decoders were written for:\n  {}",
+        client.properties().spec_version,
+        drifted.len(),
+        drifted.join("\n  ")
+    );
 }
 
 /// A forkless upgrade that adds a call to a scoped pallet leaves the scope table

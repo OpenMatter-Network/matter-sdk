@@ -1,6 +1,6 @@
-// Façade parity with testvectors/facade_calls.json (emitted from Rust), checked
-// both ways: every row has a method routing to its (pallet, call), and every
-// method has a row.
+// Façade parity with testvectors/facade_calls.json and facade_reads.json (both
+// emitted from Rust), checked both ways: every row has a method, and every
+// method has a row. Reads are replayed against their vectors in reads.test.ts.
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -17,6 +17,8 @@ import {
   type FacadeHost,
   type TxReceipt,
 } from "../src/index.js";
+
+import { readFacadeFor, readFixture, toCamel } from "./readFixture.js";
 
 const vectorsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../testvectors");
 const fixture = JSON.parse(readFileSync(resolve(vectorsDir, "facade_calls.json"), "utf8")) as {
@@ -44,10 +46,6 @@ class RecordingHost implements FacadeHost {
   }
 }
 
-function toCamel(text: string): string {
-  return text.replace(/_([a-z0-9])/g, (_all, ch: string) => ch.toUpperCase());
-}
-
 function facadeFor(name: string, host: FacadeHost): object {
   switch (name) {
     case "secrets":
@@ -63,7 +61,8 @@ function facadeFor(name: string, host: FacadeHost): object {
     case "keys":
       return new KeysFacade(host);
     default:
-      throw new Error(`the fixture names an unknown façade: ${name}`);
+      // A façade with nothing but reads: the read fixture knows it.
+      return readFacadeFor(name, host);
   }
 }
 
@@ -150,10 +149,17 @@ describe("façade parity", () => {
     }
   });
 
-  it("exposes no façade method the fixture does not pin", () => {
-    // A façade's surface is the union of both tables.
+  it("exposes no façade method the fixtures do not pin", () => {
+    // A façade's surface is the union of the write tables and the read
+    // catalogue, plus the block pin on any façade that reads.
+    const pinned = [
+      ...fixture.calls,
+      ...fixture.runtime_api_calls,
+      ...readFixture.reads,
+      ...readFixture.reads.map((row) => ({ facade: row.facade, method: readFixture.pin_method })),
+    ];
     const expected = new Map<string, Set<string>>();
-    for (const row of [...fixture.calls, ...fixture.runtime_api_calls]) {
+    for (const row of pinned) {
       const methods = expected.get(row.facade) ?? new Set<string>();
       methods.add(toCamel(row.method));
       expected.set(row.facade, methods);

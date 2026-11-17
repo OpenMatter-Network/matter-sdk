@@ -20,10 +20,13 @@ import {
   extrinsicSigningBytes,
   keySignerAdapter,
   palletNamesByIndex,
+  queryFinalized,
   receiptEvents,
+  runtimeApiFinalized,
   storedValue,
   toChainArgs,
 } from "../src/polkadot.js";
+import { FIXTURE_HEAD, FixtureChain } from "./readFixture.js";
 
 const vectorsDir = resolve(import.meta.dirname, "../../../testvectors");
 
@@ -378,5 +381,72 @@ describe("query results", () => {
     expect(storedValue(registry.createType("Option<u128>", null))).toBeUndefined();
     const some = registry.createType("Option<u128>", 0);
     expect(storedValue(some)).toBe(some);
+  });
+});
+
+describe("generic reads see the latest finalized block", () => {
+  const HEAD_REQUEST = { method: "chain_getFinalizedHead", params: [] };
+
+  it("query resolves the finalized head once, then reads storage as of that block", async () => {
+    const { registry } = spec330();
+    const chain = new FixtureChain();
+    const blocks: string[] = [];
+    const storageAt = async (block: Uint8Array) => {
+      blocks.push(u8aToHex(block));
+      return { secrets: { nextSecretId: async () => registry.createType("u128", 7) } };
+    };
+
+    const value = await queryFinalized(chain, storageAt, "Secrets", "NextSecretId", []);
+
+    expect(String(value)).toBe("7");
+    expect(blocks).toEqual([FIXTURE_HEAD]);
+    expect(chain.requests).toEqual([HEAD_REQUEST]);
+  });
+
+  it("query passes keys through, and reads an absent entry as undefined", async () => {
+    const { registry } = spec330();
+    const asked: unknown[][] = [];
+    const storageAt = async () => ({
+      system: {
+        account: async (...keys: unknown[]) => {
+          asked.push(keys);
+          return registry.createType("Option<u128>", null);
+        },
+      },
+    });
+
+    const account = Uint8Array.from({ length: 32 }, () => 7);
+    const value = await queryFinalized(new FixtureChain(), storageAt, "System", "Account", [account]);
+
+    expect(value).toBeUndefined();
+    expect(asked).toEqual([[u8aToHex(account)]]);
+  });
+
+  it("query refuses an entry the runtime does not have, naming it", async () => {
+    const read = queryFinalized(new FixtureChain(), async () => ({}), "Secrets", "NoSuchEntry", []);
+    await expect(read).rejects.toMatchObject({ kind: "chain", target: "Secrets.NoSuchEntry" });
+  });
+
+  it("a runtime API is called at the finalized head", async () => {
+    const call = { method: "state_call", params: ["KgcApi_dkg_epoch", "0x", FIXTURE_HEAD] };
+    const chain = new FixtureChain({
+      at: FIXTURE_HEAD.slice(2),
+      exchanges: [{ ...call, result: "0x07000000" }],
+    });
+
+    expect(await runtimeApiFinalized(chain, "KgcApi_dkg_epoch", "0x")).toBe("0x07000000");
+    expect(chain.requests).toEqual([HEAD_REQUEST, call]);
+  });
+
+  it("a runtime API the node refuses is a chain error naming the API", async () => {
+    const read = runtimeApiFinalized(new FixtureChain(), "NoSuchApi_method", "0x");
+    await expect(read).rejects.toMatchObject({ kind: "chain", target: "NoSuchApi_method" });
+  });
+
+  it("runtime API arguments that are not hex are refused before any request", async () => {
+    const chain = new FixtureChain();
+    const read = runtimeApiFinalized(chain, "KgcApi_dkg_epoch", "0xzz");
+    await expect(read).rejects.toMatchObject({ kind: "chain", target: "KgcApi_dkg_epoch" });
+    expect(chain.requests).toEqual([]);
   });
 });

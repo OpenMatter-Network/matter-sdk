@@ -33,6 +33,8 @@ jobs:
         run: ./scripts/check-license-copies.sh
       - name: The README's supported platforms are the ones the release builds
         run: ./scripts/platform-table.sh --check README.md
+      - name: The documented read catalogue is the one the vectors pin
+        run: ./scripts/read-catalogue.sh --check docs/reading-state.md
       - name: Documentation links resolve, and none points at a private repository
         run: ./scripts/check-doc-links.sh
   # Consumers build `matter-sdk --features chain` as static musl on the MSRV.

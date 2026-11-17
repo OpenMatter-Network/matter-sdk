@@ -1,0 +1,85 @@
+{
+  "comment": "Arguments for reading every catalogue read (facade_reads.json) against a live chain. Maintained by hand. Each binding's live test runs these at one finalized block and records its canonical JSON text; scripts/compare-live-reads.sh requires all four to record the same bytes. A `volatile` read describes the node at the moment it is asked (its peers, its best block), so every binding runs it but its answer is left out of the comparison. Accounts are public: the well-known development account, a testnet validator's stash (so a hold is decoded from live data), and one nobody holds a key for. Wide integers are decimal strings. A call priced by fees.estimate is named as in facade_reads.json: its arguments as an ordered list of {name, type, value}; the live client is read-only, so it learns the fee and not the payer. On another chain an account may simply not exist, which is a valid read.",
+  "reads": [
+    {
+      "facade": "accounts",
+      "method": "balance",
+      "args": {
+        "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+      }
+    },
+    {
+      "facade": "accounts",
+      "method": "balance",
+      "args": {
+        "who": "0x661a8879814bec3240d2e43a9db04c96782d093cd1cd2b490f260f7f5f0ea709"
+      }
+    },
+    {
+      "facade": "accounts",
+      "method": "balance",
+      "args": {
+        "who": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    },
+    {
+      "facade": "network",
+      "method": "info",
+      "args": {}
+    },
+    {
+      "facade": "network",
+      "method": "head",
+      "args": {}
+    },
+    {
+      "facade": "network",
+      "method": "block",
+      "args": {
+        "number": "1"
+      }
+    },
+    {
+      "facade": "network",
+      "method": "block",
+      "args": {
+        "number": "4294967295"
+      }
+    },
+    {
+      "facade": "network",
+      "method": "node",
+      "args": {},
+      "volatile": true
+    },
+    {
+      "facade": "network",
+      "method": "timing",
+      "args": {}
+    },
+    {
+      "facade": "fees",
+      "method": "estimate",
+      "args": {
+        "pallet": "Staking",
+        "call": "chill",
+        "args": []
+      }
+    },
+    {
+      "facade": "fees",
+      "method": "estimate",
+      "args": {
+        "pallet": "Jobs",
+        "call": "cancel_deployment",
+        "args": [
+          {
+            "name": "deployment",
+            "type": "u128",
+            "value": "42"
+          }
+        ]
+      }
+    }
+  ]
+}

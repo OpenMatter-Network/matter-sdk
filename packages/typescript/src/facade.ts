@@ -1,18 +1,82 @@
-// Typed convenience wrappers over MatterClient.tx: they shape arguments and
-// delegate, with no encoding or chain access of their own. Anything not here is
-// one `client.tx(...)` away.
+// Typed façades for common domains. A write shapes its arguments and delegates
+// to MatterClient.tx, which owns all encoding. A read takes one block's state,
+// fetches its sources there, and hands the raw bytes to a pure decoder in
+// ./reads. Anything not here is one `client.tx(...)` or `client.query(...)` away.
 
 import type { Aad, EncryptedSecret, GrantTarget, StoreSecret } from "@openmatter-network/matter-sdk-core";
 import { aadBytes } from "@openmatter-network/matter-sdk-core";
 
-import { requireEvent, type TxReceipt } from "./backend.js";
+import { requireEvent, type ChainBackend, type Mode, type TxReceipt } from "./backend.js";
 import { ClientError } from "./errors.js";
+import type { ChainProperties } from "./network.js";
+import { balanceRequests, decodeBalance, type AccountBalance } from "./reads/accounts.js";
+import {
+  FEE_PAYER,
+  QUERY_CALL_INFO,
+  callInfoArgs,
+  decodeDispatchInfo,
+  decodeEstimate,
+  feePayerArgs,
+  type FeeEstimate,
+} from "./reads/fees.js";
+import {
+  GET_BLOCK_HASH,
+  GET_HEADER,
+  GET_RUNTIME_VERSION,
+  SYSTEM_HEALTH,
+  SYSTEM_NAME,
+  SYSTEM_VERSION,
+  TIMING_CONSTANTS,
+  blockNumberParam,
+  decodeBlock,
+  decodeHeader,
+  decodeTiming,
+  hashFromHex,
+  networkInfo,
+  nodeStatus,
+  nowRequest,
+  type Block,
+  type BlockHeader,
+  type NetworkInfo,
+  type NetworkTiming,
+  type NodeStatus,
+} from "./reads/network.js";
+import {
+  accountIdOf,
+  blockHash,
+  request,
+  snapshot,
+  type RawReads,
+  type Snapshot,
+} from "./reads/source.js";
 import type { ScopeSet } from "./scopes.js";
 
-/** What a façade needs from the client. */
+/** What a façade needs from the client. Writes need `tx`; reads need the rest. */
 export interface FacadeHost {
   tx(pallet: string, call: string, args: unknown[]): Promise<TxReceipt>;
   agentKey?(key: Uint8Array): Promise<readonly [Uint8Array, ScopeSet] | undefined>;
+  /** The backend, for its block-pinned raw reads and the chain's address form. */
+  readonly backend?: Pick<ChainBackend, "reads" | "encodeAddress">;
+  /** Chain facts read once at connect, which some decoders need. */
+  readonly properties?: ChainProperties;
+  /** The signing identity's account id; absent for a read-only client. */
+  readonly accountId?: Uint8Array;
+  /** Who the client's signature speaks for; absent means itself. */
+  readonly mode?: Mode;
+}
+
+/** What a read needs from its host, or a `config` error naming what is missing. */
+function readHost(host: FacadeHost): {
+  reads: RawReads;
+  properties: ChainProperties;
+  address: (accountId: Uint8Array) => string;
+} {
+  const { backend, properties } = host;
+  const reads = backend?.reads;
+  if (backend === undefined || reads === undefined || properties === undefined) {
+    throw ClientError.config("this backend cannot serve block-pinned reads");
+  }
+  return { reads, properties, address: (accountId) => backend.encodeAddress(accountId) };
 }
 
 /** The four-blob sealed envelope as the runtime's `EncryptedSecret` composite. */
@@ -43,6 +107,183 @@ export function secretIdFromReceipt(receipt: TxReceipt): bigint {
     );
   }
   return BigInt(raw);
+}
+
+/**
+ * Accounts: what an account holds and how much of it can move.
+ *
+ * Reads only, at the latest finalized block unless pinned with `at`. Works on a
+ * read-only client.
+ */
+export class AccountsFacade {
+  constructor(
+    private readonly host: FacadeHost,
+    private readonly pin?: Uint8Array,
+  ) {}
+
+  /**
+   * Read at `block` (a block hash, as bytes or hex) instead of the latest
+   * finalized block, so several reads share one view of the chain.
+   */
+  at(block: Uint8Array | string): AccountsFacade {
+    return new AccountsFacade(this.host, blockHash(block));
+  }
+
+  /**
+   * What `who` holds: free, on hold and frozen amounts, what a transfer may
+   * move, and the reasons behind each hold and freeze. `who` is an account id,
+   * or hex or SS58 text. An account the chain does not store reads as zeros
+   * with `exists === false`.
+   */
+  async balance(who: Uint8Array | string): Promise<AccountBalance> {
+    const { reads, properties, address } = readHost(this.host);
+    const account = accountIdOf(reads, who);
+    const view = await snapshot(reads, this.pin);
+    const values = await view.storage(balanceRequests(account));
+    return decodeBalance(address(account), properties.existentialDeposit, values);
+  }
+}
+
+/**
+ * Fees: what a call would cost, and who would be charged for it.
+ *
+ * Reads only, at the latest finalized block unless pinned with `at`.
+ */
+export class FeesFacade {
+  constructor(
+    private readonly host: FacadeHost,
+    private readonly pin?: Uint8Array,
+  ) {}
+
+  /**
+   * Read at `block` (a block hash, as bytes or hex) instead of the latest
+   * finalized block, so several reads share one view of the chain.
+   */
+  at(block: Uint8Array | string): FeesFacade {
+    return new FeesFacade(this.host, blockHash(block));
+  }
+
+  /**
+   * What `pallet.call(args)` would cost this client, and who would be charged.
+   * Takes exactly what `tx` takes, and prices the call as it would be
+   * submitted: wrapped in `Proxy.proxy` when the client acts for a member.
+   * Nothing is signed or submitted.
+   *
+   * An estimate, not a quote: the fee is computed for an upper bound on the
+   * signed length, with no tip. It is also not a permission check; a call a
+   * scoped key may not make is still priced. Works on a read-only client, which
+   * learns the fee but not the payer.
+   */
+  async estimate(pallet: string, call: string, args: unknown[]): Promise<FeeEstimate> {
+    const { reads, address } = readHost(this.host);
+    const { accountId: signer, mode } = this.host;
+    const principal = mode?.kind === "delegated" ? mode.principal : undefined;
+    const bytes = reads.callData(pallet, call, args, principal);
+    const { encodedLen, args: infoArgs } = callInfoArgs(bytes);
+
+    const view = await snapshot(reads, this.pin);
+    const info = decodeDispatchInfo(await view.call(QUERY_CALL_INFO, infoArgs));
+    // The payer depends on the fee, so this is asked second.
+    const payer =
+      signer === undefined
+        ? undefined
+        : await view.call(FEE_PAYER, feePayerArgs(signer, bytes, info.partialFee));
+    const priced = {
+      pallet,
+      call,
+      encodedLen,
+      wrappedInProxy: principal !== undefined,
+      signer: signer === undefined ? undefined : address(signer),
+    };
+    return decodeEstimate(priced, info, payer, address);
+  }
+}
+
+/** The header of the block `view` reads at. */
+async function headerAt(view: Snapshot): Promise<BlockHeader> {
+  return decodeHeader(view.at, await view.requestHere(GET_HEADER));
+}
+
+/**
+ * The network: which chain this is, its blocks, its timing, and the health of
+ * the node answering.
+ *
+ * Reads only. `head` reads at the latest finalized block unless pinned with
+ * `at`; the other reads are not about one block.
+ */
+export class NetworkFacade {
+  constructor(
+    private readonly host: FacadeHost,
+    private readonly pin?: Uint8Array,
+  ) {}
+
+  /**
+   * Make `head` describe `block` (a block hash, as bytes or hex) instead of the
+   * latest finalized block.
+   */
+  at(block: Uint8Array | string): NetworkFacade {
+    return new NetworkFacade(this.host, blockHash(block));
+  }
+
+  /**
+   * Which chain this is: its name, genesis hash, token and address format, as
+   * read once at connect. No request is made.
+   */
+  info(): NetworkInfo {
+    return networkInfo(readHost(this.host).properties);
+  }
+
+  /**
+   * The latest finalized block, or the pinned one: its height, hash, time and
+   * runtime version. Its `hash` is what a façade's `at` takes, to make several
+   * reads share this block.
+   */
+  async head(): Promise<Block> {
+    const view = await snapshot(readHost(this.host).reads, this.pin);
+    const header = await headerAt(view);
+    const [now] = await view.storage(nowRequest());
+    const version = await view.requestHere(GET_RUNTIME_VERSION);
+    return decodeBlock(header, now, version);
+  }
+
+  /**
+   * The block at height `number`, or `undefined` if the chain has not reached
+   * it. Read from headers alone, so it works for blocks whose state the node
+   * has pruned; `at(hash).head()` adds the time and runtime version where it
+   * has not.
+   */
+  async block(number: bigint | number): Promise<BlockHeader | undefined> {
+    const { reads } = readHost(this.host);
+    const hash = await request(reads, GET_BLOCK_HASH, [blockNumberParam(BigInt(number))]);
+    if (hash === null || hash === undefined) return undefined;
+    return headerAt(await snapshot(reads, blockHash(hashFromHex(GET_BLOCK_HASH, hash))));
+  }
+
+  /**
+   * The node answering this client: its software, peers, whether it is still
+   * syncing, and its best and finalized blocks. About the node, not a block, so
+   * a pin does not apply.
+   */
+  async node(): Promise<NodeStatus> {
+    const { reads } = readHost(this.host);
+    const name = await request(reads, SYSTEM_NAME, []);
+    const version = await request(reads, SYSTEM_VERSION, []);
+    const health = await request(reads, SYSTEM_HEALTH, []);
+    const bestHash = hashFromHex(GET_BLOCK_HASH, await request(reads, GET_BLOCK_HASH, []));
+    const best = await headerAt(await snapshot(reads, blockHash(bestHash)));
+    const finalized = await headerAt(await snapshot(reads, undefined));
+    return nodeStatus(name, version, health, best, finalized);
+  }
+
+  /**
+   * How the chain measures time: its block time, and the length of a session,
+   * an era and the unbonding period. Constants of the connected runtime; no
+   * request is made.
+   */
+  timing(): NetworkTiming {
+    const { reads } = readHost(this.host);
+    return decodeTiming(TIMING_CONSTANTS.map(({ pallet, name }) => reads.constant(pallet, name)));
+  }
 }
 
 /** Secrets: store, rotate, share, and delete secrets. */

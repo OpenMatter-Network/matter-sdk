@@ -8,6 +8,14 @@ def to_hex(data: bytes) -> str:
     return "0x" + bytes(data).hex()
 
 
+def hex_if_bytes(value):
+    """Raw bytes (an account id, as ``lookup`` returns) as the ``0x`` hex scalecodec
+    reads as the value itself; anything else passes through."""
+    if isinstance(value, (bytes, bytearray)):
+        return to_hex(value)
+    return value
+
+
 def from_hex(s: str) -> bytes:
     """Decode a ``0x``-prefixed (or bare) hex string into bytes."""
     return bytes.fromhex(s[2:] if s.startswith("0x") else s)

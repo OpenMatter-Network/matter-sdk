@@ -281,8 +281,14 @@ func (c *ChainClient) FinalizedHead() ([32]byte, error) {
 	return z, nil
 }
 
+// nonceBytes is the width of the u32 nonce a stored account starts with.
+const nonceBytes = 4
+
+// accountNonce reads the nonce to sign with, at the best block. It takes only the
+// leading u32 of System.Account, not the whole layout the balance read decodes
+// strictly: a change elsewhere in the account must never stop a write.
 func (c *ChainClient) accountNonce(pubkey []byte) (uint32, error) {
-	key, err := types.CreateStorageKey(c.meta, "System", "Account", pubkey)
+	key, err := types.CreateStorageKey(c.meta, systemAccount.pallet, systemAccount.entry, pubkey)
 	if err != nil {
 		return 0, err
 	}
@@ -291,11 +297,10 @@ func (c *ChainClient) accountNonce(pubkey []byte) (uint32, error) {
 		return 0, err
 	}
 	b := []byte(*raw)
-	if len(b) < 4 {
+	if len(b) < nonceBytes {
 		return 0, fmt.Errorf("account %x not found / unfunded", pubkey)
 	}
-	// AccountInfo starts with the u32 nonce.
-	return binary.LittleEndian.Uint32(b[:4]), nil
+	return binary.LittleEndian.Uint32(b[:nonceBytes]), nil
 }
 
 // NextSecretID reads the `Secrets.NextSecretId` counter (u128, little-endian).

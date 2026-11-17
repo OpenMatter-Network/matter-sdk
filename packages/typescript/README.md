@@ -52,7 +52,8 @@ it connects read-only.
 |---|---|
 | Connect | `MatterClient.connect`, `connectWithApiKey`, `connectWithSigner` (any `KeySigner`: HSM, KMS, wallet), `fromEnv`. `MatterConfig` sets `network`, `rpcUrl`, `confirmMainnet`, `finalityTimeoutMs`, `backend` and `logger` |
 | Generic chain | `tx(pallet, call, args)`, `query(pallet, entry, keys)`, `runtimeApi(method, argsHex)`, `constant(pallet, name)` |
-| Façades | `client.secrets`, `client.deployments`, `client.resources`, `client.staking`, `client.orgs`, `client.keys` |
+| Façades | `client.accounts`, `client.network`, `client.fees`, `client.secrets`, `client.deployments`, `client.resources`, `client.staking`, `client.orgs`, `client.keys` |
+| Reads | `client.accounts.balance(who)` returns an `AccountBalance`: what the account holds and what a transfer can move. `client.network` has `info()`, `head()`, `block(number)`, `node()` and `timing()`. `client.fees.estimate(pallet, call, args)` takes what `tx` takes and returns a `FeeEstimate`: what the call would cost and who would be charged. `.at(blockHash)` pins a façade to one block (`head().hash` is one). `canonicalJson(result)` gives the JSON text every language prints, byte for byte; `toJson(result)` gives the same as a plain value |
 | Scoped keys | `mode`, `principal`, `principalAddress`, `scopes`, `agentKey`, plus `Scope`, `Access`, `ScopeSet` and `requiredScopes` |
 | Amounts | `client.parseAmount` / `formatAmount` / `oneToken` use the runtime's decimals. Also free functions `parseAmount`, `formatAmount`, `oneToken` and `decimalsFromExistentialDeposit`. All are `bigint` plancks and never `number` |
 | Receipts | `TxReceipt` (`txHash`, `blockHash`, `events`) and `emitted(receipt, pallet, event)` |

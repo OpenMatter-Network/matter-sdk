@@ -8,12 +8,23 @@ import {
   MatterClient,
   Network,
   decimalsDisagree,
+  type FeeEstimate,
   type MatterConfig,
 } from "@openmatter-network/matter-sdk";
 
 /** Opt-in gate for anything that costs gas. */
 const SUBMIT_ENV = "MATTER_SUBMIT";
 const SUBMIT_VALUE = "yes";
+
+/**
+ * The well-known development account, read when no key is set so a read-only
+ * run still shows a real balance.
+ */
+const SAMPLE_ACCOUNT = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+
+/** The call this tour submits behind the gate, and so the one it prices. */
+const WRITE_PALLET = "Staking";
+const WRITE_CALL = "chill";
 
 /** Read the key from the environment, never argv (shell history, `ps`). */
 function readKey(): ApiKey | undefined {
@@ -46,6 +57,8 @@ async function main(): Promise<void> {
   try {
     describeChain(client);
     await readState(client);
+    await readBalance(client);
+    await preflight(client);
     demonstrateAmounts(client);
     await maybeSubmit(client);
     console.log("\nDone.");
@@ -84,6 +97,77 @@ async function readState(client: MatterClient): Promise<void> {
   const epoch = await client.runtimeApi("KgcApi_dkg_epoch");
   console.log(`  KgcApi_dkg_epoch            = ${epoch}`);
   console.log(`  Balances.ExistentialDeposit = ${client.constant("Balances", "ExistentialDeposit")}`);
+}
+
+/** Façade reads: one question, one call, no pallet or encoding knowledge. */
+async function readBalance(client: MatterClient): Promise<void> {
+  console.log("\n--- reads (friendly helpers) ---");
+
+  // Two reads, one block: the balance is pinned to the head just read.
+  const head = await client.network.head();
+  const balance = await client.accounts.at(head.hash).balance(client.accountId ?? SAMPLE_ACCOUNT);
+  const amount = (plancks: bigint): string => tokens(client, plancks);
+
+  console.log(`  at block        : ${head.number}`);
+  console.log(`  account         : ${balance.account}`);
+  console.log(`  exists          : ${balance.exists}`);
+  console.log(`  total           : ${amount(balance.total)}`);
+  // Not `free`: freezes and the existential deposit hold some of it back.
+  console.log(`  transferable    : ${amount(balance.transferable)}`);
+  for (const hold of balance.holds) {
+    console.log(`  on hold         : ${amount(hold.amount)} for ${hold.reason}`);
+  }
+  for (const freeze of balance.freezes) {
+    console.log(`  frozen          : ${amount(freeze.amount)} for ${freeze.reason}`);
+  }
+}
+
+/** An amount of plancks as the chain's token, for printing. */
+function tokens(client: MatterClient, plancks: bigint): string {
+  return `${client.formatAmount(plancks)} ${client.properties.tokenSymbol}`;
+}
+
+/**
+ * Whose balance a fee comes out of, and how the tour knows. The runtime's answer
+ * comes first; where it has none, the signer is the working assumption; a
+ * read-only client charges nobody, so the sample account stands in.
+ */
+function chargedTo(estimate: FeeEstimate): { payer: string; how: string } {
+  if (estimate.payer !== undefined) {
+    const how = estimate.billedTo === undefined ? "per the runtime" : "an organization's treasury";
+    return { payer: estimate.payer, how };
+  }
+  if (estimate.signer !== undefined) {
+    return { payer: estimate.signer, how: "the signer; the runtime did not say" };
+  }
+  return { payer: SAMPLE_ACCOUNT, how: "a sample account; this client is read-only" };
+}
+
+/** Three reads put together: can whoever pays for this tour's write afford it? */
+async function preflight(client: MatterClient): Promise<void> {
+  console.log("\n--- pre-flight (three reads, one block) ---");
+
+  // Every read is pinned to one block, so the fee and the balance agree.
+  const head = await client.network.head();
+  const estimate = await client.fees.at(head.hash).estimate(WRITE_PALLET, WRITE_CALL, []);
+  const { payer, how } = chargedTo(estimate);
+  const balance = await client.accounts.at(head.hash).balance(payer);
+  // A fee may not take the payer below the existential deposit.
+  const spendable = balance.transferableKeepAlive;
+  const deposit = client.network.info().existentialDeposit;
+
+  console.log(`  call            : ${estimate.pallet}.${estimate.call}`);
+  console.log(`  at block        : ${head.number}`);
+  console.log(`  fee             : ${tokens(client, estimate.partialFee)} for ${estimate.encodedLen} bytes`);
+  console.log(`  charged to      : ${balance.account} (${how})`);
+  console.log(
+    `  can spend       : ${tokens(client, spendable)}, keeping the existential deposit of ${tokens(client, deposit)}`,
+  );
+  console.log(
+    spendable >= estimate.partialFee
+      ? `  verdict         : affordable, leaving ${tokens(client, spendable - estimate.partialFee)}`
+      : `  verdict         : short by ${tokens(client, estimate.partialFee - spendable)}`,
+  );
 }
 
 function demonstrateAmounts(client: MatterClient): void {

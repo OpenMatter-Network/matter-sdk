@@ -184,6 +184,88 @@ fn secure_signing_shows_exactly_this_signer() {
     );
 }
 
+// guide:reading-state:start
+use matter_sdk::chain::parse_account;
+
+async fn show_balance(client: &MatterClient, who: &str) -> matter_sdk::Result<()> {
+    let balance = client.accounts().balance(parse_account(who)?).await?;
+
+    println!(
+        "{} can move {} of {}",
+        balance.account,
+        client.format_amount(balance.transferable),
+        client.format_amount(balance.total),
+    );
+    for hold in &balance.holds {
+        println!(
+            "  {} on hold for {}",
+            client.format_amount(hold.amount),
+            hold.reason
+        );
+    }
+    // Byte for byte what every language prints.
+    if let Ok(canonical) = serde_json::to_string(&balance) {
+        println!("{canonical}");
+    }
+    Ok(())
+}
+// guide:reading-state:end
+
+#[test]
+fn reading_state_shows_exactly_this_read() {
+    let _show_balance = show_balance; // the example's entry point type-checks
+    let source = include_str!("guide_examples.rs");
+    let start = "// guide:reading-state:start\n";
+    let end = "// guide:reading-state:end";
+    let body = &source[source.find(start).unwrap() + start.len()..source.find(end).unwrap()];
+    let guide = include_str!("../../../docs/reading-state.md");
+    assert!(
+        guide.contains(body.trim_end()),
+        "docs/reading-state.md must show the balance example exactly as \
+         tests/guide_examples.rs builds it"
+    );
+}
+
+// guide:reading-state-network:start
+async fn balance_at_the_head(client: &MatterClient, who: AccountId) -> matter_sdk::Result<()> {
+    let head = client.network().head().await?;
+    // Every read pinned to `head.hash` sees the same block.
+    let balance = client.accounts().at(head.hash).balance(who).await?;
+    let timing = client.network().timing()?;
+
+    println!(
+        "block {} of {}",
+        head.number,
+        client.network().info().chain_name
+    );
+    println!(
+        "{} can move {}",
+        balance.account,
+        client.format_amount(balance.transferable)
+    );
+    println!(
+        "a block every {} ms; an era is {} blocks",
+        timing.block_time_ms, timing.era_blocks
+    );
+    Ok(())
+}
+// guide:reading-state-network:end
+
+#[test]
+fn reading_state_shows_exactly_this_pinned_read() {
+    let _balance_at_the_head = balance_at_the_head; // the example's entry point type-checks
+    let source = include_str!("guide_examples.rs");
+    let start = "// guide:reading-state-network:start\n";
+    let end = "// guide:reading-state-network:end";
+    let body = &source[source.find(start).unwrap() + start.len()..source.find(end).unwrap()];
+    let guide = include_str!("../../../docs/reading-state.md");
+    assert!(
+        guide.contains(body.trim_end()),
+        "docs/reading-state.md must show the pinned-read example exactly as \
+         tests/guide_examples.rs builds it"
+    );
+}
+
 // readme:quickstart:start
 async fn quickstart() -> matter_sdk::Result<()> {
     let client = MatterClient::connect(MatterConfig::for_network(Network::Testnet)).await?;
@@ -208,5 +290,58 @@ fn the_readme_shows_exactly_this_quickstart() {
     assert!(
         readme.contains(body.trim_end()),
         "README.md must show the Rust quickstart exactly as tests/guide_examples.rs builds it"
+    );
+}
+
+// guide:reading-state-fees:start
+/// Can this client afford `pallet.call(args)`? `None` on a read-only client,
+/// where nobody would be charged.
+async fn can_afford(
+    client: &MatterClient,
+    pallet: &str,
+    call: &str,
+    args: Vec<Value>,
+) -> matter_sdk::Result<Option<bool>> {
+    // One block for every answer, so the fee and the balance agree.
+    let head = client.network().head().await?;
+    let estimate = client
+        .fees()
+        .at(head.hash)
+        .estimate(pallet, call, args)
+        .await?;
+
+    // Who the runtime says is charged. Where it cannot say, assume the signer.
+    let Some(payer) = estimate.payer.or(estimate.signer) else {
+        return Ok(None);
+    };
+    let balance = client
+        .accounts()
+        .at(head.hash)
+        .balance(payer.account_id())
+        .await?;
+
+    // A fee may not take the payer below the existential deposit.
+    let spendable = balance.transferable_keep_alive;
+    println!(
+        "{pallet}.{call} costs {}; {payer} can spend {}",
+        client.format_amount(estimate.partial_fee),
+        client.format_amount(spendable),
+    );
+    Ok(Some(spendable >= estimate.partial_fee))
+}
+// guide:reading-state-fees:end
+
+#[test]
+fn reading_state_shows_exactly_this_fee_check() {
+    let _can_afford = can_afford; // the example's entry point type-checks
+    let source = include_str!("guide_examples.rs");
+    let start = "// guide:reading-state-fees:start\n";
+    let end = "// guide:reading-state-fees:end";
+    let body = &source[source.find(start).unwrap() + start.len()..source.find(end).unwrap()];
+    let guide = include_str!("../../../docs/reading-state.md");
+    assert!(
+        guide.contains(body.trim_end()),
+        "docs/reading-state.md must show the fee check exactly as \
+         tests/guide_examples.rs builds it"
     );
 }

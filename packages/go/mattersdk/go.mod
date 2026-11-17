@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.1
+	github.com/decred/base58 v1.0.4
 	github.com/vedhavyas/go-subkey/v2 v2.0.0
 	golang.org/x/crypto v0.7.0
 )
@@ -13,7 +14,6 @@ require (
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
-	github.com/decred/base58 v1.0.4 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.20 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect

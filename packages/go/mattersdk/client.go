@@ -41,8 +41,8 @@ const (
 	// Balances.ExistentialDeposit is UNIT / 1000, i.e. 10^(decimals - 3).
 	edDecimalOffset = 3
 
-	// ss58 prefix to assume when the node does not report one.
-	defaultSS58Prefix = 42
+	// The System constant every address this client renders is encoded under.
+	ss58PrefixConstant = "SS58Prefix"
 )
 
 // Config is how to connect.
@@ -140,6 +140,9 @@ type MatterClient struct {
 	// submitCall, when set, receives each façade call instead of TxAndWait. Tests
 	// only: it lets façade encoding be checked against metadata offline.
 	submitCall func(types.Call) (TxReceipt, error)
+	// reads, when set, answers the JSON-RPC requests façade reads make instead of
+	// the chain. Tests only: it lets reads replay recorded chain answers offline.
+	reads rpcCaller
 }
 
 // delegated returns the grant this client acts under, or nil when it acts as
@@ -301,7 +304,6 @@ func readProperties(chain *ChainClient, log *slog.Logger) (ChainProperties, erro
 	var systemProperties struct {
 		TokenSymbol   string `json:"tokenSymbol"`
 		TokenDecimals uint8  `json:"tokenDecimals"`
-		SS58Format    uint16 `json:"ss58Format"`
 	}
 	if err := chain.api.Client.Call(&systemProperties, "system_properties"); err != nil {
 		return props, fmt.Errorf("system_properties: %w", err)
@@ -324,16 +326,19 @@ func readProperties(chain *ChainClient, log *slog.Logger) (ChainProperties, erro
 	if err != nil {
 		return props, err
 	}
-	ed := decodeU128LE(raw)
+	ed, err := decodeStrict("Balances.ExistentialDeposit", raw, (*scaleReader).u128)
+	if err != nil {
+		return props, err
+	}
 	effective, ok := decimalsFromExistentialDeposit(ed)
 	if !ok {
 		// Not a clean power of ten: fall back to the declared count.
 		effective = systemProperties.TokenDecimals
 	}
 
-	ss58 := systemProperties.SS58Format
-	if ss58 == 0 {
-		ss58 = defaultSS58Prefix
+	ss58, err := readSS58Prefix(chain)
+	if err != nil {
+		return props, err
 	}
 
 	props = ChainProperties{
@@ -358,16 +363,22 @@ func readProperties(chain *ChainClient, log *slog.Logger) (ChainProperties, erro
 	return props, nil
 }
 
-// decodeU128LE reads a little-endian u128 from raw SCALE bytes.
-func decodeU128LE(raw []byte) *big.Int {
-	if len(raw) < 16 {
-		return big.NewInt(0)
+// readSS58Prefix reads the runtime's System.SS58Prefix: consensus-backed, unlike
+// the node's presentational system_properties.ss58Format.
+func readSS58Prefix(chain *ChainClient) (uint16, error) {
+	target := systemPallet + "." + ss58PrefixConstant
+	raw, err := chain.Constant(systemPallet, ss58PrefixConstant)
+	if err != nil {
+		return 0, err
 	}
-	be := make([]byte, 16)
-	for i := 0; i < 16; i++ {
-		be[15-i] = raw[i]
+	prefix, err := decodeStrict(target, raw, (*scaleReader).u16)
+	if err != nil {
+		return 0, err
 	}
-	return new(big.Int).SetBytes(be)
+	if prefix > ss58MaxPrefix {
+		return 0, chainErrorf(KindChain, target, "%s: %d is not a valid SS58 prefix", target, prefix)
+	}
+	return prefix, nil
 }
 
 // decimalsFromExistentialDeposit recovers d from ED == 10^(d-3). Reports false
@@ -440,8 +451,8 @@ func (c *MatterClient) AccountIDHex() string {
 	return ""
 }
 
-// Address returns the signing identity's SS58 address under the chain's reported
-// prefix, or "" if read-only.
+// Address returns the signing identity's SS58 address under the chain's prefix,
+// or "" if read-only.
 func (c *MatterClient) Address() string {
 	id := c.AccountID()
 	if id == nil {
@@ -531,6 +542,12 @@ func (c *MatterClient) prepare(call types.Call) (types.Call, error) {
 	if err := c.refuseIfOutOfScope(call); err != nil {
 		return types.Call{}, err
 	}
+	return c.wrapFor(delegation, call)
+}
+
+// wrapFor wraps call in proxy.proxy so it runs as delegation's member: the one
+// place that is built, so what is priced is what is signed.
+func (c *MatterClient) wrapFor(delegation *Delegation, call types.Call) (types.Call, error) {
 	principal, err := types.NewMultiAddressFromAccountID(delegation.Principal)
 	if err != nil {
 		return types.Call{}, fmt.Errorf("encoding the principal: %w", err)
@@ -653,19 +670,22 @@ func checkScopes(pallet, method string, held ScopeSet) error {
 	return nil
 }
 
-// Query reads a storage entry into result. Reports false when the entry is absent.
+// Query reads a storage entry into result, at the latest finalized block. Reports
+// false when the entry is absent.
 func (c *MatterClient) Query(result any, pallet, entry string, keys ...[]byte) (bool, error) {
-	return c.chain.Query(result, pallet, entry, keys...)
+	return queryInto(c.rpc(), c.chain.meta, result, pallet, entry, keys...)
 }
 
-// QueryRaw reads a storage entry as undecoded SCALE bytes. Nil means absent.
+// QueryRaw reads a storage entry as undecoded SCALE bytes, at the latest
+// finalized block. Nil means absent.
 func (c *MatterClient) QueryRaw(pallet, entry string, keys ...[]byte) ([]byte, error) {
-	return c.chain.QueryRaw(pallet, entry, keys...)
+	return storedAtFinalized(c.rpc(), c.chain.meta, pallet, entry, keys...)
 }
 
-// RuntimeAPI calls a runtime API by its state_call name.
+// RuntimeAPI calls a runtime API by its state_call name, at the latest finalized
+// block.
 func (c *MatterClient) RuntimeAPI(method string, args []byte) ([]byte, error) {
-	return c.chain.RuntimeAPI(method, args)
+	return runtimeAPIAtFinalized(c.rpc(), method, args)
 }
 
 // Constant reads a pallet constant from the live metadata.

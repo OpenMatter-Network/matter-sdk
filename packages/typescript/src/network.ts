@@ -44,7 +44,10 @@ export interface ChainProperties {
   readonly specVersion: number;
   /** `system_properties.tokenSymbol`, e.g. `"MTR-Test"`. */
   readonly tokenSymbol: string;
-  /** `system_properties.ss58Format`, defaulting to 42. */
+  /**
+   * The runtime's `System.SS58Prefix`: **consensus-backed**, unlike the node's
+   * presentational `system_properties.ss58Format`.
+   */
   readonly ss58Prefix: number;
 
   /**

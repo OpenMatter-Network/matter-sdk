@@ -102,7 +102,7 @@ The client reads the chain's identity once at connect and exposes it as `propert
 | `chain_name` | e.g. `MatterChain Testnet` |
 | `spec_version` | the live runtime's version |
 | `token_symbol` | `MTR` or `MTR-Test` |
-| `ss58_prefix` | address format, 42 unless the node says otherwise |
+| `ss58_prefix` | address format: the runtime constant `System.SS58Prefix` (42 on MatterChain). Every address the SDK renders uses it |
 | `token_decimals_effective` | decimals derived from the runtime; **every amount conversion uses this** |
 | `token_decimals_declared` | decimals from the node's chain-spec file; presentational only |
 | `existential_deposit` | `Balances.ExistentialDeposit`, in plancks |

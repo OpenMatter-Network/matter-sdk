@@ -70,16 +70,24 @@ class _StubSubstrate:
         self._constants = constants or {}
         self._calls = set(calls)
         self.composed = []
+        #: The block each runtime API call and storage read named: ``None`` is
+        #: the node's own choice, its best block.
+        self.called_at = []
+        self.queried_at = []
 
     def rpc_request(self, method, params):
+        if method == "chain_getFinalizedHead":
+            return {"result": FINALIZED}
         assert method == "state_call"
-        name, args = params
+        name, args, *at = params
+        self.called_at.append(at[0] if at else None)
         key = (name, bytes.fromhex(args[2:]))
         if key not in self._answers:
             raise SubstrateRequestException(f"Execution failed: {name} not found")
         return {"result": "0x" + self._answers[key].hex()}
 
-    def query(self, pallet, entry, params):
+    def query(self, pallet, entry, params, block_hash=None):
+        self.queried_at.append(block_hash)
         if (pallet, entry) not in self._storage:
             raise StorageFunctionNotFound(f'Storage function "{pallet}.{entry}" not found')
         return self._storage[(pallet, entry)]
@@ -119,6 +127,42 @@ def test_an_entry_that_is_not_stored_reads_as_none_not_its_default():
 def test_a_stored_zero_is_a_value_not_absence():
     chain = _chain(storage={("Secrets", "NextSecretId"): _StorageResult(0, True)})
     assert chain.query("Secrets", "NextSecretId") == 0
+
+
+# --- which block a generic read sees ------------------------------------------
+
+
+def test_query_reads_at_the_latest_finalized_block():
+    # Not the best block: that state can still be reverted.
+    chain = _chain(storage={("Secrets", "NextSecretId"): _StorageResult(7, True)})
+    assert chain.query("Secrets", "NextSecretId") == 7
+    assert chain.substrate.queried_at == [FINALIZED]
+
+
+def test_free_balance_reads_the_account_at_the_latest_finalized_block():
+    stored = {"nonce": 3, "data": {"free": 1_000}}
+    chain = _chain(storage={("System", "Account"): _StorageResult(stored, True)})
+    assert chain.free_balance("5Gr…") == 1_000
+    assert chain.substrate.queried_at == [FINALIZED]
+
+
+def test_an_account_the_chain_does_not_store_has_no_free_balance():
+    default_account = {"nonce": 0, "data": {"free": 0}}
+    chain = _chain(storage={("System", "Account"): _StorageResult(default_account, False)})
+    assert chain.free_balance("5Gr…") == 0
+
+
+def test_a_runtime_api_is_called_at_the_latest_finalized_block():
+    chain = _chain(answers={("KgcApi_dkg_epoch", b""): (7).to_bytes(4, "little")})
+    assert chain.runtime_api("KgcApi_dkg_epoch", return_type="u32") == 7
+    assert chain.substrate.called_at == [FINALIZED]
+
+
+def test_the_committee_reads_a_decrypt_makes_are_left_at_the_best_block():
+    # Deliberate: the decrypt path follows the committee's current state.
+    chain = _chain(answers={("KgcApi_dkg_epoch", b""): (7).to_bytes(4, "little")})
+    assert chain.dkg_epoch() == 7
+    assert chain.substrate.called_at == [None]
 
 
 # --- names the runtime lacks -------------------------------------------------

@@ -3,8 +3,8 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import type { Metadata } from "@polkadot/types";
 import type { Signer as PolkadotSigner, SignerPayloadJSON } from "@polkadot/types/types";
-import { u8aToHex } from "@polkadot/util";
-import { blake2AsU8a } from "@polkadot/util-crypto";
+import { compactStripLength, u8aConcat, u8aEq, u8aToHex } from "@polkadot/util";
+import { base58Decode, blake2AsU8a, encodeAddress } from "@polkadot/util-crypto";
 import type { KeySigner } from "@openmatter-network/matter-sdk-core";
 
 import { decimalsFromExistentialDeposit } from "./amount.js";
@@ -13,6 +13,8 @@ import { defaultLogger, type ClientLogger } from "./logger.js";
 import { afterRefresh, isPoolRejection } from "./delegation.js";
 import { ClientError } from "./errors.js";
 import type { ChainProperties } from "./network.js";
+import { bytesFromHex } from "./reads/leaf.js";
+import { ACCOUNT_ID_BYTES, snapshot, type RawReads } from "./reads/source.js";
 import { requiredScopes, ScopeSet } from "./scopes.js";
 
 /** SCALE enum index of `MultiSignature::Sr25519`. */
@@ -26,11 +28,25 @@ const MULTISIGNATURE_SR25519 = 1;
  */
 export const MAX_UNHASHED_SIGNING_PAYLOAD_BYTES = 256;
 
-/** SS58 prefix when the node reports none. */
-const DEFAULT_SS58_PREFIX = 42;
+/** The constant every address this client renders is encoded under. */
+const SS58_PREFIX_TARGET = "System.SS58Prefix";
+/** Domain separator for the SS58 checksum hash. */
+const SS58_CONTEXT = new TextEncoder().encode("SS58PRE");
+const SS58_CHECKSUM_BYTES = 2;
+const SS58_HASH_BITS = 512;
+/** First bytes below this are a one-byte prefix; up to the reserved bound, a two-byte one. */
+const SS58_SINGLE_BYTE_LIMIT = 64;
+const SS58_RESERVED_FIRST_BYTE = 128;
+/** Prefixes the SS58 registry reserves; no address may use them. */
+const SS58_RESERVED_PREFIXES: readonly number[] = [46, 47];
 
 /** Rendered `describeDispatchError` prefix for a revoked or rebound key. */
 const NOT_PROXY_PREFIX = "proxy.NotProxy";
+/** `Proxy.proxy`, as @polkadot indexes it. */
+const PROXY_PALLET = "proxy";
+const PROXY_CALL = "proxy";
+/** The `MultiAddress` variant that carries a 32-byte account id. */
+const MULTI_ADDRESS_ID = "Id";
 
 /** Runtime API mapping a key to its principal; absent before runtime spec 322. */
 const AGENT_KEY_TRAIT = "BudgetsApi";
@@ -47,12 +63,27 @@ export class PolkadotBackend implements ChainBackend {
   readonly #signer: KeySigner | undefined;
   /** Pallet index -> name as metadata spells it, for receipts. */
   readonly #palletNames: ReadonlyMap<number, string>;
+  readonly #ss58Prefix: number;
   #mode: Mode = { kind: "direct" };
 
-  private constructor(api: ApiPromise, signer: KeySigner | undefined) {
+  /** Block-pinned raw reads over the same connection. */
+  readonly reads: RawReads;
+
+  private constructor(api: ApiPromise, provider: WsProvider, signer: KeySigner | undefined) {
     this.#api = api;
     this.#signer = signer;
     this.#palletNames = palletNamesByIndex(api.runtimeMetadata);
+    this.#ss58Prefix = ss58PrefixOf(api);
+    this.reads = {
+      // The provider, not `api.rpc`: reads decode the raw answer themselves.
+      rpc: (method, params) => provider.send(method, [...params]),
+      storageKey: (pallet, entry, keys) =>
+        storageKey((p, e) => api.query[p]?.[e]?.creator as StorageKeyCreator | undefined, pallet, entry, keys),
+      constant: (pallet, name) => constantBytes((p, n) => api.consts[p]?.[n], pallet, name),
+      callData: (pallet, call, args, principal) =>
+        buildCall((p, c) => api.tx[p]?.[c], pallet, call, args, principal).method.toU8a(),
+      ss58Decode,
+    };
   }
 
   static async connect(
@@ -60,13 +91,21 @@ export class PolkadotBackend implements ChainBackend {
     signer: KeySigner | undefined,
     logger: ClientLogger = defaultLogger,
   ): Promise<PolkadotBackend> {
+    const provider = new WsProvider(url);
     let api: ApiPromise;
     try {
-      api = await ApiPromise.create({ provider: new WsProvider(url), noInitWarn: true });
+      api = await ApiPromise.create({ provider, noInitWarn: true });
     } catch (cause) {
       throw ClientError.chain(url, cause instanceof Error ? cause.message : String(cause));
     }
-    const backend = new PolkadotBackend(api, signer);
+    let backend: PolkadotBackend;
+    try {
+      backend = new PolkadotBackend(api, provider, signer);
+    } catch (cause) {
+      // The runtime lacks something the backend needs: do not leave the socket open.
+      await api.disconnect();
+      throw cause;
+    }
     if (signer !== undefined) {
       backend.#mode = await resolveMode(api, signer.accountId, logger);
       if (backend.#mode.kind === "delegated") {
@@ -92,8 +131,7 @@ export class PolkadotBackend implements ChainBackend {
   }
 
   encodeAddress(accountId: Uint8Array): string {
-    // Uses the registry's SS58 prefix, set from the chain's system_properties.
-    return this.#api.createType("AccountId32", accountId).toString();
+    return ss58Encode(accountId, this.#ss58Prefix);
   }
 
   async properties(): Promise<ChainProperties> {
@@ -123,7 +161,7 @@ export class PolkadotBackend implements ChainBackend {
       chainName: chainName.toString(),
       specVersion: api.runtimeVersion.specVersion.toNumber(),
       tokenSymbol: symbolList?.[0]?.toString() ?? "",
-      ss58Prefix: properties.ss58Format.unwrapOr(undefined)?.toNumber() ?? DEFAULT_SS58_PREFIX,
+      ss58Prefix: this.#ss58Prefix,
       tokenDecimalsDeclared,
       tokenDecimalsEffective: decimalsFromExistentialDeposit(ed) ?? tokenDecimalsDeclared,
       existentialDeposit: ed,
@@ -135,36 +173,8 @@ export class PolkadotBackend implements ChainBackend {
     if (signer === undefined) throw ClientError.readOnly();
 
     const target = `${pallet}.${call}`;
-    const section = this.#api.tx[toMemberName(pallet)];
-    const method = section?.[toMemberName(call)];
-    if (method === undefined) {
-      throw ClientError.chain(
-        target,
-        "no such call in the live runtime metadata (was the runtime upgraded?)",
-      );
-    }
-
-    // Delegated: never sign as the key itself; wrap in
-    // `proxy.proxy(member, null, call)` so it runs as the member.
     const principal = this.#mode.kind === "delegated" ? this.#mode.principal : undefined;
-    const wrap = principal === undefined ? undefined : this.#api.tx["proxy"]?.["proxy"];
-    if (principal !== undefined && wrap === undefined) {
-      throw ClientError.chain("Proxy.proxy", "this runtime exposes no proxy pallet");
-    }
-    let extrinsic;
-    try {
-      const inner = method(...(toChainArgs(args) as never[]));
-      extrinsic =
-        wrap === undefined
-          ? inner
-          : // Encoded as MultiAddress::Id.
-            wrap(this.#api.createType("AccountId32", principal), null, inner);
-    } catch (cause) {
-      throw ClientError.chain(
-        target,
-        `argument encoding: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    }
+    const extrinsic = buildCall((p, c) => this.#api.tx[p]?.[c], pallet, call, args, principal);
     const address = this.#api.createType("AccountId32", signer.accountId).toString();
 
     // Sign via KeySigner, never a keyring pair: the key may live in an HSM.
@@ -272,22 +282,13 @@ export class PolkadotBackend implements ChainBackend {
   }
 
   async query(pallet: string, entry: string, keys: unknown[]): Promise<unknown> {
-    const target = `${pallet}.${entry}`;
-    const section = this.#api.query[toMemberName(pallet)];
-    const item = section?.[toMemberName(entry)];
-    if (item === undefined) {
-      throw ClientError.chain(target, "no such storage entry in the live runtime metadata");
-    }
-    return storedValue(await item(...(toChainArgs(keys) as never[])));
+    const storageAt = async (block: Uint8Array): Promise<StorageAt> =>
+      (await this.#api.at(block)).query as unknown as StorageAt;
+    return queryFinalized(this.reads, storageAt, pallet, entry, keys);
   }
 
   async runtimeApi(method: string, argsHex: string): Promise<string> {
-    try {
-      const result = await this.#api.rpc.state.call(method, argsHex);
-      return result.toHex();
-    } catch (cause) {
-      throw ClientError.chain(method, cause instanceof Error ? cause.message : String(cause));
-    }
+    return runtimeApiFinalized(this.reads, method, argsHex);
   }
 
   async finalizedHead(): Promise<Uint8Array> {
@@ -490,6 +491,193 @@ export function keySignerAdapter(types: PayloadTypes, signer: KeySigner): Polkad
       return { id: 1, signature: u8aToHex(framed) };
     },
   };
+}
+
+/** The runtime's `System.SS58Prefix`: consensus-backed, unlike `system_properties.ss58Format`. */
+function ss58PrefixOf(api: ApiPromise): number {
+  const prefix = (api.consts["system"]?.["ss58Prefix"] as { toNumber(): number } | undefined)?.toNumber();
+  if (prefix === undefined) {
+    throw ClientError.chain(SS58_PREFIX_TARGET, "constant missing from the runtime metadata");
+  }
+  return prefix;
+}
+
+/** `accountId` as an SS58 address under `prefix`. */
+export function ss58Encode(accountId: Uint8Array, prefix: number): string {
+  return encodeAddress(accountId, prefix);
+}
+
+/**
+ * The account in an SS58 address of any usable prefix, or `undefined` unless the
+ * text is base58, its prefix is not reserved, it carries exactly 32 payload
+ * bytes, and its checksum holds.
+ *
+ * Written out rather than delegated, in every binding: @polkadot's decoder
+ * passes any hex through as an "address", and each chain library accepts a
+ * different set of strings.
+ */
+export function ss58Decode(text: string): Uint8Array | undefined {
+  let data: Uint8Array;
+  try {
+    data = base58Decode(text);
+  } catch {
+    return undefined;
+  }
+  const first = data[0];
+  if (first === undefined || first >= SS58_RESERVED_FIRST_BYTE) return undefined;
+  const prefixLength = first < SS58_SINGLE_BYTE_LIMIT ? 1 : 2;
+  const second = data[1] ?? 0;
+  const prefix =
+    prefixLength === 1
+      ? first
+      : (((first << 2) | (second >> 6)) & 0xff) | ((second & 0b0011_1111) << 8);
+  const bodyLength = prefixLength + ACCOUNT_ID_BYTES;
+  if (
+    SS58_RESERVED_PREFIXES.includes(prefix) ||
+    data.length !== bodyLength + SS58_CHECKSUM_BYTES
+  ) {
+    return undefined;
+  }
+  const body = data.subarray(0, bodyLength);
+  const checksum = blake2AsU8a(u8aConcat(SS58_CONTEXT, body), SS58_HASH_BITS).subarray(
+    0,
+    SS58_CHECKSUM_BYTES,
+  );
+  return u8aEq(checksum, data.subarray(bodyLength)) ? body.slice(prefixLength) : undefined;
+}
+
+/**
+ * What builds a call from its arguments: `api.tx.pallet.call`, and equally an
+ * entry of `decorateExtrinsics` over offline metadata.
+ */
+export type CallCreator<Built> = (...args: never[]) => Built;
+
+/**
+ * Build `pallet.call(args)` as it is submitted: the call itself, or wrapped in
+ * `Proxy.proxy(principal, None, call)` so it runs as `principal` when one is
+ * given. The one place a call is built, so what is priced is what is signed.
+ * `creatorFor` takes the names as @polkadot indexes them (camelCase).
+ */
+export function buildCall<Built>(
+  creatorFor: (pallet: string, call: string) => CallCreator<Built> | undefined,
+  pallet: string,
+  call: string,
+  args: readonly unknown[],
+  principal?: Uint8Array,
+): Built {
+  const target = `${pallet}.${call}`;
+  const creator = creatorFor(toMemberName(pallet), toMemberName(call));
+  if (creator === undefined) {
+    throw ClientError.chain(
+      target,
+      "no such call in the live runtime metadata (was the runtime upgraded?)",
+    );
+  }
+  // Delegated: never sign as the key itself.
+  const wrap = principal === undefined ? undefined : creatorFor(PROXY_PALLET, PROXY_CALL);
+  if (principal !== undefined && wrap === undefined) {
+    throw ClientError.chain("Proxy.proxy", "this runtime exposes no proxy pallet");
+  }
+  try {
+    const inner = creator(...(toChainArgs(args) as never[]));
+    return wrap === undefined || principal === undefined
+      ? inner
+      : wrap(...([{ [MULTI_ADDRESS_ID]: u8aToHex(principal) }, null, inner] as never[]));
+  } catch (cause) {
+    throw ClientError.chain(
+      target,
+      `argument encoding: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+}
+
+/**
+ * A pallet constant's SCALE bytes. `constantFor` takes the names as @polkadot
+ * indexes them (camelCase): `api.consts.pallet.name`, and equally an entry of
+ * `decorateConstants` over offline metadata.
+ */
+export function constantBytes(
+  constantFor: (pallet: string, name: string) => { toU8a(): Uint8Array } | undefined,
+  pallet: string,
+  name: string,
+): Uint8Array {
+  const constant = constantFor(toMemberName(pallet), toMemberName(name));
+  if (constant === undefined) {
+    throw ClientError.chain(`${pallet}.${name}`, "no such constant in the live runtime metadata");
+  }
+  return constant.toU8a();
+}
+
+/**
+ * What builds a storage key from map keys: `api.query.pallet.entry.creator`, and
+ * equally an entry of `decorateStorage` over offline metadata. It returns the
+ * key with a compact length in front.
+ */
+export type StorageKeyCreator = (...keys: never[]) => Uint8Array;
+
+/**
+ * The raw key `pallet.entry(keys)` is stored under. `creatorFor` takes the
+ * names as @polkadot indexes them (camelCase).
+ */
+export function storageKey(
+  creatorFor: (pallet: string, entry: string) => StorageKeyCreator | undefined,
+  pallet: string,
+  entry: string,
+  keys: readonly unknown[],
+): Uint8Array {
+  const creator = creatorFor(toMemberName(pallet), toMemberName(entry));
+  if (creator === undefined) {
+    throw ClientError.chain(
+      `${pallet}.${entry}`,
+      "no such storage entry in the live runtime metadata",
+    );
+  }
+  return compactStripLength(creator(...(toChainArgs(keys) as never[])))[1];
+}
+
+/** A block's storage, as `(await api.at(block)).query` exposes it. */
+export type StorageAt = Record<
+  string,
+  Record<string, ((...keys: never[]) => Promise<unknown>) | undefined> | undefined
+>;
+
+/**
+ * Read `pallet.entry(keys)` at the latest finalized block, so the answer cannot
+ * be reverted and a write that has returned is visible. `storageAt` gives a
+ * block's storage. An entry the runtime does not have is a chain error naming it.
+ */
+export async function queryFinalized(
+  reads: RawReads,
+  storageAt: (block: Uint8Array) => Promise<StorageAt>,
+  pallet: string,
+  entry: string,
+  keys: readonly unknown[],
+): Promise<unknown> {
+  const view = await snapshot(reads, undefined);
+  const storage = await storageAt(view.at);
+  const item = storage[toMemberName(pallet)]?.[toMemberName(entry)];
+  if (item === undefined) {
+    throw ClientError.chain(
+      `${pallet}.${entry}`,
+      "no such storage entry in the live runtime metadata",
+    );
+  }
+  return storedValue(await item(...(toChainArgs(keys) as never[])));
+}
+
+/**
+ * Call the runtime API `method` with hex-encoded SCALE arguments at the latest
+ * finalized block, returning its SCALE answer as hex.
+ */
+export async function runtimeApiFinalized(
+  reads: RawReads,
+  method: string,
+  argsHex: string,
+): Promise<string> {
+  const args = bytesFromHex(argsHex);
+  if (args === undefined) throw ClientError.chain(method, "the arguments are not hex");
+  const view = await snapshot(reads, undefined);
+  return u8aToHex(await view.call(method, args));
 }
 
 /**

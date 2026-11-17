@@ -1,5 +1,6 @@
-"""Façade parity with ``testvectors/facade_calls.json``, checked both ways: a row
-without a method fails, and so does a method without a row."""
+"""Façade parity with ``testvectors/facade_calls.json`` and ``facade_reads.json``,
+checked both ways: a row without a method fails, and so does a method without a
+row. Reads are replayed against their vectors in ``test_reads.py``."""
 
 import inspect
 import json
@@ -18,9 +19,13 @@ from matter_sdk.facade import (  # noqa: E402
     StakingFacade,
 )
 
+from read_fixture import READ_FACADES, READ_FIXTURE  # noqa: E402
+
 VECTORS = Path(__file__).resolve().parents[3] / "testvectors" / "facade_calls.json"
 
 FACADES = {
+    # Every façade with reads, including those with nothing else.
+    **READ_FACADES,
     "secrets": SecretsFacade,
     "deployments": DeploymentsFacade,
     "resources": ResourcesFacade,
@@ -122,9 +127,12 @@ def test_reads_route_through_the_named_state_call(row):
 
 
 def test_no_facade_method_is_unpinned():
-    # A façade's surface is the union of both fixture tables.
+    # A façade's surface is the union of the write tables and the read catalogue,
+    # plus the block pin on any façade that reads.
+    reads = READ_FIXTURE["reads"]
+    pins = [{"facade": row["facade"], "method": READ_FIXTURE["pin_method"]} for row in reads]
     expected = {}
-    for row in _calls() + _runtime_api_calls():
+    for row in _calls() + _runtime_api_calls() + reads + pins:
         expected.setdefault(row["facade"], set()).add(row["method"])
 
     for name, cls in FACADES.items():

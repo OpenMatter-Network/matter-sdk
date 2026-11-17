@@ -2,15 +2,75 @@ package mattersdk
 
 // Generic access to any pallet, resolved by name against the metadata loaded at
 // connect. Storage decodes into a caller-supplied `result` pointer, GSRPC's idiom.
+//
+// Storage and runtime APIs are read at the latest finalized block: the answer
+// cannot be reverted, and a write that has returned is visible.
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
-// Query reads a storage entry into `result`.
+// storedAtFinalized reads the bytes under pallet.entry(keys) at the latest
+// finalized block. Nil means nothing is stored there. An entry the runtime does
+// not have is refused before the node is asked anything.
+func storedAtFinalized(rpc rpcCaller, meta *types.Metadata, pallet, entry string, keys ...[]byte) ([]byte, error) {
+	target := pallet + "." + entry
+	key, err := types.CreateStorageKey(meta, pallet, entry, keys...)
+	if err != nil {
+		return nil, wrapChainError(KindChain, target, err, "%s: %v (was the runtime upgraded?)", target, err)
+	}
+	head, err := finalizedHead(rpc)
+	if err != nil {
+		return nil, err
+	}
+	var answer *string
+	if err := rpc.callRPC(&answer, rpcGetStorage, toHex(key), toHex(head[:])); err != nil {
+		return nil, wrapChainError(KindChain, target, err, "%s: %v", target, err)
+	}
+	if answer == nil {
+		return nil, nil
+	}
+	raw, err := hex.DecodeString(strings.TrimPrefix(*answer, hexPrefix))
+	if err != nil {
+		return nil, wrapChainError(KindChain, target, err,
+			"%s: the node answered with something that is not hex", target)
+	}
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	return raw, nil
+}
+
+// queryInto decodes what is stored under pallet.entry(keys) into result, and
+// reports whether anything is stored there.
+func queryInto(rpc rpcCaller, meta *types.Metadata, result any, pallet, entry string, keys ...[]byte) (bool, error) {
+	raw, err := storedAtFinalized(rpc, meta, pallet, entry, keys...)
+	if err != nil || raw == nil {
+		return false, err
+	}
+	if err := codec.Decode(raw, result); err != nil {
+		target := pallet + "." + entry
+		return false, wrapChainError(KindChain, target, err, "%s: %v", target, err)
+	}
+	return true, nil
+}
+
+// runtimeAPIAtFinalized calls a runtime API at the latest finalized block.
+func runtimeAPIAtFinalized(rpc rpcCaller, method string, args []byte) ([]byte, error) {
+	head, err := finalizedHead(rpc)
+	if err != nil {
+		return nil, err
+	}
+	return runtimeCallAt(rpc, method, args, head)
+}
+
+// Query reads a storage entry into `result`, at the latest finalized block.
 //
 // Reports (false, nil) when the entry is absent. `keys` are the map keys,
 // omitted for a plain value.
@@ -18,46 +78,21 @@ import (
 //	var info AccountInfo
 //	found, err := client.Query(&info, "System", "Account", accountID)
 func (c *ChainClient) Query(result any, pallet, entry string, keys ...[]byte) (bool, error) {
-	target := pallet + "." + entry
-	key, err := types.CreateStorageKey(c.meta, pallet, entry, keys...)
-	if err != nil {
-		return false, wrapChainError(KindChain, target, err, "%s: %v (was the runtime upgraded?)", target, err)
-	}
-	found, err := c.api.RPC.State.GetStorageLatest(key, result)
-	if err != nil {
-		return false, wrapChainError(KindChain, target, err, "%s: %v", target, err)
-	}
-	return found, nil
+	return queryInto(c, c.meta, result, pallet, entry, keys...)
 }
 
 // QueryRaw reads a storage entry as undecoded SCALE bytes, for entries whose type
 // this package does not model. Nil means absent.
 func (c *ChainClient) QueryRaw(pallet, entry string, keys ...[]byte) ([]byte, error) {
-	target := pallet + "." + entry
-	key, err := types.CreateStorageKey(c.meta, pallet, entry, keys...)
-	if err != nil {
-		return nil, wrapChainError(KindChain, target, err, "%s: %v (was the runtime upgraded?)", target, err)
-	}
-	raw, err := c.api.RPC.State.GetStorageRawLatest(key)
-	if err != nil {
-		return nil, wrapChainError(KindChain, target, err, "%s: %v", target, err)
-	}
-	if raw == nil || len(*raw) == 0 {
-		return nil, nil
-	}
-	return []byte(*raw), nil
+	return storedAtFinalized(c, c.meta, pallet, entry, keys...)
 }
 
-// RuntimeAPI calls a runtime API by its state_call name, returning raw SCALE
-// bytes for the caller to decode.
+// RuntimeAPI calls a runtime API by its state_call name at the latest finalized
+// block, returning raw SCALE bytes for the caller to decode.
 //
 //	raw, err := client.RuntimeAPI("KgcApi_dkg_epoch", nil)
 func (c *ChainClient) RuntimeAPI(method string, args []byte) ([]byte, error) {
-	raw, err := c.stateCall(method, args)
-	if err != nil {
-		return nil, wrapChainError(KindChain, method, err, "%s: %v", method, err)
-	}
-	return raw, nil
+	return runtimeAPIAtFinalized(c, method, args)
 }
 
 // Constant reads a pallet constant from the live metadata as raw SCALE bytes.

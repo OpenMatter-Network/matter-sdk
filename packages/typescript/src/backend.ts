@@ -3,6 +3,7 @@
 
 import { ClientError } from "./errors.js";
 import type { ChainProperties } from "./network.js";
+import type { RawReads } from "./reads/source.js";
 import type { ScopeSet } from "./scopes.js";
 
 /**
@@ -97,6 +98,12 @@ export interface ChainBackend {
 
   /** Read a pallet constant from the live metadata. */
   constant(pallet: string, name: string): unknown;
+
+  /**
+   * Block-pinned raw reads, which every façade read is built on. Absent means
+   * the backend cannot serve them, and façade reads throw a `config` error.
+   */
+  readonly reads?: RawReads;
 
   canSign(): boolean;
 

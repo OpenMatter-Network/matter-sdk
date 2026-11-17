@@ -8,12 +8,20 @@
 //! ```
 
 use anyhow::{Context, Result};
-use matter_sdk::chain::{MatterClient, MatterConfig, Network, Value};
+use matter_sdk::chain::{parse_account, FeeEstimate, MatterClient, MatterConfig, Network, Value};
 use matter_sdk::ApiKey;
 
 /// Opt-in gate for anything that costs gas.
 const SUBMIT_ENV: &str = "MATTER_SUBMIT";
 const SUBMIT_VALUE: &str = "yes";
+
+/// The well-known development account, read when no key is set so a read-only
+/// run still shows a real balance.
+const SAMPLE_ACCOUNT: &str = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+
+/// The call this tour submits behind the gate, and so the one it prices.
+const WRITE_PALLET: &str = "Staking";
+const WRITE_CALL: &str = "chill";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,6 +50,8 @@ async fn main() -> Result<()> {
 
     describe_chain(&client);
     read_state(&client).await?;
+    read_balance(&client).await?;
+    preflight(&client).await?;
     demonstrate_amounts(&client);
     maybe_submit(&client).await?;
 
@@ -108,6 +118,111 @@ async fn read_state(client: &MatterClient) -> Result<()> {
     let ed = client.constant("Balances", "ExistentialDeposit")?;
     println!("  Balances.ExistentialDeposit = {ed:?}");
 
+    Ok(())
+}
+
+/// Façade reads: one question, one call, no pallet or encoding knowledge.
+async fn read_balance(client: &MatterClient) -> Result<()> {
+    println!("\n--- reads (friendly helpers) ---");
+
+    let who = match client.account() {
+        Some(me) => me,
+        None => parse_account(SAMPLE_ACCOUNT)?,
+    };
+    // Two reads, one block: the balance is pinned to the head just read.
+    let head = client.network().head().await?;
+    let balance = client.accounts().at(head.hash).balance(who).await?;
+    let amount = |plancks: u128| tokens(client, plancks);
+
+    println!("  at block         : {}", head.number);
+    println!("  account          : {}", balance.account);
+    println!("  exists           : {}", balance.exists);
+    println!("  total            : {}", amount(balance.total));
+    // Not `free`: freezes and the existential deposit hold some of it back.
+    println!("  transferable     : {}", amount(balance.transferable));
+    for hold in &balance.holds {
+        println!(
+            "  on hold          : {} for {}",
+            amount(hold.amount),
+            hold.reason
+        );
+    }
+    for freeze in &balance.freezes {
+        println!(
+            "  frozen           : {} for {}",
+            amount(freeze.amount),
+            freeze.reason
+        );
+    }
+    Ok(())
+}
+
+/// An amount of plancks as the chain's token, for printing.
+fn tokens(client: &MatterClient, plancks: u128) -> String {
+    format!(
+        "{} {}",
+        client.format_amount(plancks),
+        client.properties().token_symbol
+    )
+}
+
+/// Whose balance a fee comes out of, and how the tour knows. The runtime's
+/// answer comes first; where it has none, the signer is the working assumption;
+/// a read-only client charges nobody, so the sample account stands in.
+fn charged_to(estimate: &FeeEstimate) -> Result<(matter_sdk::AccountId, &'static str)> {
+    Ok(match (&estimate.payer, &estimate.signer) {
+        (Some(payer), _) if estimate.billed_to.is_some() => {
+            (payer.account_id(), "an organization's treasury")
+        }
+        (Some(payer), _) => (payer.account_id(), "per the runtime"),
+        (None, Some(signer)) => (signer.account_id(), "the signer; the runtime did not say"),
+        (None, None) => (
+            parse_account(SAMPLE_ACCOUNT)?,
+            "a sample account; this client is read-only",
+        ),
+    })
+}
+
+/// Three reads put together: can whoever pays for this tour's write afford it?
+async fn preflight(client: &MatterClient) -> Result<()> {
+    println!("\n--- pre-flight (three reads, one block) ---");
+
+    // Every read is pinned to one block, so the fee and the balance agree.
+    let head = client.network().head().await?;
+    let estimate = client
+        .fees()
+        .at(head.hash)
+        .estimate(WRITE_PALLET, WRITE_CALL, vec![])
+        .await?;
+    let (payer, how) = charged_to(&estimate)?;
+    let balance = client.accounts().at(head.hash).balance(payer).await?;
+    // A fee may not take the payer below the existential deposit.
+    let spendable = balance.transferable_keep_alive;
+    let deposit = client.network().info().existential_deposit;
+
+    println!("  call             : {}.{}", estimate.pallet, estimate.call);
+    println!("  at block         : {}", head.number);
+    println!(
+        "  fee              : {} for {} bytes",
+        tokens(client, estimate.partial_fee),
+        estimate.encoded_len
+    );
+    println!("  charged to       : {} ({how})", balance.account);
+    println!(
+        "  can spend        : {}, keeping the existential deposit of {}",
+        tokens(client, spendable),
+        tokens(client, deposit)
+    );
+    match spendable.checked_sub(estimate.partial_fee) {
+        Some(left) => println!(
+            "  verdict          : affordable, leaving {}",
+            tokens(client, left)
+        ),
+        None => println!(
+            "  verdict          : short by {}",
+            tokens(client, estimate.partial_fee - spendable)
+        ),
+    }
     Ok(())
 }
 

@@ -57,6 +57,24 @@ from .signer import Signer, substrate_signer
 from .transport import Transport, UrllibTransport
 
 # Pure Python: available without the [sdk] extra.
+from .reads import (
+    AccountBalance,
+    BalanceLock,
+    BalanceReason,
+    BilledTo,
+    Block,
+    BlockHeader,
+    DispatchClass,
+    FeeEstimate,
+    LockReasons,
+    NetworkInfo,
+    NetworkTiming,
+    NodeStatus,
+    Text,
+    Weight,
+    canonical_json,
+    to_json,
+)
 from .scopes import Access, Scope, ScopeSet, required_scopes
 
 # The chain layer needs the [sdk] extra; without it, its names raise an ImportError
@@ -78,8 +96,11 @@ try:
         parse_amount,
     )
     from .facade import (
+        AccountsFacade,
         DeploymentsFacade,
+        FeesFacade,
         KeysFacade,
+        NetworkFacade,
         OrgsFacade,
         ResourcesFacade,
         SecretsFacade,
@@ -107,6 +128,9 @@ except ImportError as exc:  # pragma: no cover - depends on the install extra
     api_key_signer = _needs_sdk_extra("api_key_signer")  # type: ignore[assignment,misc]
     parse_amount = _needs_sdk_extra("parse_amount")  # type: ignore[assignment,misc]
     format_amount = _needs_sdk_extra("format_amount")  # type: ignore[assignment,misc]
+    AccountsFacade = _needs_sdk_extra("AccountsFacade")  # type: ignore[assignment,misc]
+    NetworkFacade = _needs_sdk_extra("NetworkFacade")  # type: ignore[assignment,misc]
+    FeesFacade = _needs_sdk_extra("FeesFacade")  # type: ignore[assignment,misc]
     SecretsFacade = _needs_sdk_extra("SecretsFacade")  # type: ignore[assignment,misc]
     DeploymentsFacade = _needs_sdk_extra("DeploymentsFacade")  # type: ignore[assignment,misc]
     ResourcesFacade = _needs_sdk_extra("ResourcesFacade")  # type: ignore[assignment,misc]
@@ -168,6 +192,9 @@ __all__ = [
     "parse_amount",
     "format_amount",
     # façades
+    "AccountsFacade",
+    "NetworkFacade",
+    "FeesFacade",
     "SecretsFacade",
     "DeploymentsFacade",
     "ResourcesFacade",
@@ -188,4 +215,21 @@ __all__ = [
     "to_hex",
     "from_hex",
     "secret_id_to_hex",
+    # read results
+    "AccountBalance",
+    "BalanceLock",
+    "BalanceReason",
+    "BilledTo",
+    "Block",
+    "BlockHeader",
+    "DispatchClass",
+    "FeeEstimate",
+    "LockReasons",
+    "NetworkInfo",
+    "NetworkTiming",
+    "NodeStatus",
+    "Text",
+    "Weight",
+    "canonical_json",
+    "to_json",
 ]

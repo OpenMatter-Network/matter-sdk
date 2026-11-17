@@ -1,17 +1,15 @@
 import { ApiKey, type KeySigner } from "@openmatter-network/matter-sdk-core";
 
-import {
-  decimalsFromExistentialDeposit,
-  formatAmount,
-  oneToken,
-  parseAmount,
-} from "./amount.js";
+import { formatAmount, oneToken, parseAmount } from "./amount.js";
 import type { ChainBackend, Mode, TxReceipt } from "./backend.js";
 import { ClientError } from "./errors.js";
 import { defaultLogger, type ClientLogger } from "./logger.js";
 import {
+  AccountsFacade,
   DeploymentsFacade,
+  FeesFacade,
   KeysFacade,
+  NetworkFacade,
   OrgsFacade,
   ResourcesFacade,
   SecretsFacade,
@@ -220,7 +218,7 @@ export class MatterClient {
     return `0x${Array.from(id, (b) => b.toString(16).padStart(2, "0")).join("")}`;
   }
 
-  /** The signing identity's SS58 address (chain-reported prefix), or `undefined` if read-only. */
+  /** The signing identity's SS58 address under the chain's prefix, or `undefined` if read-only. */
   get address(): string | undefined {
     const id = this.accountId;
     return id === undefined ? undefined : this.#backend.encodeAddress(id);
@@ -357,6 +355,24 @@ export class MatterClient {
       throw ClientError.chain("chain_getFinalizedHead", "this backend cannot read the finalized head");
     }
     return this.#backend.finalizedHead();
+  }
+
+  /** Accounts: what an account holds and how much of it can move. */
+  get accounts(): AccountsFacade {
+    return new AccountsFacade(this);
+  }
+
+  /**
+   * The network: which chain this is, its latest finalized block, its timing,
+   * and the health of the node answering.
+   */
+  get network(): NetworkFacade {
+    return new NetworkFacade(this);
+  }
+
+  /** Fees: what a call would cost, and who would be charged for it. */
+  get fees(): FeesFacade {
+    return new FeesFacade(this);
   }
 
   /** Secrets: store, rotate, share, and delete secrets. */

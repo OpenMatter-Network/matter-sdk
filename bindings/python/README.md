@@ -49,8 +49,9 @@ any `substrate-interface` `Keypair`-shaped object.
 
 ## Façades
 
-`client.secrets`, `client.deployments`, `client.resources`, `client.staking`,
-`client.orgs` and `client.keys`:
+`client.accounts`, `client.network`, `client.fees`, `client.secrets`,
+`client.deployments`, `client.resources`, `client.staking`, `client.orgs` and
+`client.keys`:
 
 ```python
 from matter_sdk import Aad, grant_to_user
@@ -62,7 +63,23 @@ client.deployments.set_secret_ref(deployment, secret_id)
 client.orgs.authorize_secrets_agent(org, project, who)
 ```
 
-Anything a façade doesn't cover is one `client.tx(pallet, call, params)` away.
+Reads need no key. `client.accounts.balance(who)` returns an `AccountBalance`: what the
+account holds and what a transfer can move. `client.network` has `info()`, `head()`,
+`block(number)`, `node()` and `timing()`. `client.fees.estimate(pallet, call, params)` takes
+what `tx` takes and returns a `FeeEstimate`: what the call would cost and who would be
+charged. `.at(block_hash)` pins a façade to one block (`head().hash` is one).
+`canonical_json(result)` gives the JSON text every language prints, byte for byte, and
+`to_json(result)` the same as plain data:
+
+```python
+from matter_sdk import canonical_json
+
+balance = client.accounts.balance("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY")
+print(client.format_amount(balance.transferable), canonical_json(balance))
+```
+
+Anything a façade doesn't cover is one `client.tx(pallet, call, params)` or
+`client.query(pallet, entry, keys)` away.
 
 ## Secrets and keys
 

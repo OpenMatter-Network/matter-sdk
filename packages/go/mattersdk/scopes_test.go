@@ -345,11 +345,11 @@ func loadSpec330Metadata(t *testing.T) *types.Metadata {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(vectorsRel, "spec330_metadata_v14.scale"))
 	if err != nil {
-		t.Fatalf("read the spec-322 fixture: %v", err)
+		t.Fatalf("read the spec-330 fixture: %v", err)
 	}
 	meta := &types.Metadata{}
 	if err := codec.Decode(raw, meta); err != nil {
-		t.Fatalf("decode the spec-322 fixture: %v", err)
+		t.Fatalf("decode the spec-330 fixture: %v", err)
 	}
 	return meta
 }

@@ -37,8 +37,11 @@ export type { Mode, ReceiptEvent } from "./backend.js";
 export { Access, Scope, ScopeSet, requiredScopes } from "./scopes.js";
 export type { ChainBackend, TxReceipt } from "./backend.js";
 export {
+  AccountsFacade,
   DeploymentsFacade,
+  FeesFacade,
   KeysFacade,
+  NetworkFacade,
   OrgsFacade,
   ResourcesFacade,
   SecretsFacade,
@@ -46,6 +49,20 @@ export {
   secretIdFromReceipt,
 } from "./facade.js";
 export type { FacadeHost } from "./facade.js";
+export { LockReasons } from "./reads/accounts.js";
+export type { AccountBalance, BalanceLock, BalanceReason } from "./reads/accounts.js";
+export { DispatchClass } from "./reads/fees.js";
+export type { BilledTo, FeeEstimate, Weight } from "./reads/fees.js";
+export type {
+  Block,
+  BlockHeader,
+  NetworkInfo,
+  NetworkTiming,
+  NodeStatus,
+} from "./reads/network.js";
+export { canonicalJson, toJson } from "./reads/leaf.js";
+export type { Text } from "./reads/leaf.js";
+export type { RawReads } from "./reads/source.js";
 export {
   AgentKeyKind,
   KeyPrincipal,

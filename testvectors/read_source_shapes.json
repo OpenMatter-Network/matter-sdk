@@ -1,0 +1,19 @@
+{
+  "comment": "The layout of every runtime source a catalogue read decodes (facade_reads.json), rendered from spec330_metadata.scale: field names, widths and enum variants with their indices. Read decoders are strict and positional, so this is what they were written for. The nightly runtime-drift job recomputes it from the live runtime and fails on any difference.",
+  "shapes": {
+    "Babe.EpochDuration": "u64",
+    "Babe.ExpectedBlockTime": "u128",
+    "Balances.ExistentialDeposit": "u128",
+    "Balances.Freezes": "Default [Blake2_128Concat] {[u8;32]} => {vec<{id:enum{AssetRewards=43(enum{Staked=0})|NominationPools=44(enum{PoolMinBalance=0})},amount:u128}>}",
+    "Balances.Holds": "Default [Blake2_128Concat] {[u8;32]} => {vec<{id:enum{Staking=10(enum{Staking=0})|Preimage=21(enum{Preimage=0})|Council=27(enum{ProposalSubmission=0})|TechnicalCommittee=28(enum{ProposalSubmission=0})|AssetRewards=43(enum{PoolCreation=0})|DelegatedStaking=45(enum{StakingDelegation=0})},amount:u128}>}",
+    "Balances.Locks": "Default [Blake2_128Concat] {[u8;32]} => {vec<{id:[u8;8],amount:u128,reasons:enum{Fee=0|Misc=1|All=2}}>}",
+    "PaymasterApi_fee_payer": "(who:{[u8;32]},call:vec<u8>,fee:u128,tip:u128) -> enum{None=0|Some=1(({[u8;32]},enum{None=0|Some=1(({[u8;32]},{[u8;32]}))}))}",
+    "Staking.BondingDuration": "u32",
+    "Staking.SessionsPerEra": "u32",
+    "System.Account": "Default [Blake2_128Concat] {[u8;32]} => {nonce:u32,consumers:u32,providers:u32,sufficients:u32,data:{free:u128,reserved:u128,frozen:u128,flags:{u128}}}",
+    "System.SS58Prefix": "u16",
+    "Timestamp.Now": "Default u128",
+    "TransactionPaymentCallApi_query_call_info": "(call:<the runtime's call>,len:u32) -> {weight:{ref_time:compact<u64>,proof_size:compact<u64>},class:enum{Normal=0|Operational=1|Mandatory=2},partial_fee:u128}"
+  },
+  "spec_version": 330
+}

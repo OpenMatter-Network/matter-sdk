@@ -21,8 +21,15 @@ is the single list of where the languages differ.
   - lossless amounts
   - scoped-key delegation, including `MATTER_PRINCIPAL` and the
     `KeyRevoked` / `Unsponsored` / `Dispatch` classification
-- **All six façades:** `secrets`, `deployments`, `resources`, `staking`, `orgs`, `keys`.
-  Every method is pinned by `testvectors/facade_calls.json` in both directions.
+- **Every façade:** `accounts`, `network`, `fees`, `secrets`, `deployments`,
+  `resources`, `staking`, `orgs`, `keys`. Every method is pinned in both directions: writes by
+  `testvectors/facade_calls.json`, reads by `testvectors/facade_reads.json`.
+- **Which block a read sees:** the latest finalized one, for the generic `query` and
+  runtime API calls and for every façade read.
+- **Façade reads:** at the latest finalized block, or one pinned with `at`; strict
+  decoding; and one [canonical JSON](reading-state.md#canonical-json) shape. Every
+  language replays the same vectors through its real façade, and a nightly job
+  (`scripts/compare-live-reads.sh`) holds all four to the same bytes on a live chain.
 
 ## Where they differ
 
@@ -34,6 +41,14 @@ is the single list of where the languages differ.
 | Submit without waiting | — | — | — | `Tx(types.Call)` |
 | Finality timeout | `finality_timeout` | `finalityTimeoutMs` | `finality_timeout=` (seconds) | `FinalityTimeout` |
 | Runtime API call | `runtime_api(trait, method, args)` | `runtimeApi(stateCallName, argsHex)` → hex | `runtime_api(name, args, return_type)` → decoded | `RuntimeAPI(name, args)` → bytes |
+| Account argument of a read | `impl Into<AccountId>`; `parse_account(text)` | `Uint8Array` or text | `bytes` or text | `[]byte`; `ParseAccount(text)` |
+| Account in a read result | `Address` | SS58 `string` | SS58 `str` | `Address` |
+| Text in a read result | `Text` (`Utf8` / `Raw`) | `string` or `{ hex }` | `str` or `bytes` | `Text` |
+| Read result as canonical JSON text | `serde_json::to_string(&result)` | `canonicalJson(result)` | `canonical_json(result)` | `CanonicalJSON(result)` |
+| Read result as a JSON value | `serde::Serialize` | `toJson(result)` | `to_json(result)` | `json.Marshal(result)` |
+| Block hash in a read result | `[u8; 32]` | `0x` hex `string` | `0x` hex `str` | `[32]byte` |
+| 64-bit integer in a read result | `u64` | `bigint` | `int` | `uint64` |
+| Block pin for a read | `at([u8; 32])` | `at(bytes or hex)` | `at(bytes or hex)` | `At([32]byte)` |
 | Receipt events | names | names + fields, `requireEvent`, `secretIdFromReceipt` | names + attributes, `require_event` | names + decoded `Fields`, block-level helpers |
 | Secret recovery | one call: `secrets().recover(id, aad)` | `decrypt` + your reads | `decrypt` + `chain.committee_at(epoch)` | `Decrypt` + `Chain().CommitteeAt(epoch)` |
 | Finalized head for `decrypt` | inside `recover`; else `rpc()` | `finalizedHead()` | `committee_at(epoch).block_hash` | `CommitteeAt(epoch).BlockHash` |

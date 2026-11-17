@@ -40,3 +40,40 @@ jobs:
         run: |
           cargo test -p matter-sdk --features chain --test live_chain \
             -- --ignored --nocapture
+
+  # `drift` runs Rust's read decoders against the live runtime. TypeScript, Python
+  # and Go carry their own, so this runs all four at one finalized block and
+  # requires the same bytes from each. Testnet only: its accounts are the ones
+  # testvectors/live_reads.json names.
+  read-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { path: matter-sdk }
+      - uses: ./matter-sdk/.github/actions/fetch-core-crates
+        with:
+          token: ${{ secrets.DEPS_PAT }}
+      - uses: ./matter-sdk/.github/actions/install-rust
+        with: { targets: wasm32-unknown-unknown }
+      - uses: ./matter-sdk/.github/actions/install-wasm-pack
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version: 22 }
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.11" }
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: { go-version: "1.22" }
+      - name: Build each binding
+        working-directory: matter-sdk
+        run: |
+          (cd packages/typescript-core && npm ci && npm run build)
+          (cd packages/typescript && npm install)
+          (cd bindings/python \
+            && pip install maturin pytest 'substrate-interface>=1.7' \
+            && maturin build --release \
+            && pip install --force-reinstall --no-deps target/wheels/matter_sdk-*.whl)
+          cargo build -p matter-sdk-ffi --release
+      - name: Every catalogue read prints the same bytes in all four bindings
+        working-directory: matter-sdk
+        env:
+          MATTER_RPC_URL: wss://node2.testnet.openmatter.network
+        run: scripts/compare-live-reads.sh

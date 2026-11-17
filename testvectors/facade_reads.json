@@ -1,0 +1,2457 @@
+{
+  "accounts": {
+    "accepted": [
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "D43593C715FDD31C61141ABD04A99FD6822C8558854CCDE39A5684E7A56DA27D"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "15oF4uVJwmo4TdGW7VfQxNLavjCXviqxT9S1MgbjMNHr6Sp5"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "cEaNSpz4PxFcZ7nT1VEKrKewH67rfx6MfcM6yKojyyPz7qaqp"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "yNa8JpqfFB3q8A29rCwSgxvdU94ufJw2yKKxDgznS5m1PoFvn"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "  5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\n"
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "text": "\t0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d\r\n"
+      }
+    ],
+    "addresses": [
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+        "prefix": 42
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "15oF4uVJwmo4TdGW7VfQxNLavjCXviqxT9S1MgbjMNHr6Sp5",
+        "prefix": 0
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "7NPoMQbiA6trJKkjB35uk96MeJD4PGWkLQLH7k7hXEkZpiba",
+        "prefix": 63
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "cEaNSpz4PxFcZ7nT1VEKrKewH67rfx6MfcM6yKojyyPz7qaqp",
+        "prefix": 64
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "yGHXkYLYqxijLKKfd9Q2CB9shRVu8rPNBS53wvwGTutYg4zTg",
+        "prefix": 255
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "hmsGT9XUdV5px2o6jwb2LDKHaAYKWgDsf12wkNgbUtkeE3i7a",
+        "prefix": 5234
+      },
+      {
+        "account_hex": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "address": "yNa8JpqfFB3q8A29rCwSgxvdU94ufJw2yKKxDgznS5m1PoFvn",
+        "prefix": 16383
+      }
+    ],
+    "refused": [
+      "",
+      "not an account",
+      "0x1234",
+      "33",
+      "27",
+      "5HrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcN",
+      "Ks1TRTfTB2v19pD9G5yJ7QCuf8PT8EDE6ZPrHGo9DGneUGEXH",
+      "yA3vprfzKUKan9P1eXE6iMGCMSMDZEnAtb6wEjTEf86ZXt",
+      "5g1axYPrdA2VeKsqmz8WKpa8f3n4T9ou8Qv3f8BaeheH3ApS",
+      "5moFDXwG1SuDoPHJgX1XhiqZJXvMWLSRKMUBGopt7ZEmKmWa",
+      "DrZg9tnv91k6T93t3eGTHiNyeqWAxBSabYLp7AvGcpQG7iU3",
+      "yNfuy5qCeZLhrK5ZK7UKiLpttnZ3xN7fVWGWMJgRjYcbt5ZVR",
+      "LEwthPSijdicStwa1iZyTPQB1tezTujtfjoDUv5YFYTU8YBX",
+      "﻿5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\u001c",
+      " 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\u000b"
+    ]
+  },
+  "chain": {
+    "existential_deposit": "1000000000000000",
+    "ss58_prefix": 42
+  },
+  "comment": "The read catalogue and its decode vectors. Every binding with a chain client must expose exactly these (facade, method) reads, plus `pin_method` on each façade that has one. A case is a transcript: `exchanges` lists every JSON-RPC request the read makes, in order, each with the node's `result` (which may be null) or the `error` it refused with. A `pinnable` read is recorded pinned at `at`; unpinned it first asks for the finalized head, which is `at`, and then makes the same requests. A read that is not pinnable makes the same requests either way, and so does a case that fails with no exchanges: it is refused before the chain is asked anything. The read must make exactly those requests and then either return `expected` (the JSON value) serialized as exactly `expected_json` (the canonical bytes: no whitespace, fields in declared order, only quotes, backslashes and control characters escaped; `null` for a `nullable` read with nothing to return), or fail with a chain error naming `error.target`. `args` are what a caller passes, by the row's argument names; argument types are account, string, u32, u64, u128, hash, bytes, page and call_args (a call's arguments as an ordered list of {name, type, value}, which each binding turns into the form its `tx` takes). A case with a `client` is read by a client that would sign as `client.signer`, for the member `client.principal` if any; any other case by a read-only one. `shape` names each field's form: address (SS58), u32 (number), u64/u128 (decimal string), text (string, or {hex} when not UTF-8), hex, bool, string, A|B|C (one variant name); `?` marks a field that may be null, and {\"?\": shape} an object that may be. Raw bytes are bare hex except inside exchanges and results, which are verbatim. Method names are snake_case here; bindings apply their own convention.",
+  "pin_method": "at",
+  "reads": [
+    {
+      "args": [
+        {
+          "name": "who",
+          "type": "account"
+        }
+      ],
+      "cases": [
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x070000000100000001000000000000000000f44482916345000000000000000000002cf61a24a22900000000000000000000909dceda8237000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x040a0000002cf61a24a2290000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x042c000000909dceda82370000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x047374616b696e67200000c84e676dc11b000000000000000002"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": true,
+            "free": "5000000000000000000",
+            "freezes": [
+              {
+                "amount": "4000000000000000000",
+                "reason": "NominationPools.PoolMinBalance"
+              }
+            ],
+            "frozen": "4000000000000000000",
+            "holds": [
+              {
+                "amount": "3000000000000000000",
+                "reason": "Staking.Staking"
+              }
+            ],
+            "locks": [
+              {
+                "amount": "2000000000000000000",
+                "id": "staking ",
+                "reasons": "All"
+              }
+            ],
+            "reserved": "3000000000000000000",
+            "total": "8000000000000000000",
+            "transferable": "4000000000000000000",
+            "transferable_keep_alive": "4000000000000000000"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":true,\"free\":\"5000000000000000000\",\"reserved\":\"3000000000000000000\",\"frozen\":\"4000000000000000000\",\"total\":\"8000000000000000000\",\"transferable\":\"4000000000000000000\",\"transferable_keep_alive\":\"4000000000000000000\",\"holds\":[{\"reason\":\"Staking.Staking\",\"amount\":\"3000000000000000000\"}],\"freezes\":[{\"reason\":\"NominationPools.PoolMinBalance\",\"amount\":\"4000000000000000000\"}],\"locks\":[{\"id\":\"staking \",\"amount\":\"2000000000000000000\",\"reasons\":\"All\"}]}",
+          "name": "staked_and_frozen"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": false,
+            "free": "0",
+            "freezes": [],
+            "frozen": "0",
+            "holds": [],
+            "locks": [],
+            "reserved": "0",
+            "total": "0",
+            "transferable": "0",
+            "transferable_keep_alive": "0"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":false,\"free\":\"0\",\"reserved\":\"0\",\"frozen\":\"0\",\"total\":\"0\",\"transferable\":\"0\",\"transferable_keep_alive\":\"0\",\"holds\":[],\"freezes\":[],\"locks\":[]}",
+          "name": "never_funded"
+        },
+        {
+          "args": {
+            "who": "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000010000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": true,
+            "free": "1000000000000000000",
+            "freezes": [],
+            "frozen": "0",
+            "holds": [],
+            "locks": [],
+            "reserved": "0",
+            "total": "1000000000000000000",
+            "transferable": "999000000000000000",
+            "transferable_keep_alive": "999000000000000000"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":true,\"free\":\"1000000000000000000\",\"reserved\":\"0\",\"frozen\":\"0\",\"total\":\"1000000000000000000\",\"transferable\":\"999000000000000000\",\"transferable_keep_alive\":\"999000000000000000\",\"holds\":[],\"freezes\":[],\"locks\":[]}",
+          "name": "only_provider_keeps_the_deposit"
+        },
+        {
+          "args": {
+            "who": "15oF4uVJwmo4TdGW7VfQxNLavjCXviqxT9S1MgbjMNHr6Sp5"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000010000000200000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": true,
+            "free": "1000000000000000000",
+            "freezes": [],
+            "frozen": "0",
+            "holds": [],
+            "locks": [],
+            "reserved": "0",
+            "total": "1000000000000000000",
+            "transferable": "1000000000000000000",
+            "transferable_keep_alive": "999000000000000000"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":true,\"free\":\"1000000000000000000\",\"reserved\":\"0\",\"frozen\":\"0\",\"total\":\"1000000000000000000\",\"transferable\":\"1000000000000000000\",\"transferable_keep_alive\":\"999000000000000000\",\"holds\":[],\"freezes\":[],\"locks\":[]}",
+          "name": "second_provider_frees_the_deposit"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0100000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x180a00ffffffffffffffffffffffffffffffff1500010000000000000000000000000000001b00020000000000000000000000000000001c00030000000000000000000000000000002b00040000000000000000000000000000002d0005000000000000000000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x082b00060000000000000000000000000000002c0007000000000000000000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x08fffe000102030405080000000000000000000000000000000076657374696e67200900000000000000000000000000000001"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": true,
+            "free": "340282366920938463463374607431768211455",
+            "freezes": [
+              {
+                "amount": "6",
+                "reason": "AssetRewards.Staked"
+              },
+              {
+                "amount": "7",
+                "reason": "NominationPools.PoolMinBalance"
+              }
+            ],
+            "frozen": "1",
+            "holds": [
+              {
+                "amount": "340282366920938463463374607431768211455",
+                "reason": "Staking.Staking"
+              },
+              {
+                "amount": "1",
+                "reason": "Preimage.Preimage"
+              },
+              {
+                "amount": "2",
+                "reason": "Council.ProposalSubmission"
+              },
+              {
+                "amount": "3",
+                "reason": "TechnicalCommittee.ProposalSubmission"
+              },
+              {
+                "amount": "4",
+                "reason": "AssetRewards.PoolCreation"
+              },
+              {
+                "amount": "5",
+                "reason": "DelegatedStaking.StakingDelegation"
+              }
+            ],
+            "locks": [
+              {
+                "amount": "8",
+                "id": {
+                  "hex": "0xfffe000102030405"
+                },
+                "reasons": "Fee"
+              },
+              {
+                "amount": "9",
+                "id": "vesting ",
+                "reasons": "Misc"
+              }
+            ],
+            "reserved": "340282366920938463463374607431768211455",
+            "total": "340282366920938463463374607431768211455",
+            "transferable": "340282366920938463463374607431768211455",
+            "transferable_keep_alive": "340282366920938463463373607431768211455"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":true,\"free\":\"340282366920938463463374607431768211455\",\"reserved\":\"340282366920938463463374607431768211455\",\"frozen\":\"1\",\"total\":\"340282366920938463463374607431768211455\",\"transferable\":\"340282366920938463463374607431768211455\",\"transferable_keep_alive\":\"340282366920938463463373607431768211455\",\"holds\":[{\"reason\":\"Staking.Staking\",\"amount\":\"340282366920938463463374607431768211455\"},{\"reason\":\"Preimage.Preimage\",\"amount\":\"1\"},{\"reason\":\"Council.ProposalSubmission\",\"amount\":\"2\"},{\"reason\":\"TechnicalCommittee.ProposalSubmission\",\"amount\":\"3\"},{\"reason\":\"AssetRewards.PoolCreation\",\"amount\":\"4\"},{\"reason\":\"DelegatedStaking.StakingDelegation\",\"amount\":\"5\"}],\"freezes\":[{\"reason\":\"AssetRewards.Staked\",\"amount\":\"6\"},{\"reason\":\"NominationPools.PoolMinBalance\",\"amount\":\"7\"}],\"locks\":[{\"id\":{\"hex\":\"0xfffe000102030405\"},\"amount\":\"8\",\"reasons\":\"Fee\"},{\"id\":\"vesting \",\"amount\":\"9\",\"reasons\":\"Misc\"}]}",
+          "name": "widest_amounts_and_every_reason"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x0861225c3c26c3a9010100000000000000000000000000000002e280a87f090a080c0200000000000000000000000000000002"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "expected": {
+            "account": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "exists": true,
+            "free": "1000000000000000000",
+            "freezes": [],
+            "frozen": "0",
+            "holds": [],
+            "locks": [
+              {
+                "amount": "1",
+                "id": "a\"\\<&é\u0001",
+                "reasons": "All"
+              },
+              {
+                "amount": "2",
+                "id": " \t\n\b\f",
+                "reasons": "All"
+              }
+            ],
+            "reserved": "0",
+            "total": "1000000000000000000",
+            "transferable": "1000000000000000000",
+            "transferable_keep_alive": "999000000000000000"
+          },
+          "expected_json": "{\"account\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"exists\":true,\"free\":\"1000000000000000000\",\"reserved\":\"0\",\"frozen\":\"0\",\"total\":\"1000000000000000000\",\"transferable\":\"1000000000000000000\",\"transferable_keep_alive\":\"999000000000000000\",\"holds\":[],\"freezes\":[],\"locks\":[{\"id\":\"a\\\"\\\\<&é\\u0001\",\"amount\":\"1\",\"reasons\":\"All\"},{\"id\":\" \\t\\n\\b\\f\",\"amount\":\"2\",\"reasons\":\"All\"}]}",
+          "name": "text_that_needs_escaping"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "Balances.Holds"
+          },
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x046300000064a7b3b6e00d0000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "name": "a_hold_reason_the_sdk_does_not_know"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "System.Account"
+          },
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "name": "an_account_with_a_byte_left_over"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "Balances.Freezes"
+          },
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x042c000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "name": "freezes_cut_short"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "Balances.Locks"
+          },
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x047374616b696e6720000064a7b3b6e00d000000000000000003"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "name": "lock_reasons_the_sdk_does_not_know"
+        },
+        {
+          "args": {
+            "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "Balances.Holds"
+          },
+          "exchanges": [
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                  "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x07000000000000000100000000000000000064a7b3b6e00d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f811187ede3c61f3269344d168d3e6337de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x046300000064a7b3b6e00d0000000000000000"
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2fb1c0eb12e038e5c7f91e120ed4b7ebf1de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      null
+                    ],
+                    [
+                      "0xc2261276cc9d1f8598ea4b6a74b15c2f218f26c73add634897550b4003b26bc6de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+                      "0x047374616b696e6720000064a7b3b6e00d000000000000000003"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "name": "two_malformed_sources_name_the_first"
+        }
+      ],
+      "facade": "accounts",
+      "method": "balance",
+      "nullable": false,
+      "pinnable": true,
+      "result": "AccountBalance",
+      "shape": {
+        "account": "address",
+        "exists": "bool",
+        "free": "u128",
+        "freezes": [
+          {
+            "amount": "u128",
+            "reason": "string"
+          }
+        ],
+        "frozen": "u128",
+        "holds": [
+          {
+            "amount": "u128",
+            "reason": "string"
+          }
+        ],
+        "locks": [
+          {
+            "amount": "u128",
+            "id": "text",
+            "reasons": "Fee|Misc|All"
+          }
+        ],
+        "reserved": "u128",
+        "total": "u128",
+        "transferable": "u128",
+        "transferable_keep_alive": "u128"
+      },
+      "sources": [
+        {
+          "kind": "storage",
+          "name": "System.Account"
+        },
+        {
+          "kind": "storage",
+          "name": "Balances.Holds"
+        },
+        {
+          "kind": "storage",
+          "name": "Balances.Freezes"
+        },
+        {
+          "kind": "storage",
+          "name": "Balances.Locks"
+        },
+        {
+          "kind": "constant",
+          "name": "Balances.ExistentialDeposit"
+        }
+      ],
+      "summary": "What an account holds and how much of it can move."
+    },
+    {
+      "args": [
+        {
+          "name": "pallet",
+          "type": "string"
+        },
+        {
+          "name": "call",
+          "type": "string"
+        },
+        {
+          "name": "args",
+          "type": "call_args"
+        }
+      ],
+      "cases": [
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            }
+          ],
+          "expected": {
+            "billed_to": null,
+            "call": "chill",
+            "dispatch_class": "Normal",
+            "encoded_len": 114,
+            "pallet": "Staking",
+            "partial_fee": "1234500000000000",
+            "payer": null,
+            "signer": null,
+            "weight": {
+              "proof_size": "3593",
+              "ref_time": "187000000"
+            },
+            "wrapped_in_proxy": false
+          },
+          "expected_json": "{\"pallet\":\"Staking\",\"call\":\"chill\",\"partial_fee\":\"1234500000000000\",\"weight\":{\"ref_time\":\"187000000\",\"proof_size\":\"3593\"},\"dispatch_class\":\"Normal\",\"encoded_len\":114,\"wrapped_in_proxy\":false,\"signer\":null,\"payer\":null,\"billed_to\":null}",
+          "name": "a_read_only_client_learns_the_fee"
+        },
+        {
+          "args": {
+            "args": [
+              {
+                "name": "deployment",
+                "type": "u128",
+                "value": "42"
+              }
+            ],
+            "call": "cancel_deployment",
+            "pallet": "Jobs"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x08012a00000000000000000000000000000082000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            },
+            {
+              "method": "state_call",
+              "params": [
+                "PaymasterApi_fee_payer",
+                "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d4808012a00000000000000000000000000000000a8f96dc5620400000000000000000000000000000000000000000000000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x01d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00"
+            }
+          ],
+          "expected": {
+            "billed_to": null,
+            "call": "cancel_deployment",
+            "dispatch_class": "Normal",
+            "encoded_len": 130,
+            "pallet": "Jobs",
+            "partial_fee": "1234500000000000",
+            "payer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "signer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "weight": {
+              "proof_size": "3593",
+              "ref_time": "187000000"
+            },
+            "wrapped_in_proxy": false
+          },
+          "expected_json": "{\"pallet\":\"Jobs\",\"call\":\"cancel_deployment\",\"partial_fee\":\"1234500000000000\",\"weight\":{\"ref_time\":\"187000000\",\"proof_size\":\"3593\"},\"dispatch_class\":\"Normal\",\"encoded_len\":130,\"wrapped_in_proxy\":false,\"signer\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"payer\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"billed_to\":null}",
+          "name": "the_signer_pays"
+        },
+        {
+          "args": {
+            "args": [
+              {
+                "name": "deployment",
+                "type": "u128",
+                "value": "42"
+              }
+            ],
+            "call": "cancel_deployment",
+            "pallet": "Jobs"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x08012a00000000000000000000000000000082000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            },
+            {
+              "method": "state_call",
+              "params": [
+                "PaymasterApi_fee_payer",
+                "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d4808012a00000000000000000000000000000000a8f96dc5620400000000000000000000000000000000000000000000000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x017777777777777777777777777777777777777777777777777777777777777777010a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0ad43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+            }
+          ],
+          "expected": {
+            "billed_to": {
+              "member": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "org": "0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+            },
+            "call": "cancel_deployment",
+            "dispatch_class": "Normal",
+            "encoded_len": 130,
+            "pallet": "Jobs",
+            "partial_fee": "1234500000000000",
+            "payer": "5EmM3XnzKd5LJMr6oDAD6wEBP1Lgs7juQozaPpurTr3yVFbc",
+            "signer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "weight": {
+              "proof_size": "3593",
+              "ref_time": "187000000"
+            },
+            "wrapped_in_proxy": false
+          },
+          "expected_json": "{\"pallet\":\"Jobs\",\"call\":\"cancel_deployment\",\"partial_fee\":\"1234500000000000\",\"weight\":{\"ref_time\":\"187000000\",\"proof_size\":\"3593\"},\"dispatch_class\":\"Normal\",\"encoded_len\":130,\"wrapped_in_proxy\":false,\"signer\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"payer\":\"5EmM3XnzKd5LJMr6oDAD6wEBP1Lgs7juQozaPpurTr3yVFbc\",\"billed_to\":{\"org\":\"0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a\",\"member\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\"}}",
+          "name": "an_organization_pays_for_its_member"
+        },
+        {
+          "args": {
+            "args": [
+              {
+                "name": "deployment",
+                "type": "u128",
+                "value": "42"
+              }
+            ],
+            "call": "cancel_deployment",
+            "pallet": "Jobs"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+            "signer": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x3b0000d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d0008012a000000000000000000000000000000a6000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            },
+            {
+              "method": "state_call",
+              "params": [
+                "PaymasterApi_fee_payer",
+                "0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0bd83b0000d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d0008012a00000000000000000000000000000000a8f96dc5620400000000000000000000000000000000000000000000000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x01d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00"
+            }
+          ],
+          "expected": {
+            "billed_to": null,
+            "call": "cancel_deployment",
+            "dispatch_class": "Normal",
+            "encoded_len": 166,
+            "pallet": "Jobs",
+            "partial_fee": "1234500000000000",
+            "payer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "signer": "5CKBfVFwvXyYUArQ4VRSrCczG12ASZwjMYPpEAyAKCfryDeD",
+            "weight": {
+              "proof_size": "3593",
+              "ref_time": "187000000"
+            },
+            "wrapped_in_proxy": true
+          },
+          "expected_json": "{\"pallet\":\"Jobs\",\"call\":\"cancel_deployment\",\"partial_fee\":\"1234500000000000\",\"weight\":{\"ref_time\":\"187000000\",\"proof_size\":\"3593\"},\"dispatch_class\":\"Normal\",\"encoded_len\":166,\"wrapped_in_proxy\":true,\"signer\":\"5CKBfVFwvXyYUArQ4VRSrCczG12ASZwjMYPpEAyAKCfryDeD\",\"payer\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"billed_to\":null}",
+          "name": "a_scoped_key_acting_for_a_member"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            },
+            {
+              "method": "state_call",
+              "params": [
+                "PaymasterApi_fee_payer",
+                "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d080a0600a8f96dc5620400000000000000000000000000000000000000000000000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x00"
+            }
+          ],
+          "expected": {
+            "billed_to": null,
+            "call": "chill",
+            "dispatch_class": "Normal",
+            "encoded_len": 114,
+            "pallet": "Staking",
+            "partial_fee": "1234500000000000",
+            "payer": null,
+            "signer": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+            "weight": {
+              "proof_size": "3593",
+              "ref_time": "187000000"
+            },
+            "wrapped_in_proxy": false
+          },
+          "expected_json": "{\"pallet\":\"Staking\",\"call\":\"chill\",\"partial_fee\":\"1234500000000000\",\"weight\":{\"ref_time\":\"187000000\",\"proof_size\":\"3593\"},\"dispatch_class\":\"Normal\",\"encoded_len\":114,\"wrapped_in_proxy\":false,\"signer\":\"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\"payer\":null,\"billed_to\":null}",
+          "name": "the_runtime_cannot_say_who_pays"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x13ffffffffffffffff13ffffffffffffffff02ffffffffffffffffffffffffffffffff"
+            }
+          ],
+          "expected": {
+            "billed_to": null,
+            "call": "chill",
+            "dispatch_class": "Mandatory",
+            "encoded_len": 114,
+            "pallet": "Staking",
+            "partial_fee": "340282366920938463463374607431768211455",
+            "payer": null,
+            "signer": null,
+            "weight": {
+              "proof_size": "18446744073709551615",
+              "ref_time": "18446744073709551615"
+            },
+            "wrapped_in_proxy": false
+          },
+          "expected_json": "{\"pallet\":\"Staking\",\"call\":\"chill\",\"partial_fee\":\"340282366920938463463374607431768211455\",\"weight\":{\"ref_time\":\"18446744073709551615\",\"proof_size\":\"18446744073709551615\"},\"dispatch_class\":\"Mandatory\",\"encoded_len\":114,\"wrapped_in_proxy\":false,\"signer\":null,\"payer\":null,\"billed_to\":null}",
+          "name": "the_widest_fee_and_weight"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chil",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "error": {
+            "target": "Staking.chil"
+          },
+          "exchanges": [],
+          "name": "a_call_the_runtime_does_not_have"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "error": {
+            "target": "TransactionPaymentCallApi_query_call_info"
+          },
+          "exchanges": [
+            {
+              "error": "RPC error: client error: Execution failed",
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ]
+            }
+          ],
+          "name": "a_runtime_that_will_not_price_the_call"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "error": {
+            "target": "TransactionPaymentCallApi_query_call_info"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0408000300000000000000000000000000000000"
+            }
+          ],
+          "name": "a_fee_with_a_byte_left_over"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": null
+          },
+          "error": {
+            "target": "TransactionPaymentCallApi_query_call_info"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x04080303000000000000000000000000000000"
+            }
+          ],
+          "name": "a_dispatch_class_the_sdk_does_not_know"
+        },
+        {
+          "args": {
+            "args": [],
+            "call": "chill",
+            "pallet": "Staking"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "client": {
+            "principal": null,
+            "signer": "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          },
+          "error": {
+            "target": "PaymasterApi_fee_payer"
+          },
+          "exchanges": [
+            {
+              "method": "state_call",
+              "params": [
+                "TransactionPaymentCallApi_query_call_info",
+                "0x0a0672000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x0293952c25380000a8f96dc56204000000000000000000"
+            },
+            {
+              "method": "state_call",
+              "params": [
+                "PaymasterApi_fee_payer",
+                "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d080a0600a8f96dc5620400000000000000000000000000000000000000000000000000",
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": "0x010203"
+            }
+          ],
+          "name": "a_payer_answer_cut_short"
+        }
+      ],
+      "facade": "fees",
+      "method": "estimate",
+      "nullable": false,
+      "pinnable": true,
+      "result": "FeeEstimate",
+      "shape": {
+        "billed_to": {
+          "?": {
+            "member": "address",
+            "org": "hex"
+          }
+        },
+        "call": "string",
+        "dispatch_class": "Normal|Operational|Mandatory",
+        "encoded_len": "u32",
+        "pallet": "string",
+        "partial_fee": "u128",
+        "payer": "address?",
+        "signer": "address?",
+        "weight": {
+          "proof_size": "u64",
+          "ref_time": "u64"
+        },
+        "wrapped_in_proxy": "bool"
+      },
+      "sources": [
+        {
+          "kind": "runtime_api",
+          "name": "TransactionPaymentCallApi_query_call_info"
+        },
+        {
+          "kind": "runtime_api",
+          "name": "PaymasterApi_fee_payer"
+        }
+      ],
+      "summary": "What a call would cost this client, and who would be charged for it."
+    },
+    {
+      "args": [],
+      "cases": [
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [],
+          "expected": {
+            "chain_name": "MatterChain Fake",
+            "existential_deposit": "1000000000000000",
+            "genesis_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "spec_version": 330,
+            "ss58_prefix": 42,
+            "token_decimals": 18,
+            "token_symbol": "MTR-Test"
+          },
+          "expected_json": "{\"chain_name\":\"MatterChain Fake\",\"genesis_hash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"spec_version\":330,\"token_symbol\":\"MTR-Test\",\"token_decimals\":18,\"ss58_prefix\":42,\"existential_deposit\":\"1000000000000000\"}",
+          "name": "as_read_at_connect"
+        }
+      ],
+      "facade": "network",
+      "method": "info",
+      "nullable": false,
+      "pinnable": false,
+      "result": "NetworkInfo",
+      "shape": {
+        "chain_name": "string",
+        "existential_deposit": "u128",
+        "genesis_hash": "hex",
+        "spec_version": "u32",
+        "ss58_prefix": "u32",
+        "token_decimals": "u32",
+        "token_symbol": "string"
+      },
+      "sources": [
+        {
+          "kind": "rpc",
+          "name": "system_chain"
+        },
+        {
+          "kind": "rpc",
+          "name": "system_properties"
+        },
+        {
+          "kind": "rpc",
+          "name": "chain_getBlockHash"
+        },
+        {
+          "kind": "rpc",
+          "name": "state_getRuntimeVersion"
+        },
+        {
+          "kind": "constant",
+          "name": "Balances.ExistentialDeposit"
+        },
+        {
+          "kind": "constant",
+          "name": "System.SS58Prefix"
+        }
+      ],
+      "summary": "Which chain this is: its name, genesis hash, token and address format."
+    },
+    {
+      "args": [],
+      "cases": [
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x2e5ee7",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+                      "0x002e1d919a0100000000000000000000"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "method": "state_getRuntimeVersion",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "apis": [],
+                "authoringVersion": 1,
+                "implName": "open-matter-runtime",
+                "implVersion": 1,
+                "specName": "open-matter-runtime",
+                "specVersion": 330,
+                "stateVersion": 1,
+                "transactionVersion": 10
+              }
+            }
+          ],
+          "expected": {
+            "hash": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            "number": "3038951",
+            "parent_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "spec_version": 330,
+            "timestamp_ms": "1763371200000"
+          },
+          "expected_json": "{\"number\":\"3038951\",\"hash\":\"0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1\",\"parent_hash\":\"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"timestamp_ms\":\"1763371200000\",\"spec_version\":330}",
+          "name": "a_finalized_block"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x0",
+                "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+                      null
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "method": "state_getRuntimeVersion",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "apis": [],
+                "authoringVersion": 1,
+                "implName": "open-matter-runtime",
+                "implVersion": 1,
+                "specName": "open-matter-runtime",
+                "specVersion": 330,
+                "stateVersion": 1,
+                "transactionVersion": 10
+              }
+            }
+          ],
+          "expected": {
+            "hash": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            "number": "0",
+            "parent_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "spec_version": 330,
+            "timestamp_ms": null
+          },
+          "expected_json": "{\"number\":\"0\",\"hash\":\"0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1\",\"parent_hash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"timestamp_ms\":null,\"spec_version\":330}",
+          "name": "a_block_that_records_no_time"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0xffffffffffffffff",
+                "parentHash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+                      "0xffffffffffffffff0000000000000000"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "method": "state_getRuntimeVersion",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "apis": [],
+                "authoringVersion": 1,
+                "implName": "open-matter-runtime",
+                "implVersion": 1,
+                "specName": "open-matter-runtime",
+                "specVersion": 330,
+                "stateVersion": 1,
+                "transactionVersion": 10
+              }
+            }
+          ],
+          "expected": {
+            "hash": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+            "number": "18446744073709551615",
+            "parent_hash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "spec_version": 330,
+            "timestamp_ms": "18446744073709551615"
+          },
+          "expected_json": "{\"number\":\"18446744073709551615\",\"hash\":\"0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1\",\"parent_hash\":\"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"timestamp_ms\":\"18446744073709551615\",\"spec_version\":330}",
+          "name": "the_widest_number_and_time"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "chain_getHeader"
+          },
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": null
+            }
+          ],
+          "name": "a_block_the_node_does_not_have"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "state_getRuntimeVersion"
+          },
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x7",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+                      "0x01000000000000000000000000000000"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "error": "RPC error: client error: State already discarded",
+              "method": "state_getRuntimeVersion",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ]
+            }
+          ],
+          "name": "state_the_node_has_pruned"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "Timestamp.Now"
+          },
+          "exchanges": [
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x7",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "state_queryStorageAt",
+              "params": [
+                [
+                  "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb"
+                ],
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": [
+                {
+                  "block": "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+                  "changes": [
+                    [
+                      "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+                      "0xffffffffffffffffffffffffffffffff"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "method": "state_getRuntimeVersion",
+              "params": [
+                "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+              ],
+              "result": {
+                "apis": [],
+                "authoringVersion": 1,
+                "implName": "open-matter-runtime",
+                "implVersion": 1,
+                "specName": "open-matter-runtime",
+                "specVersion": 330,
+                "stateVersion": 1,
+                "transactionVersion": 10
+              }
+            }
+          ],
+          "name": "a_time_too_wide_to_be_one"
+        }
+      ],
+      "facade": "network",
+      "method": "head",
+      "nullable": false,
+      "pinnable": true,
+      "result": "Block",
+      "shape": {
+        "hash": "hex",
+        "number": "u64",
+        "parent_hash": "hex",
+        "spec_version": "u32",
+        "timestamp_ms": "u64?"
+      },
+      "sources": [
+        {
+          "kind": "rpc",
+          "name": "chain_getHeader"
+        },
+        {
+          "kind": "storage",
+          "name": "Timestamp.Now"
+        },
+        {
+          "kind": "rpc",
+          "name": "state_getRuntimeVersion"
+        }
+      ],
+      "summary": "The latest finalized block, or the pinned one: height, hash, time and runtime version."
+    },
+    {
+      "args": [
+        {
+          "name": "number",
+          "type": "u64"
+        }
+      ],
+      "cases": [
+        {
+          "args": {
+            "number": "1234"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "chain_getBlockHash",
+              "params": [
+                "0x4d2"
+              ],
+              "result": "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x4d2",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            }
+          ],
+          "expected": {
+            "hash": "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+            "number": "1234",
+            "parent_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "expected_json": "{\"number\":\"1234\",\"hash\":\"0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3\",\"parent_hash\":\"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+          "name": "a_block_the_chain_has"
+        },
+        {
+          "args": {
+            "number": "4294967295"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "chain_getBlockHash",
+              "params": [
+                "0xffffffff"
+              ],
+              "result": null
+            }
+          ],
+          "expected": null,
+          "expected_json": "null",
+          "name": "a_height_not_reached_yet"
+        },
+        {
+          "args": {
+            "number": "18446744073709551615"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "chain_getBlockHash"
+          },
+          "exchanges": [
+            {
+              "error": "RPC error: client error: the max block number is u32",
+              "method": "chain_getBlockHash",
+              "params": [
+                "0xffffffffffffffff"
+              ]
+            }
+          ],
+          "name": "a_height_the_node_cannot_address"
+        },
+        {
+          "args": {
+            "number": "7"
+          },
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "chain_getHeader"
+          },
+          "exchanges": [
+            {
+              "method": "chain_getBlockHash",
+              "params": [
+                "0x7"
+              ],
+              "result": "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+              ],
+              "result": null
+            }
+          ],
+          "name": "a_hash_whose_header_is_gone"
+        }
+      ],
+      "facade": "network",
+      "method": "block",
+      "nullable": true,
+      "pinnable": false,
+      "result": "BlockHeader",
+      "shape": {
+        "hash": "hex",
+        "number": "u64",
+        "parent_hash": "hex"
+      },
+      "sources": [
+        {
+          "kind": "rpc",
+          "name": "chain_getBlockHash"
+        },
+        {
+          "kind": "rpc",
+          "name": "chain_getHeader"
+        }
+      ],
+      "summary": "The block at a height: its hash and parent, read from headers alone."
+    },
+    {
+      "args": [],
+      "cases": [
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "system_name",
+              "params": [],
+              "result": "Matter Node"
+            },
+            {
+              "method": "system_version",
+              "params": [],
+              "result": "1.61.1-dec11fc360a"
+            },
+            {
+              "method": "system_health",
+              "params": [],
+              "result": {
+                "isSyncing": false,
+                "peers": 8,
+                "shouldHavePeers": true
+              }
+            },
+            {
+              "method": "chain_getBlockHash",
+              "params": [],
+              "result": "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x2e5ee9",
+                "parentHash": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "chain_getFinalizedHead",
+              "params": [],
+              "result": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x2e5ee7",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            }
+          ],
+          "expected": {
+            "best_hash": "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe",
+            "best_number": "3038953",
+            "finalized_hash": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+            "finalized_number": "3038951",
+            "is_syncing": false,
+            "name": "Matter Node",
+            "peers": 8,
+            "should_have_peers": true,
+            "version": "1.61.1-dec11fc360a"
+          },
+          "expected_json": "{\"name\":\"Matter Node\",\"version\":\"1.61.1-dec11fc360a\",\"peers\":8,\"is_syncing\":false,\"should_have_peers\":true,\"best_number\":\"3038953\",\"best_hash\":\"0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe\",\"finalized_number\":\"3038951\",\"finalized_hash\":\"0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\"}",
+          "name": "a_synced_node"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [
+            {
+              "method": "system_name",
+              "params": [],
+              "result": "Matter Node"
+            },
+            {
+              "method": "system_version",
+              "params": [],
+              "result": "1.61.1-dec11fc360a"
+            },
+            {
+              "method": "system_health",
+              "params": [],
+              "result": {
+                "isSyncing": true,
+                "peers": 0,
+                "shouldHavePeers": false
+              }
+            },
+            {
+              "method": "chain_getBlockHash",
+              "params": [],
+              "result": "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0xc",
+                "parentHash": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            },
+            {
+              "method": "chain_getFinalizedHead",
+              "params": [],
+              "result": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+            },
+            {
+              "method": "chain_getHeader",
+              "params": [
+                "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+              ],
+              "result": {
+                "digest": {
+                  "logs": []
+                },
+                "extrinsicsRoot": "0xe7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+                "number": "0x0",
+                "parentHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "stateRoot": "0x5151515151515151515151515151515151515151515151515151515151515151"
+              }
+            }
+          ],
+          "expected": {
+            "best_hash": "0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe",
+            "best_number": "12",
+            "finalized_hash": "0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+            "finalized_number": "0",
+            "is_syncing": true,
+            "name": "Matter Node",
+            "peers": 0,
+            "should_have_peers": false,
+            "version": "1.61.1-dec11fc360a"
+          },
+          "expected_json": "{\"name\":\"Matter Node\",\"version\":\"1.61.1-dec11fc360a\",\"peers\":0,\"is_syncing\":true,\"should_have_peers\":false,\"best_number\":\"12\",\"best_hash\":\"0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe\",\"finalized_number\":\"0\",\"finalized_hash\":\"0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\"}",
+          "name": "a_lone_node_still_syncing"
+        },
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "error": {
+            "target": "system_health"
+          },
+          "exchanges": [
+            {
+              "method": "system_name",
+              "params": [],
+              "result": "Matter Node"
+            },
+            {
+              "method": "system_version",
+              "params": [],
+              "result": "1.61.1"
+            },
+            {
+              "error": "RPC error: client error: Method not found",
+              "method": "system_health",
+              "params": []
+            }
+          ],
+          "name": "a_node_that_will_not_say"
+        }
+      ],
+      "facade": "network",
+      "method": "node",
+      "nullable": false,
+      "pinnable": false,
+      "result": "NodeStatus",
+      "shape": {
+        "best_hash": "hex",
+        "best_number": "u64",
+        "finalized_hash": "hex",
+        "finalized_number": "u64",
+        "is_syncing": "bool",
+        "name": "string",
+        "peers": "u32",
+        "should_have_peers": "bool",
+        "version": "string"
+      },
+      "sources": [
+        {
+          "kind": "rpc",
+          "name": "system_name"
+        },
+        {
+          "kind": "rpc",
+          "name": "system_version"
+        },
+        {
+          "kind": "rpc",
+          "name": "system_health"
+        },
+        {
+          "kind": "rpc",
+          "name": "chain_getBlockHash"
+        },
+        {
+          "kind": "rpc",
+          "name": "chain_getHeader"
+        },
+        {
+          "kind": "rpc",
+          "name": "chain_getFinalizedHead"
+        }
+      ],
+      "summary": "The node answering: its software, peers, sync state, and best and finalized blocks."
+    },
+    {
+      "args": [],
+      "cases": [
+        {
+          "args": {},
+          "at": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "exchanges": [],
+          "expected": {
+            "block_time_ms": "4000",
+            "bonding_duration_eras": 7,
+            "era_blocks": "21600",
+            "session_blocks": "900",
+            "sessions_per_era": 24
+          },
+          "expected_json": "{\"block_time_ms\":\"4000\",\"session_blocks\":\"900\",\"sessions_per_era\":24,\"era_blocks\":\"21600\",\"bonding_duration_eras\":7}",
+          "name": "the_fixture_runtime"
+        }
+      ],
+      "facade": "network",
+      "method": "timing",
+      "nullable": false,
+      "pinnable": false,
+      "result": "NetworkTiming",
+      "shape": {
+        "block_time_ms": "u64",
+        "bonding_duration_eras": "u32",
+        "era_blocks": "u64",
+        "session_blocks": "u64",
+        "sessions_per_era": "u32"
+      },
+      "sources": [
+        {
+          "kind": "constant",
+          "name": "Babe.ExpectedBlockTime"
+        },
+        {
+          "kind": "constant",
+          "name": "Babe.EpochDuration"
+        },
+        {
+          "kind": "constant",
+          "name": "Staking.SessionsPerEra"
+        },
+        {
+          "kind": "constant",
+          "name": "Staking.BondingDuration"
+        }
+      ],
+      "summary": "How the chain measures time: block time, and the length of a session, an era and unbonding."
+    }
+  ],
+  "scale": {
+    "invalid": [
+      {
+        "hex": "02",
+        "type": "bool",
+        "why": "a bool is 0 or 1"
+      },
+      {
+        "hex": "0000",
+        "type": "u32",
+        "why": "truncated"
+      },
+      {
+        "hex": "00",
+        "type": "u128",
+        "why": "truncated"
+      },
+      {
+        "hex": "0000",
+        "type": "u8",
+        "why": "bytes left over"
+      },
+      {
+        "hex": "0c0102",
+        "type": "bytes",
+        "why": "length runs past the input"
+      },
+      {
+        "hex": "01",
+        "type": "compact_u32",
+        "why": "truncated two-byte compact"
+      },
+      {
+        "hex": "0100",
+        "type": "compact_u32",
+        "why": "zero in the two-byte form"
+      },
+      {
+        "hex": "fd00",
+        "type": "compact_u32",
+        "why": "63 in the two-byte form"
+      },
+      {
+        "hex": "02000000",
+        "type": "compact_u32",
+        "why": "zero in the four-byte form"
+      },
+      {
+        "hex": "feff0000",
+        "type": "compact_u32",
+        "why": "16383 in the four-byte form"
+      },
+      {
+        "hex": "0300000000",
+        "type": "compact_u32",
+        "why": "zero in the big-integer form"
+      },
+      {
+        "hex": "03ffffff3f",
+        "type": "compact_u32",
+        "why": "2^30 - 1 in the big-integer form"
+      },
+      {
+        "hex": "070000000001",
+        "type": "compact_u32",
+        "why": "2^32 does not fit a u32"
+      },
+      {
+        "hex": "17000000000000000001",
+        "type": "compact_u64",
+        "why": "2^64 does not fit a u64"
+      },
+      {
+        "hex": "13ffffffffffffff00",
+        "type": "compact_u64",
+        "why": "a leading zero byte"
+      },
+      {
+        "hex": "370000000000000000000000000000000001",
+        "type": "compact_u128",
+        "why": "2^128 does not fit a u128"
+      },
+      {
+        "hex": "13ffffffffffffff00",
+        "type": "compact_u128",
+        "why": "a leading zero byte"
+      }
+    ],
+    "valid": [
+      {
+        "hex": "ff",
+        "type": "u8",
+        "value": "255"
+      },
+      {
+        "hex": "3412",
+        "type": "u16",
+        "value": "4660"
+      },
+      {
+        "hex": "78563412",
+        "type": "u32",
+        "value": "305419896"
+      },
+      {
+        "hex": "ffffffff",
+        "type": "u32",
+        "value": "4294967295"
+      },
+      {
+        "hex": "ffffffffffffffff",
+        "type": "u64",
+        "value": "18446744073709551615"
+      },
+      {
+        "hex": "01000000000000000000000000000000",
+        "type": "u128",
+        "value": "1"
+      },
+      {
+        "hex": "ffffffffffffffffffffffffffffffff",
+        "type": "u128",
+        "value": "340282366920938463463374607431768211455"
+      },
+      {
+        "hex": "00",
+        "type": "bool",
+        "value": "false"
+      },
+      {
+        "hex": "01",
+        "type": "bool",
+        "value": "true"
+      },
+      {
+        "hex": "00",
+        "type": "compact_u32",
+        "value": "0"
+      },
+      {
+        "hex": "fc",
+        "type": "compact_u32",
+        "value": "63"
+      },
+      {
+        "hex": "0101",
+        "type": "compact_u32",
+        "value": "64"
+      },
+      {
+        "hex": "fdff",
+        "type": "compact_u32",
+        "value": "16383"
+      },
+      {
+        "hex": "02000100",
+        "type": "compact_u32",
+        "value": "16384"
+      },
+      {
+        "hex": "feffffff",
+        "type": "compact_u32",
+        "value": "1073741823"
+      },
+      {
+        "hex": "0300000040",
+        "type": "compact_u32",
+        "value": "1073741824"
+      },
+      {
+        "hex": "03ffffffff",
+        "type": "compact_u32",
+        "value": "4294967295"
+      },
+      {
+        "hex": "070000000001",
+        "type": "compact_u64",
+        "value": "4294967296"
+      },
+      {
+        "hex": "13ffffffffffffffff",
+        "type": "compact_u64",
+        "value": "18446744073709551615"
+      },
+      {
+        "hex": "17000000000000000001",
+        "type": "compact_u128",
+        "value": "18446744073709551616"
+      },
+      {
+        "hex": "33ffffffffffffffffffffffffffffffff",
+        "type": "compact_u128",
+        "value": "340282366920938463463374607431768211455"
+      },
+      {
+        "hex": "00",
+        "type": "bytes",
+        "value": "0x"
+      },
+      {
+        "hex": "0c010203",
+        "type": "bytes",
+        "value": "0x010203"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "tables": {
+    "dispatch_classes": [
+      "Normal",
+      "Operational",
+      "Mandatory"
+    ],
+    "freeze_reasons": {
+      "groups": [
+        {
+          "index": 43,
+          "pallet": "AssetRewards",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "Staked"
+            }
+          ]
+        },
+        {
+          "index": 44,
+          "pallet": "NominationPools",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "PoolMinBalance"
+            }
+          ]
+        }
+      ],
+      "source": "Balances.Freezes"
+    },
+    "hold_reasons": {
+      "groups": [
+        {
+          "index": 10,
+          "pallet": "Staking",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "Staking"
+            }
+          ]
+        },
+        {
+          "index": 21,
+          "pallet": "Preimage",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "Preimage"
+            }
+          ]
+        },
+        {
+          "index": 27,
+          "pallet": "Council",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "ProposalSubmission"
+            }
+          ]
+        },
+        {
+          "index": 28,
+          "pallet": "TechnicalCommittee",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "ProposalSubmission"
+            }
+          ]
+        },
+        {
+          "index": 43,
+          "pallet": "AssetRewards",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "PoolCreation"
+            }
+          ]
+        },
+        {
+          "index": 45,
+          "pallet": "DelegatedStaking",
+          "reasons": [
+            {
+              "index": 0,
+              "name": "StakingDelegation"
+            }
+          ]
+        }
+      ],
+      "source": "Balances.Holds"
+    },
+    "lock_reasons": [
+      "Fee",
+      "Misc",
+      "All"
+    ]
+  }
+}

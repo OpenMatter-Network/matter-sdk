@@ -12,8 +12,9 @@ the moment the upgrade lands, with no SDK release.
 | `runtime_api(…)` | any runtime API | the result |
 | `constant(pallet, name)` | any pallet constant | the value |
 
-The [façades](README.md#guides) are typed wrappers over `tx` for the calls most
-integrations need. Use `tx` for everything else.
+The [façades](README.md#guides) sit on top of these: typed writes for the calls most
+integrations need, and [reads](reading-state.md) that answer a question in one call. Use
+the generic methods for everything else.
 
 ## Writing: `tx`
 
@@ -107,6 +108,9 @@ epoch, err := client.RuntimeAPI("KgcApi_dkg_epoch", nil)           // SCALE byte
 deposit, err := client.Constant("Balances", "ExistentialDeposit")  // SCALE bytes
 ```
 
+- **A read sees the latest finalized block.** `query` and runtime API calls read state
+  that cannot be reverted, and a write that has returned is already visible to them. A
+  constant comes from the runtime the client connected to.
 - **Absent is not an error.** An entry with nothing stored, such as an unfunded
   account's `System.Account`, reads as `None` / `undefined` / `None` / `found == false`,
   even when the runtime declares a default for it. A stored zero is a value, not absent.
@@ -114,6 +118,9 @@ deposit, err := client.Constant("Balances", "ExistentialDeposit")  // SCALE byte
   (`"KgcApi", "kgc_nodes"`). TypeScript, Python and Go take the `state_call` name
   (`"KgcApi_kgc_nodes"`) with SCALE-encoded arguments. TypeScript returns hex and Go
   returns bytes; Python decodes to `return_type`.
+- **A façade read gives the meaningful value.** Where `query` reports an unfunded
+  account as absent, [`accounts.balance`](reading-state.md) reports zeros with `exists`
+  false, and works out what a transfer can move.
 - **Reads need no key** and work on a read-only client.
 
 ## Receipts and events

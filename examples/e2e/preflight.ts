@@ -1,23 +1,43 @@
-// Read-only preflight for run.ts (no gas, no extrinsics): checks the account is
-// funded, DKG is finalised, and how many committee nodes report /health "active".
+// Read-only preflight for run.ts (no gas, no extrinsics): checks the account can
+// pay a fee, DKG is finalised, and how many committee nodes report /health
+// "active". Every chain read goes through a read-only MatterClient; the key only
+// names the account and never signs.
 //
 // Env: MATTER_RPC_URL (default testnet), MATTER_SIGNER_SEED or TEST_KEY.
 //   cd examples/e2e && npx tsx preflight.ts
 
-import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Keyring } from "@polkadot/keyring";
+import { TypeRegistry } from "@polkadot/types";
+import { hexToU8a } from "@polkadot/util";
 import { cryptoWaitReady } from "@polkadot/util-crypto";
 
-const DEFAULT_RPC = "wss://node2.testnet.openmatter.network";
+import { MatterClient } from "../../packages/typescript/src/index.js";
 
-async function stateCall(api: ApiPromise, method: string, argsHex = "0x"): Promise<Uint8Array> {
-  const res = await (api.rpc as any).state.call(method, argsHex);
-  return res.toU8a(true);
+const HEALTH_TIMEOUT_MS = 8000;
+/** What a committee node that can serve a decrypt reports as its status. */
+const ACTIVE = "active";
+
+enum Exit {
+  Ok = 0,
+  Failed = 1,
+  Usage = 2,
 }
 
-function decodeOptionBytes(api: ApiPromise, bytes: Uint8Array): Uint8Array | null {
-  const opt = api.registry.createType("Option<Bytes>", bytes) as any;
-  return opt.isSome ? opt.unwrap().toU8a(true) : null;
+interface NodeHealth {
+  line: string;
+  active: boolean;
+}
+
+/** Decodes SCALE runtime-API results; needs no metadata for these base types. */
+function registryForStateCalls(): TypeRegistry {
+  const registry = new TypeRegistry();
+  registry.register({ KgcNodeInfoJs: { endpoint: "Bytes", dkg_index: "u64" } });
+  return registry;
+}
+
+/** A runtime API read through the SDK; the result is SCALE, decoded by the caller. */
+async function stateCall(client: MatterClient, method: string): Promise<Uint8Array> {
+  return hexToU8a(await client.runtimeApi(method));
 }
 
 function normalizeEndpoint(raw: string): string {
@@ -26,75 +46,93 @@ function normalizeEndpoint(raw: string): string {
   return withScheme.replace(/\/+$/, "");
 }
 
-async function main(): Promise<void> {
-  const rpcUrl = process.env.MATTER_RPC_URL ?? DEFAULT_RPC;
+async function probe(index: number, endpoint: string): Promise<NodeHealth> {
+  try {
+    const res = await fetch(`${endpoint}/health`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
+    const body: any = res.ok ? await res.json() : {};
+    const epoch = body.epoch != null ? ` epoch=${body.epoch}` : "";
+    return {
+      line: `  [${index}] ${endpoint}  ${res.status} ${body.status ?? "?"}${epoch}`,
+      active: body.status === ACTIVE,
+    };
+  } catch (e) {
+    return {
+      line: `  [${index}] ${endpoint}  UNREACHABLE (${e instanceof Error ? e.message : e})`,
+      active: false,
+    };
+  }
+}
+
+async function main(): Promise<Exit> {
   const seed = process.env.MATTER_SIGNER_SEED ?? process.env.TEST_KEY;
   if (!seed) {
     console.error("Set MATTER_SIGNER_SEED or TEST_KEY (sr25519 SURI / 0x-seed).");
-    process.exit(2);
+    return Exit.Usage;
   }
 
   await cryptoWaitReady();
   const pair = new Keyring({ type: "sr25519" }).addFromUri(seed);
 
-  const api = await ApiPromise.create({ provider: new WsProvider(rpcUrl) });
+  const rpcUrl = process.env.MATTER_RPC_URL;
+  const client = await MatterClient.connect(rpcUrl ? { rpcUrl } : {});
   try {
-    const [chain, decimals, tokens] = [
-      (await api.rpc.system.chain()).toString(),
-      api.registry.chainDecimals[0] ?? 18,
-      api.registry.chainTokens[0] ?? "UNIT",
-    ];
-    console.log(`Chain:   ${chain}  (ss58=${api.registry.chainSS58}, ${tokens}, ${decimals}dp)`);
-    console.log(`Account: ${pair.address}`);
+    const chain = client.properties;
+    console.log(
+      `Chain:   ${chain.chainName}  (ss58=${chain.ss58Prefix}, ${chain.tokenSymbol}, ${chain.tokenDecimalsEffective}dp)`,
+    );
 
-    const acct = (await api.query.system.account(pair.address)) as any;
-    const free: bigint = acct.data.free.toBigInt();
-    const human = Number(free) / 10 ** Number(decimals);
-    console.log(`Balance: ${free} planck  (~${human} ${tokens})`);
-    if (free === 0n) {
-      console.error(`\nFAIL: account ${pair.address} has zero balance — fund it before the live e2e.`);
-      process.exit(1);
+    // A fee may not take the account below the existential deposit, so what
+    // counts is what it can spend while staying alive, not its free balance.
+    const balance = await client.accounts.balance(pair.publicKey);
+    const spendable = balance.transferableKeepAlive;
+    console.log(`Account: ${balance.account}`);
+    console.log(`Balance: ${spendable} planck spendable  (${client.formatAmount(spendable)} ${chain.tokenSymbol})`);
+    if (spendable === 0n) {
+      console.error(`\nFAIL: account ${balance.account} has nothing to pay fees with — fund it before the live e2e.`);
+      return Exit.Failed;
     }
 
-    api.registry.register({ KgcNodeInfoJs: { endpoint: "Bytes", dkg_index: "u64" } });
-    const jointPk = decodeOptionBytes(api, await stateCall(api, "KgcApi_joint_pk"));
-    if (!jointPk || jointPk.length === 0) {
+    const registry = registryForStateCalls();
+    const jointPk = registry.createType("Option<Bytes>", await stateCall(client, "KgcApi_joint_pk")) as any;
+    if (jointPk.isNone || jointPk.unwrap().length === 0) {
       console.error("\nFAIL: KgcApi_joint_pk is None — DKG not finalised on this chain.");
-      process.exit(1);
+      return Exit.Failed;
     }
-    const epoch = (api.registry.createType("u32", await stateCall(api, "KgcApi_dkg_epoch")) as any).toNumber();
-    console.log(`DKG:     epoch=${epoch}, joint_pk=${jointPk.length}B`);
+    const epoch = (registry.createType("u32", await stateCall(client, "KgcApi_dkg_epoch")) as any).toNumber();
+    console.log(`DKG:     epoch=${epoch}, joint_pk=${jointPk.unwrap().length}B`);
 
-    const vec = api.registry.createType(
+    const nodes = registry.createType(
       "Vec<(AccountId, KgcNodeInfoJs)>",
-      await stateCall(api, "KgcApi_kgc_nodes"),
+      await stateCall(client, "KgcApi_kgc_nodes"),
     ) as any[];
-    const nodes = vec.map((pair) => ({
-      index: pair[1].dkg_index.toNumber(),
-      endpoint: normalizeEndpoint(new TextDecoder().decode(pair[1].endpoint.toU8a(true))),
-    }));
     console.log(`Nodes:   ${nodes.length} registered`);
 
-    let active = 0;
-    for (const n of nodes) {
-      try {
-        const res = await fetch(`${n.endpoint}/health`, { signal: AbortSignal.timeout(8000) });
-        const body: any = res.ok ? await res.json() : {};
-        const ok = body.status === "active";
-        if (ok) active++;
-        console.log(`  [${n.index}] ${n.endpoint}  ${res.status} ${body.status ?? "?"}${body.epoch != null ? ` epoch=${body.epoch}` : ""}`);
-      } catch (e) {
-        console.log(`  [${n.index}] ${n.endpoint}  UNREACHABLE (${e instanceof Error ? e.message : e})`);
-      }
-    }
+    const health = await Promise.all(
+      nodes.map(([, info]) =>
+        probe(info.dkg_index.toNumber(), normalizeEndpoint(new TextDecoder().decode(info.endpoint.toU8a(true)))),
+      ),
+    );
+    health.forEach(({ line }) => console.log(line));
+    const active = health.filter((node) => node.active).length;
+
     console.log(`\nCommittee: ${active}/${nodes.length} active.`);
-    console.log(active >= 1 ? "Preflight OK — funded account, DKG finalised, committee reachable." : "WARN: no active committee nodes — decrypt half will fail.");
+    console.log(
+      active >= 1
+        ? "Preflight OK — funded account, DKG finalised, committee reachable."
+        : "WARN: no active committee nodes — decrypt half will fail.",
+    );
+    return Exit.Ok;
   } finally {
-    await api.disconnect();
+    await client.disconnect();
   }
 }
 
-main().catch((e) => {
-  console.error(`\nFAILED: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
-  process.exit(1);
-});
+main().then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (e) => {
+    console.error(`\nFAILED: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+    process.exitCode = Exit.Failed;
+  },
+);

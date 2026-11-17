@@ -1,11 +1,14 @@
 package mattersdk
 
-// Typed façades: thin named wrappers over MatterClient.Call. Anything not here is
-// one client.Call or client.Tx away.
+// Typed façades for common domains. A write is a thin named wrapper over
+// MatterClient.Call. A read takes one block's state, fetches its sources there,
+// and hands the raw bytes to a pure decoder in read_*.go. Anything not here is one
+// client.Call, client.Tx or client.Query away.
 //
-// Names resolve at call time from live metadata. testvectors/facade_calls.json and
-// facade_test.go pin the surface both ways: a fixture row without a method fails,
-// and a method without a row fails.
+// Names resolve at call time from live metadata. testvectors/facade_calls.json
+// (writes), testvectors/facade_reads.json (reads) and facade_test.go pin the
+// surface both ways: a fixture row without a method fails, and a method without a
+// row fails.
 //
 // Every write waits for finalization and returns a TxReceipt. Under a member-tied
 // key, a call refused inside proxy.proxy is a ChainError of KindDispatch, never a
@@ -16,6 +19,7 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 // Call signs and submits pallet.method(args...), resolved by name against live
@@ -39,6 +43,249 @@ func (c *MatterClient) call(pallet, method string, args ...any) (TxReceipt, erro
 		return TxReceipt{}, err
 	}
 	return c.submitCall(built)
+}
+
+// AccountsFacade reads what an account holds and how much of it can move. Reads
+// only, at the latest finalized block unless pinned with At; it works on a
+// read-only client.
+type AccountsFacade struct {
+	client *MatterClient
+	pin    *[blockHashBytes]byte
+}
+
+// Accounts returns the accounts façade.
+func (c *MatterClient) Accounts() AccountsFacade { return AccountsFacade{client: c} }
+
+// At reads at block (a block hash) instead of the latest finalized block, so
+// several reads share one view of the chain.
+func (f AccountsFacade) At(block [32]byte) AccountsFacade {
+	return AccountsFacade{client: f.client, pin: &block}
+}
+
+// Balance reports what who holds: free, on hold and frozen amounts, what a
+// transfer may move, and the reasons behind each hold and freeze. who is a
+// 32-byte account id (see ParseAccount for text). An account the chain does not
+// store reads as zeros with Exists false.
+func (f AccountsFacade) Balance(who []byte) (AccountBalance, error) {
+	if len(who) != accountIDBytes {
+		return AccountBalance{}, ErrBadAccount
+	}
+	view, err := f.client.snapshot(f.pin)
+	if err != nil {
+		return AccountBalance{}, err
+	}
+	values, err := view.storage(balanceRequests(who))
+	if err != nil {
+		return AccountBalance{}, err
+	}
+	properties := f.client.properties
+	return decodeBalance(newAddress(who, properties.SS58Prefix), properties.ExistentialDeposit, values)
+}
+
+// FeesFacade reads what a call would cost, and who would be charged for it.
+// Reads only, at the latest finalized block unless pinned with At.
+type FeesFacade struct {
+	client *MatterClient
+	pin    *[blockHashBytes]byte
+}
+
+// Fees returns the fees façade.
+func (c *MatterClient) Fees() FeesFacade { return FeesFacade{client: c} }
+
+// At reads at block (a block hash) instead of the latest finalized block, so
+// several reads share one view of the chain.
+func (f FeesFacade) At(block [32]byte) FeesFacade {
+	return FeesFacade{client: f.client, pin: &block}
+}
+
+// Estimate reports what pallet.method(args...) would cost this client, and who
+// would be charged. It takes exactly what Call takes, and prices the call as it
+// would be submitted: wrapped in proxy.proxy when the client acts for a member.
+// Nothing is signed or submitted.
+//
+// An estimate, not a quote: the fee is computed for an upper bound on the signed
+// length, with no tip. It is also not a permission check; a call a scoped key may
+// not make is still priced. It works on a read-only client, which learns the fee
+// but not the payer.
+func (f FeesFacade) Estimate(pallet, method string, args ...any) (FeeEstimate, error) {
+	client := f.client
+	target := pallet + "." + method
+	built, err := types.NewCall(client.chain.meta, target, args...)
+	if err != nil {
+		return FeeEstimate{}, wrapChainError(KindChain, target, err, "cannot build %s: %v", target, err)
+	}
+	delegation := client.delegated()
+	if delegation != nil {
+		if built, err = client.wrapFor(delegation, built); err != nil {
+			return FeeEstimate{}, wrapChainError(KindChain, target, err, "cannot build %s: %v", target, err)
+		}
+	}
+	callBytes, err := codec.Encode(built)
+	if err != nil {
+		return FeeEstimate{}, wrapChainError(KindChain, target, err, "cannot encode %s: %v", target, err)
+	}
+	encodedLen, infoArgs, err := callInfoArgs(callBytes)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+
+	view, err := client.snapshot(f.pin)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+	rawInfo, err := view.call(apiQueryCallInfo, infoArgs)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+	info, err := decodeDispatchInfo(rawInfo)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+	prefix := client.properties.SS58Prefix
+	call := priced{pallet: pallet, call: method, encodedLen: encodedLen, wrappedInProxy: delegation != nil}
+	signer := client.AccountID()
+	if signer == nil {
+		return decodeEstimate(call, info, nil, prefix)
+	}
+	address := newAddress(signer, prefix)
+	call.signer = &address
+	// The payer depends on the fee, so this is asked second.
+	payerArgs, err := feePayerArgs(signer, callBytes, info.partialFee)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+	payer, err := view.call(apiFeePayer, payerArgs)
+	if err != nil {
+		return FeeEstimate{}, err
+	}
+	return decodeEstimate(call, info, payer, prefix)
+}
+
+// NetworkFacade reads which chain this is, its blocks, its timing, and the health
+// of the node answering. Reads only. Head reads at the latest finalized block
+// unless pinned with At; the other reads are not about one block.
+type NetworkFacade struct {
+	client *MatterClient
+	pin    *[blockHashBytes]byte
+}
+
+// Network returns the network façade.
+func (c *MatterClient) Network() NetworkFacade { return NetworkFacade{client: c} }
+
+// At makes Head describe block (a block hash) instead of the latest finalized
+// block.
+func (f NetworkFacade) At(block [32]byte) NetworkFacade {
+	return NetworkFacade{client: f.client, pin: &block}
+}
+
+// Info reports which chain this is: its name, genesis hash, token and address
+// format, as read once at connect. No request is made.
+func (f NetworkFacade) Info() NetworkInfo { return networkInfo(f.client.properties) }
+
+// headerAt reads the header of the block view reads at.
+func headerAt(view snapshot) (BlockHeader, error) {
+	var header *headerWire
+	if err := view.requestHere(&header, rpcGetHeader); err != nil {
+		return BlockHeader{}, err
+	}
+	return decodeHeader(view.at, header)
+}
+
+// Head reports the latest finalized block, or the pinned one: its height, hash,
+// time and runtime version. Its Hash is what a façade's At takes, to make several
+// reads share this block.
+func (f NetworkFacade) Head() (Block, error) {
+	view, err := f.client.snapshot(f.pin)
+	if err != nil {
+		return Block{}, err
+	}
+	header, err := headerAt(view)
+	if err != nil {
+		return Block{}, err
+	}
+	values, err := view.storage(nowRequest())
+	if err != nil {
+		return Block{}, err
+	}
+	var version runtimeVersionWire
+	if err := view.requestHere(&version, rpcGetRuntimeVersion); err != nil {
+		return Block{}, err
+	}
+	return decodeBlock(header, values[0], version)
+}
+
+// Block reports the block at height number, or nil if the chain has not reached
+// it. It is read from headers alone, so it works for blocks whose state the node
+// has pruned; At(hash).Head() adds the time and runtime version where it has not.
+func (f NetworkFacade) Block(number uint64) (*BlockHeader, error) {
+	var found *string
+	if err := f.client.request(&found, rpcGetBlockHash, blockNumberParam(number)); err != nil {
+		return nil, err
+	}
+	if found == nil {
+		return nil, nil
+	}
+	hash, err := hashFromHex(rpcGetBlockHash, *found)
+	if err != nil {
+		return nil, err
+	}
+	header, err := headerAt(snapshot{client: f.client, at: hash})
+	if err != nil {
+		return nil, err
+	}
+	return &header, nil
+}
+
+// Node reports the node answering this client: its software, peers, whether it is
+// still syncing, and its best and finalized blocks. It is about the node, not a
+// block, so a pin does not apply.
+func (f NetworkFacade) Node() (NodeStatus, error) {
+	var name, version, bestHash string
+	var health healthWire
+	if err := f.client.request(&name, rpcSystemName); err != nil {
+		return NodeStatus{}, err
+	}
+	if err := f.client.request(&version, rpcSystemVersion); err != nil {
+		return NodeStatus{}, err
+	}
+	if err := f.client.request(&health, rpcSystemHealth); err != nil {
+		return NodeStatus{}, err
+	}
+	if err := f.client.request(&bestHash, rpcGetBlockHash); err != nil {
+		return NodeStatus{}, err
+	}
+	hash, err := hashFromHex(rpcGetBlockHash, bestHash)
+	if err != nil {
+		return NodeStatus{}, err
+	}
+	best, err := headerAt(snapshot{client: f.client, at: hash})
+	if err != nil {
+		return NodeStatus{}, err
+	}
+	finalizedView, err := f.client.snapshot(nil)
+	if err != nil {
+		return NodeStatus{}, err
+	}
+	finalized, err := headerAt(finalizedView)
+	if err != nil {
+		return NodeStatus{}, err
+	}
+	return nodeStatus(name, version, health, best, finalized)
+}
+
+// Timing reports how the chain measures time: its block time, and the length of a
+// session, an era and the unbonding period. These are constants of the connected
+// runtime; no request is made.
+func (f NetworkFacade) Timing() (NetworkTiming, error) {
+	constants := make([][]byte, len(timingConstants))
+	for i, constant := range timingConstants {
+		raw, err := f.client.chain.Constant(constant.pallet, constant.name)
+		if err != nil {
+			return NetworkTiming{}, err
+		}
+		constants[i] = raw
+	}
+	return decodeTiming(constants)
 }
 
 // SecretsFacade covers pallet-secrets: store, rotate, share, and delete.

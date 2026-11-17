@@ -32,8 +32,11 @@ from .chain import (
     api_key_signer,
 )
 from .facade import (
+    AccountsFacade,
+    FeesFacade,
     DeploymentsFacade,
     KeysFacade,
+    NetworkFacade,
     OrgsFacade,
     ResourcesFacade,
     SecretsFacade,
@@ -113,6 +116,11 @@ _CONFIRM_VALUE = "yes"
 #: ``Balances.ExistentialDeposit`` is ``UNIT / 1000``, i.e. ``10 ** (decimals - 3)``.
 _ED_DECIMAL_OFFSET = 3
 
+_SYSTEM_PALLET = "System"
+_SS58_PREFIX_CONSTANT = "SS58Prefix"
+#: The largest prefix the SS58 format can carry.
+_SS58_MAX_PREFIX = 16_383
+
 
 class Network:
     """Network names. A plain namespace rather than an ``Enum`` so the values are
@@ -175,6 +183,20 @@ class ChainProperties:
             f"ChainProperties({self.chain_name!r}, spec={self.spec_version}, "
             f"token={self.token_symbol!r}, decimals={self.token_decimals_effective})"
         )
+
+
+def _ss58_prefix(chain: ChainClient) -> int:
+    """The runtime's ``System.SS58Prefix``: consensus-backed, unlike the node's
+    presentational ``system_properties.ss58Format``."""
+    prefix = int(chain.constant(_SYSTEM_PALLET, _SS58_PREFIX_CONSTANT))
+    if not 0 <= prefix <= _SS58_MAX_PREFIX:
+        raise ChainError(
+            f"chain error at {_SYSTEM_PALLET}.{_SS58_PREFIX_CONSTANT}: "
+            f"{prefix} is not a valid SS58 prefix",
+            pallet=_SYSTEM_PALLET,
+            call=_SS58_PREFIX_CONSTANT,
+        )
+    return prefix
 
 
 def _decimals_from_existential_deposit(ed: int) -> Optional[int]:
@@ -595,6 +617,22 @@ class MatterClient:
     # Façades are properties so adding a call touches only facade.py.
 
     @property
+    def accounts(self) -> AccountsFacade:
+        """Accounts: what an account holds and how much of it can move."""
+        return AccountsFacade(self)
+
+    @property
+    def network(self) -> NetworkFacade:
+        """The network: which chain this is, its latest finalized block, its
+        timing, and the health of the node answering."""
+        return NetworkFacade(self)
+
+    @property
+    def fees(self) -> FeesFacade:
+        """Fees: what a call would cost, and who would be charged for it."""
+        return FeesFacade(self)
+
+    @property
     def secrets(self) -> SecretsFacade:
         """Secrets: store, rotate, share, and delete secrets."""
         return SecretsFacade(self)
@@ -670,7 +708,7 @@ class MatterClient:
             chain_name=chain_name,
             spec_version=int(substrate.runtime_version),
             token_symbol=props.get("tokenSymbol", "") or "",
-            ss58_prefix=int(props.get("ss58Format", 42) or 42),
+            ss58_prefix=_ss58_prefix(chain),
             token_decimals_declared=declared,
             token_decimals_effective=effective,
             existential_deposit=existential_deposit,

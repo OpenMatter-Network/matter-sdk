@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "matter-delegated-e2e"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "anyhow",
  "matter-sdk",
@@ -1861,9 +1861,11 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "bincode",
+ "blake2b_simd",
+ "bs58",
  "hex",
  "matter-crypto",
  "matter-kgc-config",
@@ -1872,6 +1874,7 @@ dependencies = [
  "parity-scale-codec",
  "rand 0.8.6",
  "reqwest",
+ "scale-info",
  "serde",
  "serde_json",
  "subxt",
@@ -1883,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-client-example"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "anyhow",
  "matter-sdk",
@@ -1892,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-core"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "bincode",
  "blake2b_simd",
@@ -1911,7 +1914,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-e2e"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "matter-sdk",
  "parity-scale-codec",
@@ -1922,7 +1925,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-example"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "bincode",
  "matter-crypto",
@@ -1933,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-ffi"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "hex",
  "matter-sdk-core",
@@ -1943,7 +1946,7 @@ dependencies = [
 
 [[package]]
 name = "matter-sdk-key"
-version = "2.6.0"
+version = "2.7.0"
 dependencies = [
  "getrandom 0.2.17",
  "hex",

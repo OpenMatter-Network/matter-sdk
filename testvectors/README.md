@@ -13,6 +13,9 @@ ergonomics, never in bytes: a binding that disagrees with a vector has a bug.
 | `seed_formats.json` | One sr25519 secret in both encodings (`0x` mini-secret and BIP39 mnemonic) that must derive `account_id_hex`. The dashboard that mints API keys replays it too. | `matter-sdk` `seed_formats` | TS core, Python, Go |
 | `api_keys.json` | The full API-key ingestion contract. `valid` keys must parse to `account_id_hex`, and `invalid` keys must be rejected with the named error kind. | `matter-sdk-key` `parse` | Rust, TS core, Python, Go |
 | `facade_calls.json` | The curated façade surface: each `(façade, method)` pair and the `(pallet, call)` or runtime API it maps to, with ordered argument names | `matter-sdk` `facade_calls` | TS, Python, Go, each checked **both ways** |
+| `facade_reads.json` | The read catalogue and its decode vectors: each façade read, its sources and result shape, and cases that are transcripts: every JSON-RPC request the read makes, the node's answers, and either the exact canonical JSON bytes it must return or the source its error must name. Also the account text every binding accepts, refuses and emits; SCALE primitives each hand-written reader must decode or refuse; and the enum tables decoders carry. | `matter-sdk` `chain::read::vectors` (a lib test: it runs the real façades over a fake chain) | Rust (staleness check), TS, Python, Go, each through its real façade and checked **both ways** |
+| `read_source_shapes.json` | The layout of every runtime source a catalogue read decodes: field names, widths and enum variants with their indices, rendered from `spec330_metadata.scale`. Read decoders are strict, so this is what they were written for. | `matter-sdk` `facade_calls` | Rust (staleness check); the nightly `runtime-drift` job compares it with the live runtime |
+| `live_reads.json` | Arguments for running every catalogue read against a live chain. **Maintained by hand**, not emitted. | — | all four live tests; `scripts/compare-live-reads.sh` |
 | `scope_bits.json` | The `ScopeSet` wire contract: bit = `scope * 2 + access`, as a bare `u32`. Also an `is_superset` truth table in which Read and Write are independent. | `matter-sdk` `scope_vectors` | TS, Python, Go |
 | `required_scopes.json` | What every call of the ten scoped pallets requires of a delegated key. `required: null` marks a call no key may ever make. | `matter-sdk` `scope_vectors` | TS, Python, Go |
 | `account_transfer.json` | The operator account transfer: chain facts → the ordered calls that move what an old account holds to a new one, each tagged with the account it runs as; the cleanup step; and the `sudo_as` batch shape. **Maintained by hand**, not emitted. | — | TS (`accountTransfer`); the dashboard and the explorer replay it |
@@ -38,11 +41,24 @@ list, and `fixture_args_match_the_runtime_fields` checks every row's argument na
 arity against the metadata. The same test crate asserts that the guides document every
 façade method.
 
-`required_scopes.json` is replayed in one direction only. Each binding classifies every
-row, but a call missing from the fixture fails nothing. Completeness comes from
-generation instead: CI re-runs the emitter and fails on any diff, and the nightly
-`runtime-drift` workflow checks the live chains. The two `arg_sensitive` rows pin only
-their name-derived half; each binding tests the argument-dependent part itself.
+`facade_reads.json` goes further than routing. Its sample values are encoded against
+the types in `spec330_metadata.scale`, so a source or field the runtime lacks fails when
+the vectors are emitted, and every "must refuse" SCALE row is confirmed against the
+reference codec. Every binding then replays each case's transcript through its real
+façade: it must make exactly the recorded requests, pinned and unpinned, and return
+exactly `expected_json` or fail naming `error.target`. Comparing bytes, not parsed
+values, is what holds the four to one key order and one escaping. A plain `cargo test`
+fails if the checked-in file is stale. `scripts/read-catalogue.sh` renders the catalogue
+table in `docs/reading-state.md` from it, and CI checks the two agree.
+
+`required_scopes.json` is checked in both directions as well. Each binding classifies
+every row identically. In the other direction, a call that TypeScript or Python
+classifies by name fails without a row, and so does any call of a pallet Go scopes,
+which it walks from the V14 metadata. Rust's table must classify every call the
+metadata gives the scoped pallets, and CI re-runs the emitter and fails on any diff.
+The nightly `runtime-drift` workflow checks the live chains. The two `arg_sensitive`
+rows pin only their name-derived half; each binding tests the argument-dependent part
+itself.
 
 ## Encoding
 
@@ -51,6 +67,9 @@ their name-derived half; each binding tests the argument-dependent part itself.
   `api_keys.json`, which holds the literal string as pasted, `0x` prefix and whitespace
   included.
 - **`secret_id` is a decimal string** (`u128`).
+- **Exchanges and results in `facade_reads.json` are verbatim:** `exchanges` is JSON-RPC
+  as it goes over the wire and `expected` is what a read returns, so their bytes are
+  `0x`-prefixed.
 
 `open_secret.json` is about 4 MB. That is the real wire size of the RLWE capsules and
 zero-knowledge proofs.
@@ -64,8 +83,9 @@ regenerate the vectors and re-run every binding's conformance suite:
 cargo test -p matter-sdk-core --test roundtrip -- --ignored              # signing_payload, lagrange, open_secret
 cargo test -p matter-sdk --test seed_formats -- --ignored                # seed_formats
 cargo test -p matter-sdk-key --test parse -- --ignored                   # api_keys
-cargo test -p matter-sdk --features chain --test facade_calls -- --ignored   # facade_calls
+cargo test -p matter-sdk --features chain --test facade_calls -- --ignored   # facade_calls, read_source_shapes
 cargo test -p matter-sdk --features chain --test scope_vectors -- --ignored  # scope_bits, required_scopes
+cargo test -p matter-sdk --features chain --lib -- --ignored emit_read_vectors  # facade_reads
 ```
 
 `required_scopes.json` is generated from `spec330_metadata.scale`. When the runtime adds

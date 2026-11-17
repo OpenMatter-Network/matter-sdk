@@ -1,8 +1,9 @@
 package mattersdk
 
-// The façade surface must match testvectors/facade_calls.json both ways: a row
-// without a method fails, and a method without a row fails. Checked by reflection
-// because invoking needs live metadata.
+// The façade surface must match testvectors/facade_calls.json and
+// facade_reads.json both ways: a row without a method fails, and a method without
+// a row fails. Writes are checked by reflection because invoking needs live
+// metadata; reads are replayed against their vectors in read_test.go.
 
 import (
 	"reflect"
@@ -49,6 +50,9 @@ func loadFacadeRows(t *testing.T) []facadeRow {
 
 // facadeTypes maps a fixture façade name to the Go type implementing it.
 var facadeTypes = map[string]reflect.Type{
+	"accounts":    reflect.TypeOf(AccountsFacade{}),
+	"network":     reflect.TypeOf(NetworkFacade{}),
+	"fees":        reflect.TypeOf(FeesFacade{}),
 	"secrets":     reflect.TypeOf(SecretsFacade{}),
 	"deployments": reflect.TypeOf(DeploymentsFacade{}),
 	"resources":   reflect.TypeOf(ResourcesFacade{}),
@@ -111,27 +115,33 @@ func TestEveryPinnedReadExists(t *testing.T) {
 }
 
 func TestNoFacadeMethodIsUnpinned(t *testing.T) {
-	// A façade's surface is the union of both tables.
+	// A façade's surface is the union of the write tables and the read catalogue,
+	// plus the block pin on any façade that reads.
 	calls, reads := loadFacadeFixture(t)
+	catalogue := loadReadFixture(t)
 	pinned := map[string]map[string]bool{}
-	for _, row := range calls {
-		if pinned[row.Facade] == nil {
-			pinned[row.Facade] = map[string]bool{}
+	pin := func(facade, method string) {
+		if pinned[facade] == nil {
+			pinned[facade] = map[string]bool{}
 		}
-		pinned[row.Facade][goMethodName(row.Method)] = true
+		pinned[facade][goMethodName(method)] = true
+	}
+	for _, row := range calls {
+		pin(row.Facade, row.Method)
 	}
 	for _, row := range reads {
-		if pinned[row.Facade] == nil {
-			pinned[row.Facade] = map[string]bool{}
-		}
-		pinned[row.Facade][goMethodName(row.Method)] = true
+		pin(row.Facade, row.Method)
+	}
+	for _, row := range catalogue.Reads {
+		pin(row.Facade, row.Method)
+		pin(row.Facade, catalogue.PinMethod)
 	}
 
 	for facade, facadeType := range facadeTypes {
 		for i := 0; i < facadeType.NumMethod(); i++ {
 			name := facadeType.Method(i).Name
 			if !pinned[facade][name] {
-				t.Errorf("%s.%s is not pinned by facade_calls.json", facadeType.Name(), name)
+				t.Errorf("%s.%s is not pinned by facade_calls.json or facade_reads.json", facadeType.Name(), name)
 			}
 		}
 		if got, want := facadeType.NumMethod(), len(pinned[facade]); got != want {
@@ -140,7 +150,7 @@ func TestNoFacadeMethodIsUnpinned(t *testing.T) {
 	}
 }
 
-func TestTheCuratedFacadesAreTheSixDocumentedOnes(t *testing.T) {
+func TestTheCuratedFacadesAreTheDocumentedOnes(t *testing.T) {
 	// Adding a façade must also update README and docs/parity.md.
 	calls, reads := loadFacadeFixture(t)
 	seen := map[string]bool{}
@@ -148,6 +158,9 @@ func TestTheCuratedFacadesAreTheSixDocumentedOnes(t *testing.T) {
 		seen[row.Facade] = true
 	}
 	for _, row := range reads {
+		seen[row.Facade] = true
+	}
+	for _, row := range loadReadFixture(t).Reads {
 		seen[row.Facade] = true
 	}
 	if len(seen) != len(facadeTypes) {
@@ -163,7 +176,7 @@ func TestTheCuratedFacadesAreTheSixDocumentedOnes(t *testing.T) {
 func TestClientExposesEveryFacadeAccessor(t *testing.T) {
 	clientType := reflect.TypeOf(&MatterClient{})
 	for _, accessor := range []string{
-		"Secrets", "Deployments", "Resources", "Staking", "Orgs", "Keys",
+		"Accounts", "Network", "Fees", "Secrets", "Deployments", "Resources", "Staking", "Orgs", "Keys",
 	} {
 		if _, ok := clientType.MethodByName(accessor); !ok {
 			t.Errorf("MatterClient.%s() is missing", accessor)

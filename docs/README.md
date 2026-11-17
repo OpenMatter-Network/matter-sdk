@@ -10,6 +10,9 @@ Python and Go side by side.
   properties, environment variables.
 - [**The chain surface**](chain-surface.md): `tx`, `query`, runtime APIs and constants
   for any pallet; receipts, amounts, escape hatches.
+- [**Reading chain state**](reading-state.md): balances and what can move, the chain's
+  head, timing and node health, what a call would cost and who pays, which block a read
+  sees, canonical JSON, the read catalogue.
 - [**Keys and scopes**](keys-and-scopes.md): API key formats, member-tied scoped keys,
   and minting and revoking keys with the `keys` façade.
 - [**Deployments**](deployments.md): requesting workloads, sealed env and TLS,

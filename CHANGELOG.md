@@ -8,6 +8,31 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Reading chain state in one call.** The new `accounts` façade (`client.accounts()`,
+  `client.accounts`, `client.Accounts()`) has `balance(who)`, which returns what an account
+  holds and what a transfer can actually move (`transferable`, `transferable_keep_alive`),
+  with the reason behind every hold and freeze. The new `network` façade has `info()`
+  (which chain this is), `head()` (the latest finalized block: height, hash, time, runtime
+  version), `block(number)`, `node()` (the node's software, peers, sync state, best and
+  finalized blocks) and `timing()` (block time, and the length of a session, an era and
+  unbonding). The new `fees` façade has `estimate(pallet, call, args)`, which takes what
+  `tx` takes and returns what the call would cost this client (priced as it would be
+  signed, `Proxy.proxy` wrap included), the computation it is allowed, and who the runtime
+  says would be charged: the signer, the member a key acts for, or an organization's
+  treasury. A read sees the latest finalized block; `at(block_hash)` pins a façade to one
+  block so several reads share a view. Reads accept an account as bytes, hex, or SS58
+  under any prefix (`parse_account`, `ParseAccount`), and return it as an address under
+  the chain's prefix (`Address` in Rust and Go). Decoding is strict: a layout the runtime
+  has changed is a `Chain` error naming the source, never a wrong value. Every result
+  converts to one canonical JSON text, byte for byte identical in all four languages
+  (`serde_json::to_string`, `canonicalJson`, `canonical_json`, `CanonicalJSON`), and to a
+  plain JSON value for embedding (`toJson`, `to_json`, `json.Marshal`). Pinned by
+  `testvectors/facade_reads.json`, a transcript of each read's requests and exact result
+  that every language replays through its real façade; by
+  `testvectors/read_source_shapes.json`, the layouts the decoders were written for; and by
+  a nightly job that runs `scripts/compare-live-reads.sh` against testnet and requires the
+  same bytes from all four. See `docs/reading-state.md`.
+
 - **Rotating a login** in the TypeScript core (runtime spec 337, committee nodes that
   attest rotations): `prepareLoginRotation` seals a new seed for a new account at the
   login's next generation, `rotateLogin` builds the call the new account signs, and
@@ -64,6 +89,20 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Generic reads see the latest finalized block in every language.** `query` and
+  `runtimeApi` / `runtime_api` / `RuntimeAPI` in TypeScript, Python and Go (`Query` and
+  `QueryRaw` included) now read at the latest finalized block, as Rust always has. They
+  used to read the node's best block, which can still be reverted, so a value could be
+  seen and then disappear. A write through this SDK waits for finality, so a read after
+  it still sees it. Each read makes one more request, to resolve the head. Python's
+  `ChainClient.free_balance` reads there too. The committee reads a decrypt makes are
+  unchanged.
+
+- **The SS58 prefix comes from the runtime.** `properties.ss58_prefix`, and every address
+  the SDK renders, now uses the constant `System.SS58Prefix` instead of the node's
+  `system_properties.ss58Format` (defaulting to 42). Rust's `address()` and
+  `principal_address()` no longer assume 42. Addresses on MatterChain are unchanged.
+
 - `collectLoginAttestations` asks a threshold of nodes rather than all of them (see
   Security). A node that does not answer is replaced only once its request's deadline
   passes, so one slow node can now delay a registration by that long. It takes an
@@ -92,6 +131,12 @@ versions follow [Semantic Versioning](https://semver.org/).
   `MATTER_SECRET_ID`.
 
 ### Fixed
+
+- **Python: a member-tied API key can write.** `ChainClient.submit` wrapped the call in
+  `Proxy.proxy` with the member's account as raw bytes, which the codec refuses
+  (`TypeError`), so every write under a scoped key failed before it was signed. The
+  account now goes in as hex, and the wrap is built in one place that the new fee
+  estimate shares and the read vectors pin byte for byte.
 
 - `FetchTransport` works in a browser. It kept `fetch` as a field and called it as a
   method, which a browser refuses ("Illegal invocation"), so the default transport — and

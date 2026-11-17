@@ -27,6 +27,7 @@ language, spelled in that language's style.
 | `Unsponsored { principal, … }` | `unsponsored` / `KindUnsponsored` | `UnsponsoredError` | the call is in scope, but nobody can pay the fee | fund the member or their billing org |
 | `Dispatch` | `dispatch` / `KindDispatch` | `DispatchError` | a delegated call landed, but the call it wrapped failed | handle it as the runtime error it names |
 | `BadAmount` | TypeScript throws `AmountError`; Go returns a plain `error` | `ValueError` | an amount string did not parse ([amounts](chain-surface.md#amounts)) | fix the input; nothing is ever truncated |
+| `Key(KeyError::Malformed)` | TypeScript throws `TypeError`; Go returns `ErrBadAccount` | `ValueError` | an account given to a [read](reading-state.md#accounts-in-addresses-out) is not 32 bytes, hex or an SS58 address | fix the input; no request was made |
 
 Python has two lower-level classes:
 `PoolRejectedError` (the node refused the extrinsic before any block) and

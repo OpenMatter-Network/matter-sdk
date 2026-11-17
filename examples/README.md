@@ -5,7 +5,7 @@ by default and covers the surface most integrations use.
 
 | Example | Network | Costs gas | What it shows |
 |---|---|---|---|
-| [`client-rust`](client-rust) · [`client-typescript`](client-typescript) · [`client-python`](client-python) · [`client-go`](client-go) | testnet | **no**, unless `MATTER_SUBMIT=yes` | Connecting from an `apiKey` (or read-only), chain properties, `query` / `runtimeApi` / `constant`, lossless amounts, and a façade write (`staking.chill`) behind the submit gate |
+| [`client-rust`](client-rust) · [`client-typescript`](client-typescript) · [`client-python`](client-python) · [`client-go`](client-go) | testnet | **no**, unless `MATTER_SUBMIT=yes` | Connecting from an `apiKey` (or read-only), chain properties, `query` / `runtimeApi` / `constant`, façade reads (`network.head`, then `accounts.balance` pinned to that block: what the account holds and can move), a pre-flight that puts three reads together at one block (`network.head`, `fees.estimate`, `accounts.balance`: can whoever pays for the next write afford it?), lossless amounts, and a façade write (`staking.chill`) behind the submit gate |
 | [`delegated-e2e`](delegated-e2e) (Rust) | testnet | **no**, unless `MATTER_SUBMIT=yes` | A member-tied scoped key: the resolved `Mode`, a local `NeverAdmitted` refusal, a local `NotPermitted` refusal, and a write wrapped as the member |
 | [`rust`](rust) · [`typescript`](typescript) | none | no | Seal and recover against an in-process committee. The TypeScript demo replays `testvectors/open_secret.json` |
 | [`rust-e2e`](rust-e2e) · [`e2e`](e2e) (TypeScript) · [`python-e2e`](python-e2e) · [`go-e2e`](go-e2e) | testnet | **yes** | A full Secrets round trip: seal → `Secrets.store_secret` → read back → threshold-decrypt → compare |

@@ -1,7 +1,10 @@
-//! Curated typed façades for common domains. Each method converts typed
-//! arguments to `Value`s and delegates to
-//! [`MatterClient::tx`](super::MatterClient::tx), which owns all encoding.
-//! Anything not here is one `client.tx(...)` away.
+//! Curated typed façades for common domains.
+//!
+//! A write converts typed arguments to `Value`s and delegates to
+//! [`MatterClient::tx`](super::MatterClient::tx), which owns all encoding. A
+//! read takes one block's state, fetches its sources there, and hands the raw
+//! bytes to a pure decoder in [`read`](super::read). Anything not here is one
+//! `client.tx(...)` or `client.query(...)` away.
 //!
 //! Names resolve against live metadata at call time, so a runtime rename
 //! surfaces as [`SdkError::Chain`](crate::SdkError::Chain);
@@ -11,6 +14,20 @@ use matter_sdk_core::{Aad, Plaintext};
 use matter_sdk_key::{AccountId, ScopeSet};
 use subxt::dynamic::Value;
 
+use super::read::{
+    accounts,
+    fees,
+    network,
+    AccountBalance,
+    Block,
+    BlockHeader,
+    FeeEstimate,
+    NetworkInfo,
+    NetworkTiming,
+    NodeStatus,
+    Pin,
+    Snapshot,
+};
 use super::{recover, MatterClient, TxReceipt};
 use crate::calls::{GrantTarget, StoreSecret};
 use crate::error::Result;
@@ -45,6 +62,179 @@ impl StoreSecret {
             Value::from_bytes(&self.aad),
         ]
     }
+}
+
+/// Accounts: what an account holds and how much of it can move.
+///
+/// Reads only, at the latest finalized block unless pinned with
+/// [`Accounts::at`]. Works on a read-only client.
+pub struct Accounts<'a>(pub(super) &'a MatterClient, pub(super) Pin);
+
+impl Accounts<'_> {
+    /// Read at `block` (a block hash) instead of the latest finalized block, so
+    /// several reads share one view of the chain.
+    pub fn at(self, block: [u8; 32]) -> Self {
+        Self(self.0, Pin::Block(block))
+    }
+
+    /// What `who` holds: free, on hold and frozen amounts, what a transfer may
+    /// move, and the reasons behind each hold and freeze. An account the chain
+    /// does not store reads as zeros with `exists == false`.
+    pub async fn balance(&self, who: impl Into<AccountId>) -> Result<AccountBalance> {
+        let who = who.into();
+        let snapshot = self.0.snapshot(self.1).await?;
+        let values = snapshot.storage(&accounts::balance_requests(who)).await?;
+        accounts::decode_balance(
+            self.0.address_of(who),
+            self.0.properties.existential_deposit,
+            &values,
+        )
+    }
+}
+
+/// The network: which chain this is, its blocks, its timing, and the health of
+/// the node answering.
+///
+/// Reads only. [`NetworkState::head`] reads at the latest finalized block unless
+/// pinned with [`NetworkState::at`]; the other reads are not about one block.
+pub struct NetworkState<'a>(pub(super) &'a MatterClient, pub(super) Pin);
+
+impl NetworkState<'_> {
+    /// Make [`head`](Self::head) describe `block` (a block hash) instead of the
+    /// latest finalized block.
+    pub fn at(self, block: [u8; 32]) -> Self {
+        Self(self.0, Pin::Block(block))
+    }
+
+    /// Which chain this is: its name, genesis hash, token and address format, as
+    /// read once at connect. No request is made.
+    pub fn info(&self) -> NetworkInfo {
+        network::info(&self.0.properties)
+    }
+
+    /// The latest finalized block, or the pinned one: its height, hash, time and
+    /// runtime version. Its `hash` is what a façade's `at` takes, to make
+    /// several reads share this block.
+    pub async fn head(&self) -> Result<Block> {
+        let snapshot = self.0.snapshot(self.1).await?;
+        let header = header_at(&snapshot).await?;
+        let [now] = snapshot.storage(&network::now_request()).await?;
+        let version: network::RuntimeVersionWire =
+            snapshot.request_here(network::GET_RUNTIME_VERSION).await?;
+        network::decode_block(header, now.as_deref(), &version)
+    }
+
+    /// The block at height `number`, or `None` if the chain has not reached it.
+    /// Read from headers alone, so it works for blocks whose state the node has
+    /// pruned; `at(hash).head()` adds the time and runtime version where it has not.
+    pub async fn block(&self, number: u64) -> Result<Option<BlockHeader>> {
+        let hash: Option<String> = self
+            .0
+            .request(
+                network::GET_BLOCK_HASH,
+                vec![network::block_number_param(number).into()],
+            )
+            .await?;
+        let Some(hash) = hash else {
+            return Ok(None);
+        };
+        let hash = network::hash_from_hex(network::GET_BLOCK_HASH, &hash)?;
+        let snapshot = self.0.snapshot(Pin::Block(hash)).await?;
+        header_at(&snapshot).await.map(Some)
+    }
+
+    /// The node answering this client: its software, peers, whether it is still
+    /// syncing, and its best and finalized blocks. About the node, not a block,
+    /// so a pin does not apply.
+    pub async fn node(&self) -> Result<NodeStatus> {
+        let name: String = self.0.request(network::SYSTEM_NAME, Vec::new()).await?;
+        let version: String = self.0.request(network::SYSTEM_VERSION, Vec::new()).await?;
+        let health: network::HealthWire =
+            self.0.request(network::SYSTEM_HEALTH, Vec::new()).await?;
+        let best_hash: String = self.0.request(network::GET_BLOCK_HASH, Vec::new()).await?;
+        let best_hash = network::hash_from_hex(network::GET_BLOCK_HASH, &best_hash)?;
+        let best = header_at(&self.0.snapshot(Pin::Block(best_hash)).await?).await?;
+        let finalized = header_at(&self.0.snapshot(Pin::Finalized).await?).await?;
+        Ok(network::node_status(
+            name, version, &health, best, finalized,
+        ))
+    }
+
+    /// How the chain measures time: its block time, and the length of a session,
+    /// an era and the unbonding period. Constants of the connected runtime; no
+    /// request is made.
+    pub fn timing(&self) -> Result<NetworkTiming> {
+        let [a, b, c, d] = network::TIMING_CONSTANTS;
+        network::decode_timing(&[
+            self.0.constant_bytes(a)?,
+            self.0.constant_bytes(b)?,
+            self.0.constant_bytes(c)?,
+            self.0.constant_bytes(d)?,
+        ])
+    }
+}
+
+/// Fees: what a call would cost, and who would be charged for it.
+///
+/// Reads only, at the latest finalized block unless pinned with [`Fees::at`].
+pub struct Fees<'a>(pub(super) &'a MatterClient, pub(super) Pin);
+
+impl Fees<'_> {
+    /// Read at `block` (a block hash) instead of the latest finalized block, so
+    /// several reads share one view of the chain.
+    pub fn at(self, block: [u8; 32]) -> Self {
+        Self(self.0, Pin::Block(block))
+    }
+
+    /// What `pallet.call(args)` would cost this client, and who would be
+    /// charged. Takes exactly what [`MatterClient::tx`] takes, and prices the
+    /// call as it would be submitted: wrapped in `Proxy.proxy` when the client
+    /// acts for a member. Nothing is signed or submitted.
+    ///
+    /// An estimate, not a quote: the fee is computed for an upper bound on the
+    /// signed length, with no tip. It is also not a permission check; a call a
+    /// scoped key may not make is still priced. Works on a read-only client,
+    /// which learns the fee but not the payer.
+    pub async fn estimate(
+        &self,
+        pallet: &str,
+        call: &str,
+        args: Vec<Value>,
+    ) -> Result<FeeEstimate> {
+        let (bytes, wrapped_in_proxy) = self.0.call_as_submitted(pallet, call, args)?;
+        let (encoded_len, info_args) = fees::call_info_args(&bytes)?;
+        let signer = self.0.account();
+
+        let snapshot = self.0.snapshot(self.1).await?;
+        let info = snapshot.call(fees::QUERY_CALL_INFO, &info_args).await?;
+        let info = fees::decode_dispatch_info(&info)?;
+        // The payer depends on the fee, so this is asked second.
+        let payer = match signer {
+            Some(signer) => Some(
+                snapshot
+                    .call(
+                        fees::FEE_PAYER,
+                        &fees::fee_payer_args(signer, &bytes, info.0),
+                    )
+                    .await?,
+            ),
+            None => None,
+        };
+        let priced = fees::Priced {
+            pallet,
+            call,
+            encoded_len,
+            wrapped_in_proxy,
+            signer: signer.map(|id| self.0.address_of(id)),
+        };
+        fees::decode_estimate(priced, info, payer.as_deref(), |id| self.0.address_of(id))
+    }
+}
+
+/// The header of the block `snapshot` reads at.
+async fn header_at(snapshot: &Snapshot<'_>) -> Result<BlockHeader> {
+    let header: Option<network::HeaderWire> = snapshot.request_here(network::GET_HEADER).await?;
+    network::decode_header(snapshot.at(), header)
 }
 
 /// Secrets: store, rotate, share, and delete secrets.
@@ -546,6 +736,135 @@ mod tests {
     fn options_encode_as_the_runtime_enum() {
         assert!(format!("{:?}", option_u128(Some(1))).contains("Some"));
         assert!(format!("{:?}", option_u128(None)).contains("None"));
+    }
+
+    mod reads {
+        use parity_scale_codec::{Compact, Encode};
+        use serde_json::json;
+
+        use crate::chain::read::accounts::balance_requests;
+        use crate::chain::read::fees::QUERY_CALL_INFO;
+        use crate::chain::read::hex0x;
+        use crate::chain::read::testing::{
+            offline_client,
+            storage_key,
+            FakeChain,
+            ALICE,
+            FAKE_HEAD,
+            TOKEN,
+        };
+        use crate::{AccountId, SdkError};
+
+        /// A chain storing Alice with one free token and nothing else.
+        fn chain_with_alice() -> FakeChain {
+            let [account, ..] = balance_requests(AccountId(ALICE));
+            let info = (7u32, 0u32, 1u32, 0u32, (TOKEN, 0u128, 0u128, 0u128)).encode();
+            FakeChain::new().with_storage(storage_key(&account), info)
+        }
+
+        #[tokio::test]
+        async fn an_unpinned_read_resolves_the_finalized_head_once_then_reads_there() {
+            let chain = chain_with_alice();
+            let client = offline_client(&chain);
+
+            let balance = client.accounts().balance(ALICE).await.unwrap();
+            assert!(balance.exists);
+            assert_eq!(balance.free, TOKEN);
+
+            let requests = chain.exchanges();
+            let methods: Vec<&str> = requests.iter().map(|r| r.method.as_str()).collect();
+            assert_eq!(methods, ["chain_getFinalizedHead", "state_queryStorageAt"]);
+            // Every source in the one request, at the head just resolved.
+            assert_eq!(requests[1].params[0].as_array().unwrap().len(), 4);
+            assert_eq!(requests[1].params[1], json!(hex0x(&FAKE_HEAD)));
+        }
+
+        #[tokio::test]
+        async fn a_pinned_read_asks_for_no_head_and_reads_at_the_pin() {
+            let chain = chain_with_alice();
+            let client = offline_client(&chain);
+            let pin = [0x77u8; 32];
+
+            client.accounts().at(pin).balance(ALICE).await.unwrap();
+
+            let requests = chain.exchanges();
+            assert_eq!(requests.len(), 1, "{requests:?}");
+            assert_eq!(requests[0].method, "state_queryStorageAt");
+            assert_eq!(requests[0].params[1], json!(hex0x(&pin)));
+        }
+
+        #[tokio::test]
+        async fn a_refused_request_is_a_chain_error_naming_the_method() {
+            let err = offline_client(&FakeChain::refusing())
+                .accounts()
+                .balance(ALICE)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(&err, SdkError::Chain { target, .. } if target == "chain_getFinalizedHead"),
+                "{err:?}"
+            );
+
+            let err = offline_client(&FakeChain::refusing())
+                .accounts()
+                .at(FAKE_HEAD)
+                .balance(ALICE)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(&err, SdkError::Chain { target, .. } if target == "state_queryStorageAt"),
+                "{err:?}"
+            );
+        }
+
+        #[tokio::test]
+        async fn an_unpinned_estimate_prices_the_call_at_the_finalized_head() {
+            let info = (Compact(1u64), Compact(2u64), 0u8, 3u128).encode();
+            let chain = FakeChain::new().with_runtime_api(QUERY_CALL_INFO, info);
+
+            let estimate = offline_client(&chain)
+                .fees()
+                .estimate("Staking", "chill", vec![])
+                .await
+                .unwrap();
+            assert_eq!(estimate.partial_fee, 3);
+            // Read-only: there is no signer to ask the runtime about.
+            assert_eq!((estimate.signer, estimate.payer), (None, None));
+
+            let requests = chain.exchanges();
+            let methods: Vec<&str> = requests.iter().map(|r| r.method.as_str()).collect();
+            assert_eq!(methods, ["chain_getFinalizedHead", "state_call"]);
+            assert_eq!(requests[1].params[0], json!(QUERY_CALL_INFO));
+            assert_eq!(requests[1].params[2], json!(hex0x(&FAKE_HEAD)));
+        }
+
+        #[tokio::test]
+        async fn a_call_the_runtime_does_not_have_is_refused_before_anything_is_asked() {
+            let chain = FakeChain::new();
+
+            let err = offline_client(&chain)
+                .fees()
+                .estimate("Staking", "chil", vec![])
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(&err, SdkError::Chain { target, .. } if target == "Staking.chil"),
+                "{err:?}"
+            );
+            assert!(chain.exchanges().is_empty());
+        }
+
+        #[tokio::test]
+        async fn an_account_nobody_funded_reads_as_absent_not_as_an_error() {
+            let chain = FakeChain::new();
+            let balance = offline_client(&chain)
+                .accounts()
+                .balance(ALICE)
+                .await
+                .unwrap();
+            assert!(!balance.exists);
+            assert_eq!(balance.total, 0);
+        }
     }
 
     #[test]
