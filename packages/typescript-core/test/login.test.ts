@@ -27,11 +27,15 @@ import {
   oidcSigner,
   openLogin,
   prepareLoginRegistration,
+  prepareLoginRotation,
   registerLogin,
+  rotateLogin,
   signingPayload,
   substrateSigner,
   verifyPlaintextProof,
   LOGIN_FIRST_GENERATION,
+  LOGIN_FOR_RUNTIME_API,
+  LOGIN_PREVIOUS_FOR_RUNTIME_API,
   type AttestLoginRequest,
   type AttestLoginResponse,
   type CommitteeNode,
@@ -366,6 +370,8 @@ const attestors = (answers: Record<string, Answer>) => ({
 const endpoints = (n: number) => Array.from({ length: n }, (_, i) => ({ endpoint: `http://node-${i + 1}` }));
 const refusal = (status: number, kind: LoginError["kind"]) =>
   new LoginError(kind, `attest-login ${status} from a node`, { status });
+/** Ask the nodes in the order they are listed, so a test knows who is asked first. */
+const AS_LISTED = { order: (count: number) => Array.from({ length: count }, (_, i) => i) };
 
 describe("collectLoginAttestations", () => {
   it("returns threshold attestations from distinct nodes", async () => {
@@ -374,11 +380,51 @@ describe("collectLoginAttestations", () => {
       "http://node-2": attestation(2),
       "http://node-3": attestation(3),
     });
-    const got = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2);
+    const got = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2, AS_LISTED);
     expect(got).toHaveLength(2);
     expect(new Set(got.map((a) => toHex(a.nodeAccount))).size).toBe(2);
     expect(got[0]!.signature).toEqual(new Uint8Array(64).fill(0xee));
-    expect(transport.asked).toHaveLength(3);
+  });
+
+  // A sign-in token names the person (Google's carries their email address),
+  // and every node asked reads it. A registration needs a threshold of
+  // signatures, so a threshold of nodes is all that is asked.
+  it("asks only a threshold of nodes while they all sign", async () => {
+    const transport = attestors({
+      "http://node-1": attestation(1),
+      "http://node-2": attestation(2),
+      "http://node-3": attestation(3),
+      "http://node-4": attestation(4),
+      "http://node-5": attestation(5),
+    });
+    const got = await collectLoginAttestations(transport, endpoints(5), ATTEST_REQUEST, 3, AS_LISTED);
+    expect(got.map((a) => a.nodeAccount[0])).toEqual([1, 2, 3]);
+    expect(transport.asked).toEqual(["http://node-1", "http://node-2", "http://node-3"]);
+  });
+
+  it("asks one more node for each that does not sign, and no more", async () => {
+    const transport = attestors({
+      "http://node-1": attestation(1),
+      "http://node-2": refusal(503, "unavailable"),
+      "http://node-3": new TypeError("fetch failed"),
+      "http://node-4": attestation(4),
+      "http://node-5": attestation(5),
+    });
+    const got = await collectLoginAttestations(transport, endpoints(5), ATTEST_REQUEST, 2, AS_LISTED);
+    expect(got.map((a) => a.nodeAccount[0])).toEqual([1, 4]);
+    expect(transport.asked).toEqual(["http://node-1", "http://node-2", "http://node-3", "http://node-4"]);
+  });
+
+  it("chooses whom to ask at random unless told", async () => {
+    const first = new Set<string>();
+    for (let run = 0; run < 80; run += 1) {
+      const transport = attestors(Object.fromEntries(endpoints(5).map(({ endpoint }, i) => [endpoint, attestation(i + 1)])));
+      await collectLoginAttestations(transport, endpoints(5), ATTEST_REQUEST, 2);
+      expect(transport.asked).toHaveLength(2);
+      transport.asked.forEach((endpoint) => first.add(endpoint));
+    }
+    // Each node is left out of one run with probability 3/5; of all eighty, never.
+    expect(first.size).toBe(5);
   });
 
   it("does not count one node account twice", async () => {
@@ -387,7 +433,7 @@ describe("collectLoginAttestations", () => {
       "http://node-2": attestation(1),
       "http://node-3": refusal(503, "unavailable"),
     });
-    const err = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2).catch((e) => e);
+    const err = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2, AS_LISTED).catch((e) => e);
     expect(err).toBeInstanceOf(LoginError);
     expect(err.kind).toBe("attestations");
     expect(err.faults).toEqual([
@@ -403,7 +449,7 @@ describe("collectLoginAttestations", () => {
       "http://node-3": new TypeError("fetch failed"),
       "http://node-4": { node_account: "0x1234", signature: "0x00", crypto_protocol_version: 2 },
     });
-    const err = await collectLoginAttestations(transport, endpoints(4), ATTEST_REQUEST, 3).catch((e) => e);
+    const err = await collectLoginAttestations(transport, endpoints(4), ATTEST_REQUEST, 3, AS_LISTED).catch((e) => e);
     expect(err.kind).toBe("attestations");
     expect(err.message).toMatch(/need 3 attestations, got 1/);
     expect(err.faults.map((f: any) => [f.endpoint, f.kind, f.status])).toEqual([
@@ -422,20 +468,20 @@ describe("collectLoginAttestations", () => {
       "http://node-2": refusal(409, "already-registered"),
       "http://node-3": never,
     });
-    const err = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2).catch((e) => e);
+    const err = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2, AS_LISTED).catch((e) => e);
     expect(err).toBeInstanceOf(LoginError);
     expect(err.kind).toBe("already-registered");
     expect(err.status).toBe(409);
   });
 
-  it("does not wait for a slow node once the threshold is met", async () => {
-    const transport = attestors({
-      "http://node-1": attestation(1),
-      "http://node-2": new Promise<AttestLoginResponse>(() => {}),
-      "http://node-3": attestation(3),
-    });
-    const got = await collectLoginAttestations(transport, endpoints(3), ATTEST_REQUEST, 2);
-    expect(got.map((a) => a.nodeAccount[0])).toEqual([1, 3]);
+  it("refuses an order that is not one of the nodes, each once", async () => {
+    const transport = attestors({ "http://node-1": attestation(1), "http://node-2": attestation(2) });
+    for (const order of [() => [0], () => [0, 0], () => [0, 2], () => [1, 0, 1]]) {
+      const err = await collectLoginAttestations(transport, endpoints(2), ATTEST_REQUEST, 1, { order }).catch((e) => e);
+      expect(err).toBeInstanceOf(LoginError);
+      expect(err.kind).toBe("invalid-input");
+    }
+    expect(transport.asked).toEqual([]);
   });
 
   it("refuses an impossible threshold without asking anyone", async () => {
@@ -517,12 +563,143 @@ describe("prepareLoginRegistration", () => {
   });
 });
 
+describe("prepareLoginRotation", () => {
+  // Any 32 bytes are a seed; this one is not the registration fixture's.
+  const seed = new Uint8Array(32).fill(0x09);
+  const account = loginAccount(seed);
+  const genesis = new Uint8Array(32).fill(0x42);
+  const jointPk = fromHex(fixture.joint_pk_hex);
+  /** The login as the chain has it: another account's, rotated twice already. */
+  const onRecord = { account: new Uint8Array(32).fill(0x33), secretId: 9n, generation: 2 };
+  const prepare = (from = onRecord) =>
+    prepareLoginRotation({
+      appId: APP_ID,
+      issuer: ISSUER,
+      subject: SUBJECT,
+      account,
+      jointPk,
+      epoch: fixture.epoch,
+      seed,
+      genesis,
+      from,
+    });
+
+  it("seals a NEW seed for a new account and asks for exactly the next generation", () => {
+    const rotation = prepare();
+    const { envelope } = rotation;
+    const identity = loginIdentity(APP_ID, ISSUER, SUBJECT);
+    const payloadHash = loginPayloadHash(envelope.bindingId, envelope.capsule, envelope.proof, envelope.ct);
+    expect(rotation.generation).toBe(3);
+    expect(bindingCommitsTo(account, envelope.bindingId)).toBe(true);
+    expect(rotation.attestationPayload).toEqual(
+      loginAttestationPayload(genesis, APP_ID, identity, account, payloadHash, 3),
+    );
+    // Never what a registration of the same account would be attested with.
+    expect(rotation.attestationPayload).not.toEqual(
+      loginAttestationPayload(genesis, APP_ID, identity, account, payloadHash, LOGIN_FIRST_GENERATION),
+    );
+    expect(rotation).toMatchObject({ appId: APP_ID, account, epoch: fixture.epoch, identity });
+  });
+
+  it("a registration is the first generation", () => {
+    const registration = prepareLoginRegistration({
+      appId: APP_ID,
+      issuer: ISSUER,
+      subject: SUBJECT,
+      account,
+      jointPk,
+      epoch: fixture.epoch,
+      seed,
+      genesis,
+    });
+    expect(registration.generation).toBe(LOGIN_FIRST_GENERATION);
+  });
+
+  it("refuses to rotate a login to the account it already has", () => {
+    const err = (() => {
+      try {
+        return prepare({ ...onRecord, account });
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(err).toBeInstanceOf(LoginError);
+    expect((err as LoginError).kind).toBe("invalid-input");
+  });
+
+  it("refuses a seed that does not control the new account", () => {
+    expect(() =>
+      prepareLoginRotation({
+        appId: APP_ID,
+        issuer: ISSUER,
+        subject: SUBJECT,
+        account: new Uint8Array(32).fill(0x77),
+        jointPk,
+        epoch: 1,
+        seed,
+        genesis,
+        from: onRecord,
+      }),
+    ).toThrow(LoginAccountMismatch);
+  });
+
+  it("says which generation it asks for, and builds the rotate_login arguments", async () => {
+    const rotation = prepare();
+    const seen: Uint8Array[] = [];
+    const req = await attestLoginRequest(rotation, { idToken: TOKEN, requester: REQUESTER, sign: fakeSign(seen) });
+    expect(req).toEqual({
+      app_id: toHex(APP_ID),
+      id_token: TOKEN,
+      account: toHex(account),
+      payload_hash: toHex(rotation.payloadHash),
+      requester: toHex(REQUESTER),
+      signature: "0x" + "5a".repeat(64),
+      generation: 3,
+    });
+    expect(seen).toEqual([rotation.attestationPayload]);
+
+    const attestations = [{ nodeAccount: new Uint8Array(32).fill(1), signature: new Uint8Array(64).fill(2) }];
+    expect(rotateLogin(rotation, attestations)).toEqual({
+      appId: APP_ID,
+      identity: rotation.identity,
+      payload: rotation.envelope,
+      epoch: fixture.epoch,
+      attestations: [[attestations[0]!.nodeAccount, attestations[0]!.signature]],
+    });
+  });
+
+  it("a 409 for a rotation is a rotation conflict, never 'already registered'", async () => {
+    const never = new Promise<AttestLoginResponse>(() => {});
+    const transport = attestors({
+      "http://node-1": never,
+      "http://node-2": refusal(409, "already-registered"),
+      "http://node-3": never,
+    });
+    const err = await collectLoginAttestations(
+      transport,
+      endpoints(3),
+      { ...ATTEST_REQUEST, generation: 1 },
+      2,
+      AS_LISTED,
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(LoginError);
+    expect(err.kind).toBe("rotation-conflict");
+    expect(err.status).toBe(409);
+  });
+});
+
 describe("the login record read", () => {
   const identity = new Uint8Array(32).fill(0x1d);
   const account = new Uint8Array(32).fill(0x33);
 
   it("frames the LoginsApi_login_for argument", () => {
     expect(loginForArgs(APP_ID, identity)).toBe("0x" + "a1".repeat(32) + "1d".repeat(32));
+  });
+
+  it("names the two reads as the runtime does", () => {
+    expect(LOGIN_FOR_RUNTIME_API).toBe("LoginsApi_login_for");
+    // Same arguments, same answer: the account the login left at its last rotation.
+    expect(LOGIN_PREVIOUS_FOR_RUNTIME_API).toBe("LoginsApi_previous_login_for");
   });
 
   it("decodes Some(record) and None", () => {

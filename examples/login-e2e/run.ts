@@ -161,6 +161,13 @@ async function main(): Promise<void> {
     await sudo(api, alice, api.tx.logins.setIssuer!(toHex(appId), issuer.iss, [AUDIENCE], issuer.jwksUri));
     step("app registered", toHex(appId));
 
+    // From runtime spec 336 a network registers no login while it would
+    // still store a COPY of a sealed secret under another account. An
+    // operator's switch, off on a fresh dev chain: read it, never assume.
+    const copiesRefused = (await stateCall(api, "SecretsApi_owner_binding_enforced"))[0] === 1;
+    if (!copiesRefused) await sudo(api, alice, api.tx.secrets!.setOwnerBindingEnforced!(true));
+    step("copies of a sealed secret are refused", copiesRefused ? "already" : "switched on");
+
     const jointPk = optionBytes(api, await stateCall(api, "KgcApi_joint_pk"));
     if (!jointPk?.length) throw new Error("KGC DKG not finalised on chain (joint_pk is None)");
     const epoch = (api.registry.createType("u32", await stateCall(api, "KgcApi_dkg_epoch")) as any).toNumber();

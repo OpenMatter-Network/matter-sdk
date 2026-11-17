@@ -15,6 +15,12 @@ export interface AttestLoginRequest {
   requester: string;
   /** `requester`'s 64-byte sr25519 signature over the attestation payload. */
   signature: string;
+  /**
+   * The generation the login will be at once this lands. Absent for a first
+   * registration — the body every node understands; set for a rotation, where
+   * it is one more than the login's generation on chain.
+   */
+  generation?: number;
 }
 
 /** `POST /attest-login` response body. */
@@ -30,6 +36,9 @@ export interface AttestLoginResponse {
  * Distinct login failure causes, so callers branch on `.kind`, never on text.
  *
  * - `already-registered`: the identity has a login (HTTP 409). Sign in instead.
+ * - `rotation-conflict`: a rotation was refused with HTTP 409 — the login is
+ *   not one generation before the one asked for (it has rotated since), or it
+ *   already resolves to this account. Read the record again.
  * - `token-refused`: a node refused the sign-in token or the request signature
  *   (401/403). Another node will say the same; get a new token.
  * - `rate-limited`: 429. Back off.
@@ -47,6 +56,7 @@ export interface AttestLoginResponse {
  */
 export type LoginErrorKind =
   | "already-registered"
+  | "rotation-conflict"
   | "token-refused"
   | "rate-limited"
   | "unavailable"
